@@ -207,7 +207,20 @@ fn open_add(ui: &AppWindow, app: &App, url: &str) {
     ui.set_add_open(true);
 }
 
+/// On Windows prefer the Skia renderer: the software renderer's partial presentation
+/// can leave regions of the window unpainted (desktop shows through).
+fn select_renderer() {
+    #[cfg(windows)]
+    if std::env::var_os("SLINT_BACKEND").is_none() {
+        let skia = slint::BackendSelector::new().backend_name("winit".into()).renderer_name("skia".into()).select();
+        if skia.is_err() {
+            let _ = slint::BackendSelector::new().backend_name("winit".into()).renderer_name("software".into()).select();
+        }
+    }
+}
+
 fn main() -> Result<(), slint::PlatformError> {
+    select_renderer();
     let mgr = Manager::new(&state_dir());
     let settings = mgr.settings();
     // URLs on the command line are queued right away (e.g. from a browser or script).

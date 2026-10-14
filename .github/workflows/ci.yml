@@ -37,6 +37,15 @@ jobs:
           B=target/release/dlx
           $B --version
           $B --help >/dev/null
+      - name: GUI screenshot (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/win-screenshot.ps1
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && always()
+        with:
+          name: windows-gui-screenshot
+          path: win-screenshot.png
       - name: Build Windows installer (Inno Setup)
         if: runner.os == 'Windows'
         shell: pwsh

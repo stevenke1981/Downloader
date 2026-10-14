@@ -1,6 +1,6 @@
 [package]
 name = "downloader"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 
@@ -11,6 +11,11 @@ rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
 arboard = { version = "3", default-features = false }
 sys-locale = "0.3"
 dirs = "6"
+
+# Windows: the software renderer's partial (damage-region) presentation via softbuffer
+# leaves parts of the window unpainted/transparent on some systems, so use Skia there.
+[target.'cfg(windows)'.dependencies]
+slint = { version = "1.18.1", default-features = false, features = ["renderer-skia"] }
 
 [build-dependencies]
 slint-build = "1.18.1"
