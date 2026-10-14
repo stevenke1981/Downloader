@@ -1,0 +1,220 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: fr\n"
+
+msgid "Active"
+msgstr "Actifs"
+
+msgid "Add"
+msgstr "Ajouter"
+
+msgid "Add download"
+msgstr "Ajouter un téléchargement"
+
+msgid "All downloads"
+msgstr "Tous"
+
+msgid "Also delete the file from disk"
+msgstr "Supprimer aussi le fichier du disque"
+
+msgid "Apply"
+msgstr "Appliquer"
+
+msgid "Archives"
+msgstr "Archives"
+
+msgid "Browse…"
+msgstr "Parcourir…"
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Categories"
+msgstr "Catégories"
+
+msgid "Checksum (MD5 / SHA-256, optional)"
+msgstr "Somme de contrôle (MD5 / SHA-256, facultatif)"
+
+msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
+msgstr "La somme doit comporter 32 (MD5) ou 64 (SHA-256) caractères hexadécimaux."
+
+msgid "Completed"
+msgstr "Terminés"
+
+msgid "Connections"
+msgstr "Connexions"
+
+msgid "Connections per download"
+msgstr "Connexions par téléchargement"
+
+msgid "Default folder for the file type"
+msgstr "Dossier par défaut selon le type"
+
+msgid "Default limit per download (KB/s)"
+msgstr "Limite par défaut par téléchargement (Ko/s)"
+
+msgid "Delete"
+msgstr "Supprimer"
+
+msgid "Delete download"
+msgstr "Supprimer le téléchargement"
+
+msgid "Documents"
+msgstr "Documents"
+
+msgid "Download folder"
+msgstr "Dossier de téléchargement"
+
+msgid "Downloading"
+msgstr "En cours"
+
+msgid "Error"
+msgstr "Erreur"
+
+msgid "Global speed limit (KB/s, 0 = unlimited)"
+msgstr "Limite globale (Ko/s, 0 = illimité)"
+
+msgid "High"
+msgstr "Haute"
+
+msgid "Images"
+msgstr "Images"
+
+msgid "Language"
+msgstr "Langue"
+
+msgid "Low"
+msgstr "Basse"
+
+msgid "Max simultaneous downloads"
+msgstr "Téléchargements simultanés max."
+
+msgid "Music"
+msgstr "Musique"
+
+msgid "Name"
+msgstr "Nom"
+
+msgid "No"
+msgstr "Non"
+
+msgid "No downloads yet. Click \"Add\" or copy a link."
+msgstr "Aucun téléchargement. Cliquez sur « Ajouter » ou copiez un lien."
+
+msgid "Normal"
+msgstr "Normale"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Only download between"
+msgstr "Télécharger uniquement entre"
+
+msgid "Open folder"
+msgstr "Ouvrir le dossier"
+
+msgid "Other"
+msgstr "Autres"
+
+msgid "Pause"
+msgstr "Suspendre"
+
+msgid "Pause all"
+msgstr "Tout suspendre"
+
+msgid "Paused"
+msgstr "Suspendu"
+
+msgid "Please enter a valid http(s) URL."
+msgstr "Veuillez saisir une URL http(s) valide."
+
+msgid "Please enter valid numbers and times (HH:MM)."
+msgstr "Veuillez saisir des nombres et heures valides (HH:MM)."
+
+msgid "Priority"
+msgstr "Priorité"
+
+msgid "Programs"
+msgstr "Programmes"
+
+msgid "Progress"
+msgstr "Progression"
+
+msgid "Proxy"
+msgstr "Proxy"
+
+msgid "Queued"
+msgstr "En file d'attente"
+
+msgid "Remove the selected download from the list?"
+msgstr "Retirer le téléchargement sélectionné de la liste ?"
+
+msgid "Resume support"
+msgstr "Reprise possible"
+
+msgid "Retries"
+msgstr "Tentatives"
+
+msgid "Save to"
+msgstr "Enregistrer dans"
+
+msgid "Saved to"
+msgstr "Enregistré dans"
+
+msgid "Segments"
+msgstr "Segments"
+
+msgid "Settings"
+msgstr "Paramètres"
+
+msgid "Size"
+msgstr "Taille"
+
+msgid "Sort into category sub-folders (Video, Music, …)"
+msgstr "Ranger par sous-dossiers de catégorie (Vidéo, Musique…)"
+
+msgid "Speed"
+msgstr "Vitesse"
+
+msgid "Speed limit (KB/s, 0 = unlimited)"
+msgstr "Limite (Ko/s, 0 = illimité)"
+
+msgid "Start"
+msgstr "Démarrer"
+
+msgid "Start all"
+msgstr "Tout démarrer"
+
+msgid "Start immediately"
+msgstr "Démarrer immédiatement"
+
+msgid "Status"
+msgstr "État"
+
+msgid "System default"
+msgstr "Langue du système"
+
+msgid "Time left"
+msgstr "Restant"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "Unknown"
+msgstr "Inconnu"
+
+msgid "Verifying"
+msgstr "Vérification"
+
+msgid "Video"
+msgstr "Vidéo"
+
+msgid "Watch the clipboard for download links"
+msgstr "Surveiller le presse-papiers pour les liens"
+
+msgid "Yes"
+msgstr "Oui"
+
+msgid "{0} downloads, {1} active"
+msgstr "{0} téléchargements, {1} actifs"

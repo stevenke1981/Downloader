@@ -1,0 +1,220 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: es\n"
+
+msgid "Active"
+msgstr "Activas"
+
+msgid "Add"
+msgstr "Añadir"
+
+msgid "Add download"
+msgstr "Añadir descarga"
+
+msgid "All downloads"
+msgstr "Todas"
+
+msgid "Also delete the file from disk"
+msgstr "Eliminar también el archivo del disco"
+
+msgid "Apply"
+msgstr "Aplicar"
+
+msgid "Archives"
+msgstr "Comprimidos"
+
+msgid "Browse…"
+msgstr "Examinar…"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Categories"
+msgstr "Categorías"
+
+msgid "Checksum (MD5 / SHA-256, optional)"
+msgstr "Suma de verificación (MD5 / SHA-256, opcional)"
+
+msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
+msgstr "La suma debe tener 32 (MD5) o 64 (SHA-256) caracteres hexadecimales."
+
+msgid "Completed"
+msgstr "Completadas"
+
+msgid "Connections"
+msgstr "Conexiones"
+
+msgid "Connections per download"
+msgstr "Conexiones por descarga"
+
+msgid "Default folder for the file type"
+msgstr "Carpeta predeterminada según el tipo"
+
+msgid "Default limit per download (KB/s)"
+msgstr "Límite predeterminado por descarga (KB/s)"
+
+msgid "Delete"
+msgstr "Eliminar"
+
+msgid "Delete download"
+msgstr "Eliminar descarga"
+
+msgid "Documents"
+msgstr "Documentos"
+
+msgid "Download folder"
+msgstr "Carpeta de descargas"
+
+msgid "Downloading"
+msgstr "Descargando"
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Global speed limit (KB/s, 0 = unlimited)"
+msgstr "Límite global (KB/s, 0 = sin límite)"
+
+msgid "High"
+msgstr "Alta"
+
+msgid "Images"
+msgstr "Imágenes"
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "Low"
+msgstr "Baja"
+
+msgid "Max simultaneous downloads"
+msgstr "Descargas simultáneas máximas"
+
+msgid "Music"
+msgstr "Música"
+
+msgid "Name"
+msgstr "Nombre"
+
+msgid "No"
+msgstr "No"
+
+msgid "No downloads yet. Click \"Add\" or copy a link."
+msgstr "Aún no hay descargas. Pulsa \"Añadir\" o copia un enlace."
+
+msgid "Normal"
+msgstr "Normal"
+
+msgid "OK"
+msgstr "Aceptar"
+
+msgid "Only download between"
+msgstr "Descargar solo entre"
+
+msgid "Open folder"
+msgstr "Abrir carpeta"
+
+msgid "Other"
+msgstr "Otros"
+
+msgid "Pause"
+msgstr "Pausar"
+
+msgid "Pause all"
+msgstr "Pausar todo"
+
+msgid "Paused"
+msgstr "En pausa"
+
+msgid "Please enter a valid http(s) URL."
+msgstr "Introduce una URL http(s) válida."
+
+msgid "Please enter valid numbers and times (HH:MM)."
+msgstr "Introduce números y horas válidos (HH:MM)."
+
+msgid "Priority"
+msgstr "Prioridad"
+
+msgid "Programs"
+msgstr "Programas"
+
+msgid "Progress"
+msgstr "Progreso"
+
+msgid "Proxy"
+msgstr "Proxy"
+
+msgid "Queued"
+msgstr "En cola"
+
+msgid "Remove the selected download from the list?"
+msgstr "¿Quitar la descarga seleccionada de la lista?"
+
+msgid "Resume support"
+msgstr "Reanudable"
+
+msgid "Retries"
+msgstr "Reintentos"
+
+msgid "Save to"
+msgstr "Guardar en"
+
+msgid "Saved to"
+msgstr "Guardado en"
+
+msgid "Segments"
+msgstr "Segmentos"
+
+msgid "Settings"
+msgstr "Ajustes"
+
+msgid "Size"
+msgstr "Tamaño"
+
+msgid "Sort into category sub-folders (Video, Music, …)"
+msgstr "Ordenar en subcarpetas por categoría (Vídeo, Música…)"
+
+msgid "Speed"
+msgstr "Velocidad"
+
+msgid "Speed limit (KB/s, 0 = unlimited)"
+msgstr "Límite (KB/s, 0 = sin límite)"
+
+msgid "Start"
+msgstr "Iniciar"
+
+msgid "Start all"
+msgstr "Iniciar todo"
+
+msgid "Start immediately"
+msgstr "Iniciar ahora"
+
+msgid "Status"
+msgstr "Estado"
+
+msgid "System default"
+msgstr "Predeterminado del sistema"
+
+msgid "Time left"
+msgstr "Restante"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "Unknown"
+msgstr "Desconocido"
+
+msgid "Verifying"
+msgstr "Verificando"
+
+msgid "Video"
+msgstr "Vídeo"
+
+msgid "Watch the clipboard for download links"
+msgstr "Vigilar el portapapeles en busca de enlaces"
+
+msgid "Yes"
+msgstr "Sí"
+
+msgid "{0} downloads, {1} active"
+msgstr "{0} descargas, {1} activas"

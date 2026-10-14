@@ -1,0 +1,220 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: ja\n"
+
+msgid "Active"
+msgstr "アクティブ"
+
+msgid "Add"
+msgstr "追加"
+
+msgid "Add download"
+msgstr "ダウンロードを追加"
+
+msgid "All downloads"
+msgstr "すべて"
+
+msgid "Also delete the file from disk"
+msgstr "ディスクからファイルも削除する"
+
+msgid "Apply"
+msgstr "適用"
+
+msgid "Archives"
+msgstr "圧縮ファイル"
+
+msgid "Browse…"
+msgstr "参照…"
+
+msgid "Cancel"
+msgstr "キャンセル"
+
+msgid "Categories"
+msgstr "カテゴリ"
+
+msgid "Checksum (MD5 / SHA-256, optional)"
+msgstr "チェックサム（MD5 / SHA-256、任意）"
+
+msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
+msgstr "チェックサムは 32 文字（MD5）または 64 文字（SHA-256）の16進数で入力してください。"
+
+msgid "Completed"
+msgstr "完了"
+
+msgid "Connections"
+msgstr "接続数"
+
+msgid "Connections per download"
+msgstr "ダウンロードごとの接続数"
+
+msgid "Default folder for the file type"
+msgstr "ファイル種類ごとの既定フォルダー"
+
+msgid "Default limit per download (KB/s)"
+msgstr "ダウンロードごとの既定の制限（KB/s）"
+
+msgid "Delete"
+msgstr "削除"
+
+msgid "Delete download"
+msgstr "ダウンロードを削除"
+
+msgid "Documents"
+msgstr "ドキュメント"
+
+msgid "Download folder"
+msgstr "ダウンロードフォルダー"
+
+msgid "Downloading"
+msgstr "ダウンロード中"
+
+msgid "Error"
+msgstr "エラー"
+
+msgid "Global speed limit (KB/s, 0 = unlimited)"
+msgstr "全体の速度制限（KB/s、0 = 無制限）"
+
+msgid "High"
+msgstr "高"
+
+msgid "Images"
+msgstr "画像"
+
+msgid "Language"
+msgstr "言語"
+
+msgid "Low"
+msgstr "低"
+
+msgid "Max simultaneous downloads"
+msgstr "同時ダウンロード数"
+
+msgid "Music"
+msgstr "音楽"
+
+msgid "Name"
+msgstr "名前"
+
+msgid "No"
+msgstr "いいえ"
+
+msgid "No downloads yet. Click \"Add\" or copy a link."
+msgstr "ダウンロードはまだありません。「追加」を押すかリンクをコピーしてください。"
+
+msgid "Normal"
+msgstr "標準"
+
+msgid "OK"
+msgstr "OK"
+
+msgid "Only download between"
+msgstr "次の時間帯のみダウンロード"
+
+msgid "Open folder"
+msgstr "フォルダーを開く"
+
+msgid "Other"
+msgstr "その他"
+
+msgid "Pause"
+msgstr "一時停止"
+
+msgid "Pause all"
+msgstr "すべて一時停止"
+
+msgid "Paused"
+msgstr "一時停止中"
+
+msgid "Please enter a valid http(s) URL."
+msgstr "有効な http(s) URL を入力してください。"
+
+msgid "Please enter valid numbers and times (HH:MM)."
+msgstr "正しい数値と時刻（HH:MM）を入力してください。"
+
+msgid "Priority"
+msgstr "優先度"
+
+msgid "Programs"
+msgstr "プログラム"
+
+msgid "Progress"
+msgstr "進行状況"
+
+msgid "Proxy"
+msgstr "プロキシ"
+
+msgid "Queued"
+msgstr "待機中"
+
+msgid "Remove the selected download from the list?"
+msgstr "選択したダウンロードを一覧から削除しますか？"
+
+msgid "Resume support"
+msgstr "レジューム対応"
+
+msgid "Retries"
+msgstr "再試行回数"
+
+msgid "Save to"
+msgstr "保存先"
+
+msgid "Saved to"
+msgstr "保存先"
+
+msgid "Segments"
+msgstr "セグメント"
+
+msgid "Settings"
+msgstr "設定"
+
+msgid "Size"
+msgstr "サイズ"
+
+msgid "Sort into category sub-folders (Video, Music, …)"
+msgstr "カテゴリ別のサブフォルダーに保存（動画、音楽…）"
+
+msgid "Speed"
+msgstr "速度"
+
+msgid "Speed limit (KB/s, 0 = unlimited)"
+msgstr "速度制限（KB/s、0 = 無制限）"
+
+msgid "Start"
+msgstr "開始"
+
+msgid "Start all"
+msgstr "すべて開始"
+
+msgid "Start immediately"
+msgstr "すぐに開始"
+
+msgid "Status"
+msgstr "状態"
+
+msgid "System default"
+msgstr "システムに従う"
+
+msgid "Time left"
+msgstr "残り時間"
+
+msgid "URL"
+msgstr "URL"
+
+msgid "Unknown"
+msgstr "不明"
+
+msgid "Verifying"
+msgstr "検証中"
+
+msgid "Video"
+msgstr "動画"
+
+msgid "Watch the clipboard for download links"
+msgstr "クリップボードのダウンロードリンクを監視"
+
+msgid "Yes"
+msgstr "はい"
+
+msgid "{0} downloads, {1} active"
+msgstr "ダウンロード {0} 件、実行中 {1} 件"

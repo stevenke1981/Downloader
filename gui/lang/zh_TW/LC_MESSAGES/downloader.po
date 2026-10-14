@@ -1,0 +1,220 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: zh_TW\n"
+
+msgid "Active"
+msgstr "進行中"
+
+msgid "Add"
+msgstr "新增"
+
+msgid "Add download"
+msgstr "新增下載"
+
+msgid "All downloads"
+msgstr "全部下載"
+
+msgid "Also delete the file from disk"
+msgstr "同時從磁碟刪除檔案"
+
+msgid "Apply"
+msgstr "套用"
+
+msgid "Archives"
+msgstr "壓縮檔"
+
+msgid "Browse…"
+msgstr "瀏覽…"
+
+msgid "Cancel"
+msgstr "取消"
+
+msgid "Categories"
+msgstr "分類"
+
+msgid "Checksum (MD5 / SHA-256, optional)"
+msgstr "校驗碼（MD5 / SHA-256，選填）"
+
+msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
+msgstr "校驗碼必須是 32（MD5）或 64（SHA-256）個十六進位字元。"
+
+msgid "Completed"
+msgstr "已完成"
+
+msgid "Connections"
+msgstr "連線數"
+
+msgid "Connections per download"
+msgstr "每個下載的連線數"
+
+msgid "Default folder for the file type"
+msgstr "依檔案類型的預設資料夾"
+
+msgid "Default limit per download (KB/s)"
+msgstr "每個下載的預設限速（KB/s）"
+
+msgid "Delete"
+msgstr "刪除"
+
+msgid "Delete download"
+msgstr "刪除下載"
+
+msgid "Documents"
+msgstr "文件"
+
+msgid "Download folder"
+msgstr "下載資料夾"
+
+msgid "Downloading"
+msgstr "下載中"
+
+msgid "Error"
+msgstr "錯誤"
+
+msgid "Global speed limit (KB/s, 0 = unlimited)"
+msgstr "全域限速（KB/s，0 = 不限）"
+
+msgid "High"
+msgstr "高"
+
+msgid "Images"
+msgstr "圖片"
+
+msgid "Language"
+msgstr "語言"
+
+msgid "Low"
+msgstr "低"
+
+msgid "Max simultaneous downloads"
+msgstr "同時下載數上限"
+
+msgid "Music"
+msgstr "音樂"
+
+msgid "Name"
+msgstr "名稱"
+
+msgid "No"
+msgstr "否"
+
+msgid "No downloads yet. Click \"Add\" or copy a link."
+msgstr "還沒有下載。按「新增」或複製一個連結。"
+
+msgid "Normal"
+msgstr "一般"
+
+msgid "OK"
+msgstr "確定"
+
+msgid "Only download between"
+msgstr "只在此時段下載"
+
+msgid "Open folder"
+msgstr "開啟資料夾"
+
+msgid "Other"
+msgstr "其他"
+
+msgid "Pause"
+msgstr "暫停"
+
+msgid "Pause all"
+msgstr "全部暫停"
+
+msgid "Paused"
+msgstr "已暫停"
+
+msgid "Please enter a valid http(s) URL."
+msgstr "請輸入有效的 http(s) 網址。"
+
+msgid "Please enter valid numbers and times (HH:MM)."
+msgstr "請輸入有效的數字和時間（HH:MM）。"
+
+msgid "Priority"
+msgstr "優先順序"
+
+msgid "Programs"
+msgstr "程式"
+
+msgid "Progress"
+msgstr "進度"
+
+msgid "Proxy"
+msgstr "代理伺服器"
+
+msgid "Queued"
+msgstr "排隊中"
+
+msgid "Remove the selected download from the list?"
+msgstr "要從清單中移除選取的下載嗎？"
+
+msgid "Resume support"
+msgstr "支援續傳"
+
+msgid "Retries"
+msgstr "重試次數"
+
+msgid "Save to"
+msgstr "儲存到"
+
+msgid "Saved to"
+msgstr "儲存位置"
+
+msgid "Segments"
+msgstr "分段"
+
+msgid "Settings"
+msgstr "設定"
+
+msgid "Size"
+msgstr "大小"
+
+msgid "Sort into category sub-folders (Video, Music, …)"
+msgstr "依分類存到子資料夾（影片、音樂…）"
+
+msgid "Speed"
+msgstr "速度"
+
+msgid "Speed limit (KB/s, 0 = unlimited)"
+msgstr "限速（KB/s，0 = 不限）"
+
+msgid "Start"
+msgstr "開始"
+
+msgid "Start all"
+msgstr "全部開始"
+
+msgid "Start immediately"
+msgstr "立即開始"
+
+msgid "Status"
+msgstr "狀態"
+
+msgid "System default"
+msgstr "跟隨系統"
+
+msgid "Time left"
+msgstr "剩餘時間"
+
+msgid "URL"
+msgstr "網址"
+
+msgid "Unknown"
+msgstr "未知"
+
+msgid "Verifying"
+msgstr "驗證中"
+
+msgid "Video"
+msgstr "影片"
+
+msgid "Watch the clipboard for download links"
+msgstr "監看剪貼簿中的下載連結"
+
+msgid "Yes"
+msgstr "是"
+
+msgid "{0} downloads, {1} active"
+msgstr "共 {0} 個下載，{1} 個進行中"
