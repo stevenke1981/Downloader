@@ -4,6 +4,8 @@
 
 ## 已完成
 
+- Windows CI 曾在既有 `manager_queue_and_persistence` 測試發現排程使用舊的同時下載數量設定。已將設定更新與排程放入同一臨界區；最終來源及重新驗證結果以 Release 的 BUILDINFO 為準。
+
 - 獨立程式碼審查：最後一輪未發現 P1／P2 問題。
 - Windows 5900X：`cargo test --release --locked -j 2`，38 項測試通過。
 - `cargo clippy --release --locked --workspace --all-targets -j 2` 通過；核心與既有 fixture 仍有樣式警告，GUI 正式程式碼無警告。

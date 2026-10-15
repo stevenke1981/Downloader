@@ -30,7 +30,7 @@ jobs:
       - name: Format GUI
         run: cargo fmt -p downloader --check
       - name: Lint
-        run: cargo clippy --workspace --all-targets --locked
+        run: cargo clippy --release --workspace --all-targets --locked
       - name: Build (release)
         run: cargo build --release --locked
       - name: Test
