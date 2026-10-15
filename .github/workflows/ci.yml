@@ -49,7 +49,31 @@ jobs:
         if: runner.os == 'Windows' && always()
         with:
           name: windows-gui-screenshot
-          path: win-screenshot.png
+          path: |
+            win-screenshot.png
+            win-screenshot.json
+      - name: Small-window layout fixtures (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $build = cargo test --release --locked -p downloader --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot locate GUI test executable' }
+          $testExe = $build | ForEach-Object { $_ | ConvertFrom-Json } |
+            Where-Object { $_.reason -eq 'compiler-artifact' -and $_.profile.test -and $_.target.name -eq 'downloader' } |
+            Select-Object -ExpandProperty executable -Last 1
+          if (!$testExe) { throw 'GUI test executable missing' }
+          foreach ($scene in @('details', 'settings')) {
+            $env:DOWNLOADER_UI_FIXTURE = $scene
+            ./scripts/win-screenshot.ps1 -Exe $testExe -Out "win-layout-$scene.png" -Arguments @('--exact', 'lifecycle_tests::render_layout_fixture', '--ignored', '--nocapture')
+          }
+          Remove-Item Env:DOWNLOADER_UI_FIXTURE
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && always()
+        with:
+          name: windows-small-window-layout
+          path: |
+            win-layout-*.png
+            win-layout-*.json
       - name: Build Windows installer (Inno Setup)
         if: runner.os == 'Windows'
         shell: pwsh

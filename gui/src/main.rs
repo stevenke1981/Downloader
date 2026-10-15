@@ -9,10 +9,33 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
+mod window_placement;
 
 slint::include_modules!();
 mod reveal;
 mod tray;
+
+fn schedule_initial_placement(_ui: &AppWindow) {
+    #[cfg(windows)]
+    {
+        // Slint creates the native window after entering the event loop. Waiting
+        // for that window avoids silently skipping placement before HWND exists.
+        let weak = _ui.as_weak();
+        if let Err(error) = slint::spawn_local(async move {
+            if let Some(ui) = weak.upgrade() {
+                match ui.window().winit_window().await {
+                    Ok(native) => {
+                        drop(native);
+                        window_placement::fit_initial_window(ui.window());
+                    }
+                    Err(error) => eprintln!("Cannot position initial window: {error}"),
+                }
+            }
+        }) {
+            eprintln!("Cannot schedule initial window placement: {error}");
+        }
+    }
+}
 
 fn restore_main(ui: &AppWindow, compact: &CompactWindow) {
     if ui.show().is_ok() {
@@ -813,6 +836,7 @@ fn main() -> Result<(), slint::PlatformError> {
     });
 
     ui.show()?;
+    schedule_initial_placement(&ui);
     let result = slint::run_event_loop_until_quit();
     drop(timer);
     let _ = std::fs::remove_file(dlcore::ipc::endpoint_path(&state_dir()));
@@ -830,6 +854,94 @@ mod fixture_server;
 #[cfg(test)]
 mod lifecycle_tests {
     use super::*;
+    // Runs only when explicitly selected by the isolated CI screenshot script.
+    // It renders the real AppWindow with synthetic data, without a Manager,
+    // clipboard, private history, download, or simulated native mouse input.
+    #[test]
+    #[ignore = "native rendering fixture for isolated Windows CI screenshots"]
+    fn render_layout_fixture() {
+        assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
+        let scene = std::env::var("DOWNLOADER_UI_FIXTURE").unwrap();
+        assert!(matches!(scene.as_str(), "details" | "settings"));
+        select_renderer();
+        let ui = AppWindow::new().unwrap();
+        apply_lang("zh_TW");
+        set_languages_model(&ui);
+        ui.set_tray_available(true);
+        ui.set_has_selection(true);
+        ui.set_d_name("自製測試資料 fixture with spaces.txt".into());
+        ui.set_d_path("C:\\fixture\\自製測試資料 fixture with spaces.txt".into());
+        ui.set_d_url("http://127.0.0.1/fixture.txt".into());
+        ui.set_d_size("256 KiB".into());
+        ui.set_d_conns("4".into());
+        ui.set_d_resume("Yes".into());
+        ui.set_d_verify(1);
+        ui.set_d_algo("SHA-256".into());
+        ui.set_d_expected("0123456789abcdef".repeat(4).into());
+        ui.set_d_actual("0123456789abcdef".repeat(4).into());
+        ui.set_d_limit("0".into());
+        ui.set_total_speed("0 B/s".into());
+        ui.set_status_line("1 個下載，0 個進行中（自製測試資料）".into());
+        ui.set_rows(ModelRc::new(VecModel::from(vec![Row {
+            name: "自製測試資料 fixture with spaces.txt".into(),
+            size: "256 KiB".into(),
+            progress: 1.0,
+            progress_text: "100%".into(),
+            status: 4,
+            selected: true,
+            verify: 1,
+            ..Default::default()
+        }])));
+        ui.set_set_open(scene == "settings");
+        ui.window().set_size(slint::LogicalSize::new(760.0, 480.0));
+        ui.show().unwrap();
+        schedule_initial_placement(&ui);
+        // Bound the fixture lifetime even if the screenshot helper fails.
+        slint::Timer::single_shot(Duration::from_secs(30), || {
+            let _ = slint::quit_event_loop();
+        });
+        slint::run_event_loop_until_quit().unwrap();
+    }
+
+    #[test]
+    fn important_controls_remain_inside_small_client_sizes() {
+        use i_slint_backend_testing::ElementHandle;
+        use std::cell::Cell;
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = AppWindow::new().unwrap();
+        apply_lang("en");
+        ui.set_tray_available(true);
+        ui.set_has_selection(true);
+        ui.set_d_name("A long fixture filename with spaces and Unicode 測試.txt".into());
+        let compact_calls = Rc::new(Cell::new(0));
+        let calls = compact_calls.clone();
+        ui.on_compact_clicked(move || calls.set(calls.get() + 1));
+        ui.show().unwrap();
+        for (width, height) in [(760.0, 480.0), (960.0, 640.0), (1280.0, 800.0)] {
+            ui.window().set_size(slint::LogicalSize::new(width, height));
+            for label in ["Compact window", "Minimize to tray", "Exit", "Open folder"] {
+                let control = ElementHandle::find_by_accessible_label(&ui, label)
+                    .next()
+                    .unwrap_or_else(|| panic!("missing control {label}"));
+                let p = control.absolute_position();
+                let s = control.size();
+                assert!(s.width > 0.0 && s.height > 0.0, "empty control {label}");
+                assert!(
+                    p.x >= 0.0
+                        && p.y >= 0.0
+                        && p.x + s.width <= width + 0.5
+                        && p.y + s.height <= height + 0.5,
+                    "{label} at {p:?} size {s:?} outside {width}x{height}"
+                );
+            }
+            ElementHandle::find_by_accessible_label(&ui, "Compact window")
+                .next()
+                .unwrap()
+                .mock_single_click(slint::platform::PointerEventButton::Left);
+        }
+        assert_eq!(compact_calls.get(), 3);
+    }
+
     #[test]
     fn exit_protects_queued_downloading_and_verifying() {
         for s in [Status::Queued, Status::Downloading, Status::Verifying] {
