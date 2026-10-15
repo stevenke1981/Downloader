@@ -12,6 +12,9 @@ export struct Row {
     status: int,
     category: int,
     selected: bool,
+    // -1 off, 0 verifying, 1 verified, 2 failed, 3 no checksum, 4 not verified
+    verify: int,
+    verify-progress: float,
 }
 
 export struct SegBar {
@@ -38,10 +41,18 @@ export global Tr {
         if (c == 5) { return @tr("Images"); }
         return @tr("Other");
     }
+    pure public function verify(v: int, p: float) -> string {
+        if (v == 0) { return @tr("Verifying") + " " + round(p * 100) + "%"; }
+        if (v == 1) { return "✓ " + @tr("Verified"); }
+        if (v == 2) { return "✗ " + @tr("Verification failed"); }
+        if (v == 3) { return @tr("No checksum"); }
+        if (v == 4) { return @tr("Not verified"); }
+        return "";
+    }
     pure public function yes-no(b: bool) -> string { return b ? @tr("Yes") : @tr("No"); }
     pure public function status-line(total: int, active: int) -> string { return @tr("{0} downloads, {1} active", total, active); }
     pure public function invalid-url() -> string { return @tr("Please enter a valid http(s) URL."); }
-    pure public function invalid-checksum() -> string { return @tr("Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."); }
+    pure public function invalid-checksum() -> string { return @tr("Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."); }
     pure public function invalid-number() -> string { return @tr("Please enter valid numbers and times (HH:MM)."); }
     pure public function system-default() -> string { return @tr("System default"); }
     pure public function unknown() -> string { return @tr("Unknown"); }
@@ -190,6 +201,14 @@ export component AppWindow inherits Window {
     in property <string> d-conns;
     in property <string> d-error;
     in property <[SegBar]> d-segs;
+    in property <int> d-verify: -1;
+    in property <float> d-verify-progress;
+    in property <string> d-algo;
+    in property <string> d-expected;
+    in property <string> d-actual;
+    in property <string> d-source;
+    in property <string> d-signature;
+    in property <string> d-verify-note;
     in-out property <string> d-limit;
     in-out property <int> d-priority: 1;
 
@@ -222,6 +241,7 @@ export component AppWindow inherits Window {
     in-out property <string> s-start;
     in-out property <string> s-stop;
     in-out property <bool> s-clip;
+    in-out property <bool> s-verify: true;
     in-out property <string> s-error;
 
     callback add-clicked();
@@ -309,6 +329,7 @@ export component AppWindow inherits Window {
                         HeaderCell { text: @tr("Speed"); width: 86px; }
                         HeaderCell { text: @tr("Time left"); width: 70px; }
                         HeaderCell { text: @tr("Status"); width: 90px; }
+                        HeaderCell { text: @tr("Integrity"); width: 110px; }
                     }
                     Rectangle { y: parent.height - 1px; height: 1px; background: #e3e6ea; }
                 }
@@ -354,6 +375,14 @@ export component AppWindow inherits Window {
                                     vertical-alignment: center;
                                     color: r.status == 5 ? #d32f2f : r.status == 4 ? #2e7d32 : #444;
                                 }
+                                Text {
+                                    text: Tr.verify(r.verify, r.verify-progress);
+                                    width: 110px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                    font-size: 12px;
+                                    color: r.verify == 1 ? #2e7d32 : r.verify == 2 ? #d32f2f : #6b7785;
+                                }
                             }
                         }
                     }
@@ -368,7 +397,7 @@ export component AppWindow inherits Window {
                 // ---------- details ----------
                 Rectangle { height: 1px; background: #e3e6ea; }
                 Rectangle {
-                    height: root.has-selection ? 206px : 0px;
+                    height: root.has-selection ? 300px : 0px;
                     visible: root.has-selection;
                     background: #fbfcfd;
                     VerticalLayout {
@@ -391,6 +420,20 @@ export component AppWindow inherits Window {
                             Text { text: @tr("Resume support") + ": " + root.d-resume; font-size: 12px; color: #444; }
                             Text { text: root.d-error; font-size: 12px; color: #d32f2f; overflow: elide; horizontal-stretch: 1; }
                         }
+                        if root.d-verify >= 0: HorizontalLayout {
+                            spacing: 12px;
+                            Text {
+                                text: Tr.verify(root.d-verify, root.d-verify-progress);
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: root.d-verify == 1 ? #2e7d32 : root.d-verify == 2 ? #d32f2f : #444;
+                            }
+                            Text { text: root.d-algo; font-size: 12px; color: #444; }
+                            Text { text: root.d-source == "" ? "" : @tr("Source") + ": " + root.d-source; font-size: 12px; color: #607080; overflow: elide; horizontal-stretch: 1; }
+                        }
+                        if root.d-expected != "": Text { text: @tr("Expected") + ": " + root.d-expected; font-size: 11px; color: #444; overflow: elide; font-family: "monospace"; }
+                        if root.d-actual != "": Text { text: @tr("Actual") + ":   " + root.d-actual; font-size: 11px; color: root.d-verify == 2 ? #d32f2f : #444; overflow: elide; font-family: "monospace"; }
+                        if root.d-signature != "": Text { text: @tr("Signature available (not verified)") + ": " + root.d-signature; font-size: 11px; color: #607080; overflow: elide; }
                         Text { text: @tr("Segments"); font-size: 11px; color: #8a96a3; }
                         // per-segment progress map
                         Rectangle {
@@ -439,7 +482,7 @@ export component AppWindow inherits Window {
             Button { text: @tr("Browse…"); clicked => { root.add-folder = root.browse(0); } }
         }
         Field { label: @tr("Connections"); SpinBox { value <=> root.add-conns; minimum: 1; maximum: 32; } Rectangle { horizontal-stretch: 1; } }
-        Field { label: @tr("Checksum (MD5 / SHA-256, optional)"); LineEdit { text <=> root.add-checksum; horizontal-stretch: 1; } }
+        Field { label: @tr("Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"); LineEdit { text <=> root.add-checksum; horizontal-stretch: 1; } }
         CheckBox { text: @tr("Start immediately"); checked <=> root.add-start; }
         if root.add-error != "": Text { text: root.add-error; color: #d32f2f; wrap: word-wrap; }
         HorizontalLayout {
@@ -490,6 +533,7 @@ export component AppWindow inherits Window {
             Text { text: "(HH:MM)"; vertical-alignment: center; color: #888; }
         }
         CheckBox { text: @tr("Watch the clipboard for download links"); checked <=> root.s-clip; }
+        CheckBox { text: @tr("Verify downloads automatically (look for checksum files)"); checked <=> root.s-verify; }
         if root.s-error != "": Text { text: root.s-error; color: #d32f2f; wrap: word-wrap; }
         HorizontalLayout {
             alignment: end;

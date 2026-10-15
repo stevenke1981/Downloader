@@ -6,6 +6,9 @@ msgstr ""
 msgid "Active"
 msgstr "アクティブ"
 
+msgid "Actual"
+msgstr "実際"
+
 msgid "Add"
 msgstr "追加"
 
@@ -33,11 +36,11 @@ msgstr "キャンセル"
 msgid "Categories"
 msgstr "カテゴリ"
 
-msgid "Checksum (MD5 / SHA-256, optional)"
-msgstr "チェックサム（MD5 / SHA-256、任意）"
+msgid "Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
+msgstr "チェックサム（MD5 / SHA-1 / SHA-256 / SHA-512、任意）"
 
-msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
-msgstr "チェックサムは 32 文字（MD5）または 64 文字（SHA-256）の16進数で入力してください。"
+msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
+msgstr "チェックサムは 32・40・64・128 文字の16進数で入力してください（BLAKE2b は b2: を付ける）。"
 
 msgid "Completed"
 msgstr "完了"
@@ -72,6 +75,9 @@ msgstr "ダウンロード中"
 msgid "Error"
 msgstr "エラー"
 
+msgid "Expected"
+msgstr "期待値"
+
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "全体の速度制限（KB/s、0 = 無制限）"
 
@@ -80,6 +86,9 @@ msgstr "高"
 
 msgid "Images"
 msgstr "画像"
+
+msgid "Integrity"
+msgstr "整合性"
 
 msgid "Language"
 msgstr "言語"
@@ -99,11 +108,17 @@ msgstr "名前"
 msgid "No"
 msgstr "いいえ"
 
+msgid "No checksum"
+msgstr "チェックサムなし"
+
 msgid "No downloads yet. Click \"Add\" or copy a link."
 msgstr "ダウンロードはまだありません。「追加」を押すかリンクをコピーしてください。"
 
 msgid "Normal"
 msgstr "標準"
+
+msgid "Not verified"
+msgstr "未検証"
 
 msgid "OK"
 msgstr "OK"
@@ -168,11 +183,17 @@ msgstr "セグメント"
 msgid "Settings"
 msgstr "設定"
 
+msgid "Signature available (not verified)"
+msgstr "署名あり（未検証）"
+
 msgid "Size"
 msgstr "サイズ"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "カテゴリ別のサブフォルダーに保存（動画、音楽…）"
+
+msgid "Source"
+msgstr "取得元"
 
 msgid "Speed"
 msgstr "速度"
@@ -203,6 +224,15 @@ msgstr "URL"
 
 msgid "Unknown"
 msgstr "不明"
+
+msgid "Verification failed"
+msgstr "検証失敗"
+
+msgid "Verified"
+msgstr "検証済み"
+
+msgid "Verify downloads automatically (look for checksum files)"
+msgstr "ダウンロードを自動検証（チェックサムファイルを探す）"
 
 msgid "Verifying"
 msgstr "検証中"

@@ -13,6 +13,7 @@ fn ctx(limit: u64) -> Ctx {
         local: Arc::new(RateLimiter::new(limit)),
         retries: 2,
         cancel: CancellationToken::new(),
+        verify: false,
     }
 }
 
@@ -140,7 +141,7 @@ async fn checksum_verification() {
     use sha2::Digest;
     let good = hex::encode(sha2::Sha256::digest(&data));
     let t = task(s.url("ok.bin"), dir.path(), 2);
-    t.lock().unwrap().checksum = Some(Checksum { algo: Algo::Sha256, expected: good });
+    t.lock().unwrap().checksum = Some(Checksum { algo: Algo::Sha256, expected: good, source: "user".into() });
     assert_eq!(engine::run(t, ctx(0)).await.unwrap(), Outcome::Completed);
 
     let md5 = hex::encode(md5::Md5::digest(&data));
@@ -149,9 +150,9 @@ async fn checksum_verification() {
     assert_eq!(engine::run(t, ctx(0)).await.unwrap(), Outcome::Completed);
 
     let t = task(s.url("bad.bin"), dir.path(), 2);
-    t.lock().unwrap().checksum = Some(Checksum { algo: Algo::Md5, expected: "0".repeat(32) });
+    t.lock().unwrap().checksum = Some(Checksum { algo: Algo::Md5, expected: "0".repeat(32), source: "user".into() });
     let e = engine::run(t, ctx(0)).await.unwrap_err();
-    assert!(e.contains("checksum mismatch"), "{e}");
+    assert!(e.contains("verification failed"), "{e}");
 }
 
 #[tokio::test]
@@ -229,4 +230,132 @@ async fn multi_connection_beats_single_connection_on_capped_server() {
     let speedup = times[0] / times[1];
     println!("1 connection: {:.2}s, 8 connections: {:.2}s, speedup {speedup:.1}x", times[0], times[1]);
     assert!(speedup > 3.0, "speedup only {speedup:.1}x");
+}
+
+// ---------------- verification ----------------
+fn vctx() -> Ctx {
+    Ctx { verify: true, ..ctx(0) }
+}
+fn sha256(d: &[u8]) -> String {
+    use sha2::Digest;
+    hex::encode(sha2::Sha256::digest(d))
+}
+fn state(t: &Arc<Mutex<Task>>) -> dlcore::Verification {
+    t.lock().unwrap().verification.clone().expect("verification recorded")
+}
+
+#[tokio::test]
+async fn verify_with_sidecar_file() {
+    let data = server::test_data(700_000);
+    let s = server::start(data.clone(), true, 0).await;
+    s.extra.lock().unwrap().insert("tool.tar.zst.sha256".into(), format!("{}\n", sha256(&data)).into_bytes());
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("tool.tar.zst"), dir.path(), 4);
+    assert_eq!(engine::run(t.clone(), vctx()).await.unwrap(), Outcome::Completed);
+    let v = state(&t);
+    assert_eq!(v.state, dlcore::VerifyState::Verified);
+    assert_eq!(v.algo, Some(Algo::Sha256));
+    assert!(v.source.ends_with("tool.tar.zst.sha256"), "{}", v.source);
+}
+
+#[tokio::test]
+async fn verify_with_gnu_sums_list() {
+    let data = server::test_data(500_000);
+    let s = server::start(data.clone(), true, 0).await;
+    use blake2::Digest;
+    let b2 = hex::encode(blake2::Blake2b512::digest(&data));
+    s.extra.lock().unwrap().insert(
+        "b2sums.txt".into(),
+        format!("{}  other.iso\n{b2} *arch-x86_64.iso\n", "0".repeat(128)).into_bytes(),
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("arch-x86_64.iso"), dir.path(), 4);
+    assert_eq!(engine::run(t.clone(), vctx()).await.unwrap(), Outcome::Completed);
+    let v = state(&t);
+    assert_eq!(v.state, dlcore::VerifyState::Verified);
+    assert_eq!(v.algo, Some(Algo::Blake2b));
+}
+
+#[tokio::test]
+async fn verify_with_bsd_sums_list_and_signature() {
+    let data = server::test_data(400_000);
+    let s = server::start(data.clone(), true, 0).await;
+    use sha2::Digest;
+    let h = hex::encode(sha2::Sha512::digest(&data));
+    s.extra.lock().unwrap().insert("SHA512SUMS".into(), format!("SHA512 (pkg.zip) = {h}\n").into_bytes());
+    s.extra.lock().unwrap().insert("pkg.zip.sig".into(), b"\x89\x02\x33fake".to_vec());
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("pkg.zip"), dir.path(), 2);
+    assert_eq!(engine::run(t.clone(), vctx()).await.unwrap(), Outcome::Completed);
+    let v = state(&t);
+    assert_eq!(v.state, dlcore::VerifyState::Verified);
+    assert_eq!(v.algo, Some(Algo::Sha512));
+    assert!(v.signature.unwrap().ends_with("pkg.zip.sig"));
+}
+
+#[tokio::test]
+async fn verify_with_digest_header() {
+    let data = server::test_data(300_000);
+    let s = server::start(data.clone(), true, 0).await;
+    use base64::Engine;
+    use sha2::Digest;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(sha2::Sha256::digest(&data));
+    s.headers.lock().unwrap().push(("Repr-Digest".into(), format!("sha-256=:{b64}:")));
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("blob.bin"), dir.path(), 2);
+    assert_eq!(engine::run(t.clone(), vctx()).await.unwrap(), Outcome::Completed);
+    let v = state(&t);
+    assert_eq!(v.state, dlcore::VerifyState::Verified);
+    assert_eq!(v.source, "header: repr-digest");
+}
+
+#[tokio::test]
+async fn mismatch_triggers_one_full_redownload_then_succeeds() {
+    let data = server::test_data(600_000);
+    let s = server::start(data.clone(), true, 0).await;
+    s.extra.lock().unwrap().insert("f.bin.sha256".into(), sha256(&data).into_bytes());
+    s.corrupt.store(1, Ordering::SeqCst); // first data response is corrupted
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("f.bin"), dir.path(), 1);
+    assert_eq!(engine::run(t.clone(), vctx()).await.unwrap(), Outcome::Completed);
+    assert_eq!(state(&t).state, dlcore::VerifyState::Verified);
+    assert!(t.lock().unwrap().verify_retried);
+    assert_eq!(s.data_requests.load(Ordering::SeqCst), 2, "downloaded twice");
+    assert!(std::fs::read(dir.path().join("f.bin")).unwrap() == data);
+}
+
+#[tokio::test]
+async fn persistent_mismatch_fails_after_one_retry() {
+    let data = server::test_data(300_000);
+    let s = server::start(data.clone(), true, 0).await;
+    s.extra.lock().unwrap().insert("SHA256SUMS".into(), format!("{}  bad.bin\n", "1".repeat(64)).into_bytes());
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("bad.bin"), dir.path(), 1);
+    let e = engine::run(t.clone(), vctx()).await.unwrap_err();
+    assert!(e.contains("verification failed"), "{e}");
+    assert_eq!(state(&t).state, dlcore::VerifyState::Failed);
+    assert_eq!(s.data_requests.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn no_checksum_available() {
+    let data = server::test_data(200_000);
+    let s = server::start(data.clone(), true, 0).await;
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("plain.dat"), dir.path(), 2);
+    assert_eq!(engine::run(t.clone(), vctx()).await.unwrap(), Outcome::Completed);
+    let v = state(&t);
+    assert_eq!(v.state, dlcore::VerifyState::NoChecksum);
+    assert!(v.signature.is_none());
+}
+
+#[tokio::test]
+async fn md5_etag_is_advisory() {
+    let data = server::test_data(100_000);
+    let s = server::start(data.clone(), true, 0).await;
+    *s.etag.lock().unwrap() = format!("\"{}\"", "a".repeat(32)); // not the real MD5
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("e.bin"), dir.path(), 2);
+    assert_eq!(engine::run(t.clone(), vctx()).await.unwrap(), Outcome::Completed);
+    assert_eq!(state(&t).state, dlcore::VerifyState::Unverified);
 }

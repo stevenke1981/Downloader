@@ -22,8 +22,13 @@ struct Args {
     /// Speed limit, e.g. 500K, 2M (0 = unlimited)
     #[arg(short = 'l', long, default_value = "0")]
     limit: String,
-    /// Expected MD5 or SHA-256 hex digest (algorithm detected by length)
-    #[arg(long)]
+    /// Integrity check: "auto" (find checksum files / headers next to the download),
+    /// "off", or an expected hex digest (MD5, SHA-1, SHA-256, SHA-512 detected by length;
+    /// prefix "b2:" for BLAKE2b-512)
+    #[arg(long, default_value = "auto")]
+    verify: String,
+    /// Same as --verify <hash>
+    #[arg(long, hide = true)]
     checksum: Option<String>,
     /// Proxy URL (http://, https://, socks5://)
     #[arg(long, default_value = "")]
@@ -49,12 +54,16 @@ async fn main() {
         eprintln!("invalid --limit");
         std::process::exit(2)
     });
-    let checksum = a.checksum.as_deref().map(|c| {
-        Checksum::guess(c).unwrap_or_else(|| {
-            eprintln!("--checksum must be a 32 (MD5) or 64 (SHA-256) hex digest");
+    let v = a.checksum.clone().unwrap_or_else(|| a.verify.clone());
+    let auto_verify = v != "off";
+    let checksum = if v == "auto" || v == "off" {
+        None
+    } else {
+        Some(Checksum::guess(&v).unwrap_or_else(|| {
+            eprintln!("--verify must be auto, off, or a 32/40/64/128-character hex digest");
             std::process::exit(2)
-        })
-    });
+        }))
+    };
     let settings = Settings { proxy: a.proxy.clone(), ..Default::default() };
     let client = settings.build_client().unwrap_or_else(|e| {
         eprintln!("{e}");
@@ -82,6 +91,7 @@ async fn main() {
             connections: a.connections.clamp(1, 32),
             checksum: checksum.clone(),
             status: Status::Downloading,
+            verify_retried: false,
             ..task
         }));
         if resumed > 0 && !a.quiet {
@@ -93,6 +103,7 @@ async fn main() {
             local: Arc::new(RateLimiter::new(limit)),
             retries: a.retries,
             cancel: cancel.clone(),
+            verify: auto_verify,
         };
         let start = Instant::now();
         let job = tokio::spawn(engine::run(task.clone(), ctx));
@@ -128,6 +139,9 @@ async fn main() {
         match r {
             Ok(Outcome::Completed) => {
                 let _ = std::fs::remove_file(&sp);
+                if !a.quiet {
+                    report_verification(&t);
+                }
                 let el = start.elapsed().as_secs_f64();
                 println!(
                     "{}  {} in {:.2}s ({}/s)",
@@ -143,6 +157,9 @@ async fn main() {
                 std::process::exit(130);
             }
             Err(e) => {
+                if !a.quiet {
+                    report_verification(&t);
+                }
                 if t.resumable {
                     let _ = std::fs::write(&sp, serde_json::to_vec(&t).unwrap());
                 }
@@ -152,4 +169,20 @@ async fn main() {
         }
     }
     std::process::exit(code);
+}
+
+fn report_verification(t: &Task) {
+    use dlcore::VerifyState::*;
+    let Some(v) = &t.verification else { return };
+    let algo = v.algo.map(|a| a.name()).unwrap_or("");
+    match v.state {
+        Verified => eprintln!("verified: {algo} {} (from {})", v.actual, v.source),
+        Failed => eprintln!("VERIFICATION FAILED: {algo} expected {} got {} (from {})", v.expected, v.actual, v.source),
+        NoChecksum => eprintln!("no checksum found; integrity not verified (size check passed)"),
+        Unverified => eprintln!("not verified: {}", v.note),
+        Verifying => {}
+    }
+    if let Some(s) = &v.signature {
+        eprintln!("signature available: {s} (not verified)");
+    }
 }

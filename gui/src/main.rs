@@ -128,6 +128,18 @@ fn open_in_file_manager(path: &Path) {
     let _ = r;
 }
 
+fn verify_index(s: &Snapshot) -> i32 {
+    use dlcore::VerifyState::*;
+    match s.verification.as_ref().map(|v| v.state) {
+        Some(Verifying) => 0,
+        Some(Verified) => 1,
+        Some(Failed) => 2,
+        Some(NoChecksum) => 3,
+        Some(Unverified) => 4,
+        None => -1,
+    }
+}
+
 fn refresh(ui: &AppWindow, app: &mut App) {
     let snaps = app.mgr().snapshots();
     let tr = ui.global::<Tr>();
@@ -167,6 +179,8 @@ fn refresh(ui: &AppWindow, app: &mut App) {
                 status: s.status.index(),
                 category: s.category.index(),
                 selected: Some(s.id) == app.selected,
+                verify: verify_index(s),
+                verify_progress: s.verify_progress,
             }
         })
         .collect();
@@ -208,6 +222,15 @@ fn refresh(ui: &AppWindow, app: &mut App) {
             vec![SegBar { x: 0.0, w: 1.0, done: if s.status == Status::Completed { 1.0 } else { 0.0 } }]
         };
         ui.set_d_segs(ModelRc::new(VecModel::from(segs)));
+        let v = s.verification.clone().unwrap_or_default();
+        ui.set_d_verify(verify_index(s));
+        ui.set_d_verify_progress(s.verify_progress);
+        ui.set_d_algo(v.algo.map(|a| a.name()).unwrap_or("").into());
+        ui.set_d_expected(v.expected.into());
+        ui.set_d_actual(v.actual.into());
+        ui.set_d_source(v.source.into());
+        ui.set_d_signature(v.signature.unwrap_or_default().into());
+        ui.set_d_verify_note(v.note.into());
         if app.detail_for != Some(s.id) {
             app.detail_for = Some(s.id);
             ui.set_d_limit(kbs(s.speed_limit).into());
@@ -309,6 +332,8 @@ fn main() -> Result<(), slint::PlatformError> {
                             url: d.url,
                             referer: d.referrer,
                             file_name: d.filename,
+                            checksum_urls: d.checksum_urls,
+                            checksum: d.checksum.as_deref().and_then(dlcore::Checksum::guess),
                             start: true,
                             ..Default::default()
                         });
@@ -452,6 +477,7 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.set_s_start(s.schedule.start.clone().into());
         ui.set_s_stop(s.schedule.stop.clone().into());
         ui.set_s_clip(s.watch_clipboard);
+        ui.set_s_verify(s.auto_verify);
         ui.set_s_error("".into());
         ui.set_set_open(true);
     });
@@ -469,6 +495,7 @@ fn main() -> Result<(), slint::PlatformError> {
         s.schedule.start = ui.get_s_start().trim().to_string();
         s.schedule.stop = ui.get_s_stop().trim().to_string();
         s.watch_clipboard = ui.get_s_clip();
+        s.auto_verify = ui.get_s_verify();
         let (g, p) = (parse_kbs(&ui.get_s_global()), parse_kbs(&ui.get_s_perdl()));
         let tr = ui.global::<Tr>();
         let (Some(g), Some(p)) = (g, p) else { ui.set_s_error(tr.invoke_invalid_number()); return; };

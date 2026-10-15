@@ -45,7 +45,7 @@ fn ipc_add_and_token_check() {
     })
     .unwrap();
     assert!(ipc::endpoint_path(dir.path()).exists());
-    let req = AddRequest { url: "https://x.org/f.iso".into(), referrer: Some("https://x.org/".into()), filename: Some("f.iso".into()) };
+    let req = AddRequest { url: "https://x.org/f.iso".into(), referrer: Some("https://x.org/".into()), filename: Some("f.iso".into()), ..Default::default() };
     let r = ipc::send_to_app(dir.path(), Command::Add { downloads: vec![req.clone()] }).unwrap();
     assert!(r.ok);
     assert_eq!(got.lock().unwrap().as_slice(), &[req]);

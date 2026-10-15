@@ -6,6 +6,9 @@ msgstr ""
 msgid "Active"
 msgstr "진행 중"
 
+msgid "Actual"
+msgstr "실제"
+
 msgid "Add"
 msgstr "추가"
 
@@ -33,11 +36,11 @@ msgstr "취소"
 msgid "Categories"
 msgstr "분류"
 
-msgid "Checksum (MD5 / SHA-256, optional)"
-msgstr "체크섬 (MD5 / SHA-256, 선택)"
+msgid "Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
+msgstr "체크섬 (MD5 / SHA-1 / SHA-256 / SHA-512, 선택)"
 
-msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
-msgstr "체크섬은 32자(MD5) 또는 64자(SHA-256) 16진수여야 합니다."
+msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
+msgstr "체크섬은 32, 40, 64, 128자 16진수여야 합니다 (BLAKE2b는 b2: 접두사)."
 
 msgid "Completed"
 msgstr "완료"
@@ -72,6 +75,9 @@ msgstr "다운로드 중"
 msgid "Error"
 msgstr "오류"
 
+msgid "Expected"
+msgstr "예상"
+
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "전체 속도 제한 (KB/s, 0 = 무제한)"
 
@@ -80,6 +86,9 @@ msgstr "높음"
 
 msgid "Images"
 msgstr "이미지"
+
+msgid "Integrity"
+msgstr "무결성"
 
 msgid "Language"
 msgstr "언어"
@@ -99,11 +108,17 @@ msgstr "이름"
 msgid "No"
 msgstr "아니요"
 
+msgid "No checksum"
+msgstr "체크섬 없음"
+
 msgid "No downloads yet. Click \"Add\" or copy a link."
 msgstr "아직 다운로드가 없습니다. \"추가\"를 누르거나 링크를 복사하세요."
 
 msgid "Normal"
 msgstr "보통"
+
+msgid "Not verified"
+msgstr "검증 안 됨"
 
 msgid "OK"
 msgstr "확인"
@@ -168,11 +183,17 @@ msgstr "세그먼트"
 msgid "Settings"
 msgstr "설정"
 
+msgid "Signature available (not verified)"
+msgstr "서명 있음 (검증 안 함)"
+
 msgid "Size"
 msgstr "크기"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "분류별 하위 폴더에 저장 (동영상, 음악…)"
+
+msgid "Source"
+msgstr "출처"
 
 msgid "Speed"
 msgstr "속도"
@@ -203,6 +224,15 @@ msgstr "URL"
 
 msgid "Unknown"
 msgstr "알 수 없음"
+
+msgid "Verification failed"
+msgstr "검증 실패"
+
+msgid "Verified"
+msgstr "검증됨"
+
+msgid "Verify downloads automatically (look for checksum files)"
+msgstr "다운로드 자동 검증 (체크섬 파일 찾기)"
 
 msgid "Verifying"
 msgstr "확인 중"

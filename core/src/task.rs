@@ -71,6 +71,42 @@ pub struct Task {
     pub referer: Option<String>,
     /// File name suggested by the browser; used instead of the server's name.
     pub suggested_name: Option<String>,
+    /// URL after redirects (used to find checksum files next to it).
+    pub final_url: Option<String>,
+    /// Checksum list / sidecar URLs seen on the page (from the browser extension).
+    pub checksum_urls: Vec<String>,
+    /// Digests advertised in response headers.
+    pub header_checksums: Vec<Checksum>,
+    pub verification: Option<Verification>,
+    pub verify_retried: bool,
+    /// Bytes hashed so far while verifying (not persisted).
+    #[serde(skip)]
+    pub verify_done: std::sync::Arc<std::sync::atomic::AtomicU64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum VerifyState {
+    #[default]
+    Verifying,
+    Verified,
+    Failed,
+    /// No checksum was found.
+    NoChecksum,
+    /// A checksum was found but couldn't be relied on (e.g. ETag not an MD5).
+    Unverified,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default)]
+pub struct Verification {
+    pub state: VerifyState,
+    pub algo: Option<crate::checksum::Algo>,
+    pub expected: String,
+    pub actual: String,
+    pub source: String,
+    /// URL of a detached OpenPGP signature (.sig / .asc), if one exists.
+    pub signature: Option<String>,
+    pub note: String,
 }
 
 impl Task {

@@ -6,6 +6,9 @@ msgstr ""
 msgid "Active"
 msgstr "Aktiv"
 
+msgid "Actual"
+msgstr "Tatsächlich"
+
 msgid "Add"
 msgstr "Hinzufügen"
 
@@ -33,11 +36,11 @@ msgstr "Abbrechen"
 msgid "Categories"
 msgstr "Kategorien"
 
-msgid "Checksum (MD5 / SHA-256, optional)"
-msgstr "Prüfsumme (MD5 / SHA-256, optional)"
+msgid "Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
+msgstr "Prüfsumme (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
 
-msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
-msgstr "Die Prüfsumme muss 32 (MD5) oder 64 (SHA-256) Hex-Zeichen lang sein."
+msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
+msgstr "Die Prüfsumme muss 32, 40, 64 oder 128 Hex-Zeichen haben (Präfix b2: für BLAKE2b)."
 
 msgid "Completed"
 msgstr "Abgeschlossen"
@@ -72,6 +75,9 @@ msgstr "Lädt herunter"
 msgid "Error"
 msgstr "Fehler"
 
+msgid "Expected"
+msgstr "Erwartet"
+
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "Globales Limit (KB/s, 0 = unbegrenzt)"
 
@@ -80,6 +86,9 @@ msgstr "Hoch"
 
 msgid "Images"
 msgstr "Bilder"
+
+msgid "Integrity"
+msgstr "Integrität"
 
 msgid "Language"
 msgstr "Sprache"
@@ -99,11 +108,17 @@ msgstr "Name"
 msgid "No"
 msgstr "Nein"
 
+msgid "No checksum"
+msgstr "Keine Prüfsumme"
+
 msgid "No downloads yet. Click \"Add\" or copy a link."
 msgstr "Noch keine Downloads. Klicke auf \"Hinzufügen\" oder kopiere einen Link."
 
 msgid "Normal"
 msgstr "Normal"
+
+msgid "Not verified"
+msgstr "Nicht geprüft"
 
 msgid "OK"
 msgstr "OK"
@@ -168,11 +183,17 @@ msgstr "Segmente"
 msgid "Settings"
 msgstr "Einstellungen"
 
+msgid "Signature available (not verified)"
+msgstr "Signatur vorhanden (nicht geprüft)"
+
 msgid "Size"
 msgstr "Größe"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "In Kategorie-Unterordner sortieren (Video, Musik …)"
+
+msgid "Source"
+msgstr "Quelle"
 
 msgid "Speed"
 msgstr "Geschwindigkeit"
@@ -203,6 +224,15 @@ msgstr "URL"
 
 msgid "Unknown"
 msgstr "Unbekannt"
+
+msgid "Verification failed"
+msgstr "Prüfung fehlgeschlagen"
+
+msgid "Verified"
+msgstr "Verifiziert"
+
+msgid "Verify downloads automatically (look for checksum files)"
+msgstr "Downloads automatisch prüfen (Prüfsummendateien suchen)"
 
 msgid "Verifying"
 msgstr "Wird geprüft"

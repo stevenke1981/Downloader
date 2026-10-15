@@ -17,6 +17,21 @@ pub struct Server {
     pub max_parallel: AtomicUsize,
     active: AtomicUsize,
     pub port: u16,
+    /// Extra files served by exact name (checksum lists, sidecars...).
+    pub extra: Mutex<std::collections::HashMap<String, Vec<u8>>>,
+    /// Extra response headers for the main file (e.g. Digest).
+    pub headers: Mutex<Vec<(String, String)>>,
+    /// Flip one byte in the next N data responses of the main file.
+    pub corrupt: AtomicUsize,
+    /// Number of full/partial data requests for the main file.
+    pub data_requests: AtomicUsize,
+}
+
+fn is_meta(name: &str) -> bool {
+    let l = name.to_ascii_lowercase();
+    ["sha256", "sha512", "sha1", "md5", "b2", "sig", "asc", "sum", "sums", "sums.txt", "checksums", "checksum", "checksums.txt"]
+        .iter()
+        .any(|e| l.ends_with(&format!(".{e}")) || l == *e || l.ends_with(e))
 }
 
 pub fn test_data(n: usize) -> Vec<u8> {
@@ -55,6 +70,10 @@ pub async fn start(data: Vec<u8>, range: bool, per_conn_rate: u64) -> Arc<Server
         max_parallel: AtomicUsize::new(0),
         active: AtomicUsize::new(0),
         port,
+        extra: Default::default(),
+        headers: Default::default(),
+        corrupt: AtomicUsize::new(0),
+        data_requests: AtomicUsize::new(0),
     });
     let srv = s.clone();
     tokio::spawn(async move {
@@ -86,7 +105,18 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
             .find(|l| l.to_ascii_lowercase().starts_with(&format!("{}:", name.to_ascii_lowercase())))
             .map(|l| l[name.len() + 1..].trim().to_string())
     };
-    let data = s.data.lock().unwrap().clone();
+    let path = req.split_whitespace().nth(1).unwrap_or("/").to_string();
+    let name = path.rsplit('/').next().unwrap_or("").to_string();
+    let extra = s.extra.lock().unwrap().get(&name).cloned();
+    if let Some(body) = extra {
+        let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n", body.len());
+        sock.write_all(head.as_bytes()).await?;
+        return sock.write_all(&body).await;
+    }
+    if is_meta(&name) {
+        return sock.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+    }
+    let mut data = s.data.lock().unwrap().clone();
     let etag = s.etag.lock().unwrap().clone();
     let total = data.len() as u64;
     let mut range = None;
@@ -117,8 +147,20 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
     if range.is_some() {
         head += &format!("Content-Range: bytes {start}-{}/{total}\r\n", end - 1);
     }
+    for (k, v) in s.headers.lock().unwrap().iter() {
+        head += &format!("{k}: {v}\r\n");
+    }
     head += "\r\n";
     sock.write_all(head.as_bytes()).await?;
+    if end - start > 1 {
+        s.data_requests.fetch_add(1, Ordering::SeqCst);
+        if s.corrupt.load(Ordering::SeqCst) > 0 {
+            s.corrupt.fetch_sub(1, Ordering::SeqCst);
+            let mut d = (*data).clone();
+            d[start as usize] ^= 0xff;
+            data = Arc::new(d);
+        }
+    }
     let now = s.active.fetch_add(1, Ordering::SeqCst) + 1;
     s.max_parallel.fetch_max(now, Ordering::SeqCst);
     let t0 = std::time::Instant::now();

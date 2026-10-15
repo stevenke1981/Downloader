@@ -6,6 +6,9 @@ msgstr ""
 msgid "Active"
 msgstr "进行中"
 
+msgid "Actual"
+msgstr "实际"
+
 msgid "Add"
 msgstr "新建"
 
@@ -33,11 +36,11 @@ msgstr "取消"
 msgid "Categories"
 msgstr "分类"
 
-msgid "Checksum (MD5 / SHA-256, optional)"
-msgstr "校验码（MD5 / SHA-256，可选）"
+msgid "Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
+msgstr "校验码（MD5 / SHA-1 / SHA-256 / SHA-512，可选）"
 
-msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
-msgstr "校验码必须是 32（MD5）或 64（SHA-256）个十六进制字符。"
+msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
+msgstr "校验码必须是 32、40、64 或 128 个十六进制字符（BLAKE2b 请加 b2:）。"
 
 msgid "Completed"
 msgstr "已完成"
@@ -72,6 +75,9 @@ msgstr "下载中"
 msgid "Error"
 msgstr "错误"
 
+msgid "Expected"
+msgstr "预期"
+
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "全局限速（KB/s，0 = 不限）"
 
@@ -80,6 +86,9 @@ msgstr "高"
 
 msgid "Images"
 msgstr "图片"
+
+msgid "Integrity"
+msgstr "完整性"
 
 msgid "Language"
 msgstr "语言"
@@ -99,11 +108,17 @@ msgstr "名称"
 msgid "No"
 msgstr "否"
 
+msgid "No checksum"
+msgstr "无校验文件"
+
 msgid "No downloads yet. Click \"Add\" or copy a link."
 msgstr "还没有下载。点击“新建”或复制一个链接。"
 
 msgid "Normal"
 msgstr "普通"
+
+msgid "Not verified"
+msgstr "未校验"
 
 msgid "OK"
 msgstr "确定"
@@ -168,11 +183,17 @@ msgstr "分段"
 msgid "Settings"
 msgstr "设置"
 
+msgid "Signature available (not verified)"
+msgstr "有签名文件（未验证签名）"
+
 msgid "Size"
 msgstr "大小"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "按分类保存到子文件夹（视频、音乐…）"
+
+msgid "Source"
+msgstr "来源"
 
 msgid "Speed"
 msgstr "速度"
@@ -203,6 +224,15 @@ msgstr "网址"
 
 msgid "Unknown"
 msgstr "未知"
+
+msgid "Verification failed"
+msgstr "校验失败"
+
+msgid "Verified"
+msgstr "已校验"
+
+msgid "Verify downloads automatically (look for checksum files)"
+msgstr "自动校验下载（查找校验文件）"
 
 msgid "Verifying"
 msgstr "校验中"

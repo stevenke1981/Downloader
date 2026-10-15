@@ -10,6 +10,7 @@ pub mod manager;
 pub mod settings;
 pub mod task;
 pub mod util;
+pub mod verify;
 
 pub use category::Category;
 pub use checksum::{Algo, Checksum};
@@ -17,4 +18,4 @@ pub use engine::{Ctx, Outcome};
 pub use limiter::RateLimiter;
 pub use manager::{Manager, NewDownload, Snapshot};
 pub use settings::{Schedule, Settings};
-pub use task::{Seg, Status, Task};
+pub use task::{Seg, Status, Task, Verification, VerifyState};

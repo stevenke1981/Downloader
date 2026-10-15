@@ -67,6 +67,8 @@ pub struct Settings {
     pub proxy: String,
     pub schedule: Schedule,
     pub watch_clipboard: bool,
+    /// Look for checksum files / digest headers and verify finished downloads.
+    pub auto_verify: bool,
 }
 
 impl Default for Settings {
@@ -83,6 +85,7 @@ impl Default for Settings {
             proxy: String::new(),
             schedule: Schedule::default(),
             watch_clipboard: false,
+            auto_verify: true,
         }
     }
 }

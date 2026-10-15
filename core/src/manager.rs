@@ -58,6 +58,9 @@ pub struct Snapshot {
     pub speed_limit: u64,
     pub priority: i32,
     pub resumable: bool,
+    pub verification: Option<crate::task::Verification>,
+    /// 0..1 while hashing.
+    pub verify_progress: f32,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -75,6 +78,8 @@ pub struct NewDownload {
     pub referer: Option<String>,
     /// File name to use instead of the server's.
     pub file_name: Option<String>,
+    /// Checksum list / sidecar URLs seen on the page.
+    pub checksum_urls: Vec<String>,
 }
 
 pub struct Manager {
@@ -174,6 +179,7 @@ impl Manager {
             added: chrono::Utc::now().timestamp(),
             referer: d.referer.filter(|r| r.starts_with("http")),
             suggested_name: d.file_name,
+            checksum_urls: d.checksum_urls,
             ..Default::default()
         };
         self.inner.entries.lock().unwrap().push(Entry {
@@ -201,6 +207,7 @@ impl Manager {
             if matches!(t.status, Status::Paused | Status::Error) {
                 t.status = Status::Queued;
                 t.error = None;
+                t.verify_retried = false;
             }
         });
         self.inner.tick(0.5);
@@ -297,6 +304,8 @@ impl Manager {
                     speed_limit: t.speed_limit,
                     priority: t.priority,
                     resumable: t.resumable,
+                    verification: t.verification.clone(),
+                    verify_progress: match t.total { Some(n) if n > 0 => (t.verify_done.load(Ordering::Relaxed) as f64 / n as f64).min(1.0) as f32, _ => 0.0 },
                 }
             })
             .collect()
@@ -410,6 +419,7 @@ impl Inner {
                 local: e.limiter.clone(),
                 retries: settings.retries,
                 cancel: cancel.clone(),
+                verify: settings.auto_verify,
             };
             let task = e.task.clone();
             let me = self.clone();

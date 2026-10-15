@@ -76,6 +76,28 @@ async function allLinks(tabId) {
   return [...urls];
 }
 
+// Links on the page that look like checksum files (sha256sums.txt, x.iso.sha256, ...).
+const SUMS_RE = /(\/(sha(1|224|256|384|512)|md5|b2)sums?(\.txt)?|\/checksums?(\.txt|\.sha256)?|\.(sha1|sha256|sha512|md5|b2)(sum)?)$/i;
+async function checksumLinks(tabId) {
+  if (tabId == null || tabId < 0) return [];
+  try {
+    const res = await chrome.scripting.executeScript({
+      target: { tabId, allFrames: true },
+      func: () => [...document.querySelectorAll("a[href]")].map((a) => a.href),
+    });
+    const out = new Set();
+    for (const r of res || []) for (const u of r.result || []) if (SUMS_RE.test(u.split(/[?#]/)[0])) out.add(u.split("#")[0]);
+    return [...out].slice(0, 50);
+  } catch (_) {
+    return [];
+  }
+}
+async function tabForPage(url) {
+  if (!url) return null;
+  const tabs = await chrome.tabs.query({});
+  return tabs.find((t) => t.url === url) || tabs.find((t) => t.active && t.url && url.startsWith(t.url.split("#")[0])) || null;
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const referrer = info.pageUrl || tab?.url;
   let downloads = [];
@@ -87,6 +109,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (!urls.length) return badge("0", "#888");
     downloads = urls.map((url) => ({ url, referrer }));
   }
+  const sums = await checksumLinks(tab?.id);
+  if (sums.length) downloads = downloads.map((d) => ({ ...d, checksum_urls: sums }));
   const r = await sendToApp(downloads);
   badge(r.ok ? String(downloads.length) : "!", r.ok ? "#1e88e5" : "#d32f2f");
 });
@@ -116,7 +140,9 @@ chrome.downloads.onCreated.addListener(async (item) => {
   try { await chrome.downloads.cancel(item.id); } catch (_) {}
   try { await chrome.downloads.erase({ id: item.id }); } catch (_) {}
   const filename = item.filename ? item.filename.split(/[\\/]/).pop() : undefined;
-  const r = await sendToApp([{ url, referrer: item.referrer || undefined, filename }]);
+  const tab = await tabForPage(item.referrer).catch(() => null);
+  const checksum_urls = await checksumLinks(tab?.id);
+  const r = await sendToApp([{ url, referrer: item.referrer || undefined, filename, checksum_urls }]);
   if (r.ok) {
     badge("1", "#1e88e5");
   } else if (o.fallback) {

@@ -15,6 +15,10 @@ pub struct AddRequest {
     pub url: String,
     pub referrer: Option<String>,
     pub filename: Option<String>,
+    /// Checksum list / sidecar links found on the page.
+    pub checksum_urls: Vec<String>,
+    /// A hash the user typed (algorithm detected by length).
+    pub checksum: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

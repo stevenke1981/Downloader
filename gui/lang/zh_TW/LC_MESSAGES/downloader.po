@@ -6,6 +6,9 @@ msgstr ""
 msgid "Active"
 msgstr "進行中"
 
+msgid "Actual"
+msgstr "實際"
+
 msgid "Add"
 msgstr "新增"
 
@@ -33,11 +36,11 @@ msgstr "取消"
 msgid "Categories"
 msgstr "分類"
 
-msgid "Checksum (MD5 / SHA-256, optional)"
-msgstr "校驗碼（MD5 / SHA-256，選填）"
+msgid "Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
+msgstr "校驗碼（MD5 / SHA-1 / SHA-256 / SHA-512，選填）"
 
-msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
-msgstr "校驗碼必須是 32（MD5）或 64（SHA-256）個十六進位字元。"
+msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
+msgstr "校驗碼必須是 32、40、64 或 128 個十六進位字元（BLAKE2b 請加上 b2:）。"
 
 msgid "Completed"
 msgstr "已完成"
@@ -72,6 +75,9 @@ msgstr "下載中"
 msgid "Error"
 msgstr "錯誤"
 
+msgid "Expected"
+msgstr "預期"
+
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "全域限速（KB/s，0 = 不限）"
 
@@ -80,6 +86,9 @@ msgstr "高"
 
 msgid "Images"
 msgstr "圖片"
+
+msgid "Integrity"
+msgstr "完整性"
 
 msgid "Language"
 msgstr "語言"
@@ -99,11 +108,17 @@ msgstr "名稱"
 msgid "No"
 msgstr "否"
 
+msgid "No checksum"
+msgstr "無校驗檔"
+
 msgid "No downloads yet. Click \"Add\" or copy a link."
 msgstr "還沒有下載。按「新增」或複製一個連結。"
 
 msgid "Normal"
 msgstr "一般"
+
+msgid "Not verified"
+msgstr "未驗證"
 
 msgid "OK"
 msgstr "確定"
@@ -168,11 +183,17 @@ msgstr "分段"
 msgid "Settings"
 msgstr "設定"
 
+msgid "Signature available (not verified)"
+msgstr "有簽章檔（未驗證簽章）"
+
 msgid "Size"
 msgstr "大小"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "依分類存到子資料夾（影片、音樂…）"
+
+msgid "Source"
+msgstr "來源"
 
 msgid "Speed"
 msgstr "速度"
@@ -203,6 +224,15 @@ msgstr "網址"
 
 msgid "Unknown"
 msgstr "未知"
+
+msgid "Verification failed"
+msgstr "驗證失敗"
+
+msgid "Verified"
+msgstr "已驗證"
+
+msgid "Verify downloads automatically (look for checksum files)"
+msgstr "自動驗證下載（尋找校驗檔）"
 
 msgid "Verifying"
 msgstr "驗證中"

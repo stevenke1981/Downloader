@@ -19,7 +19,7 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 - **限速**：全域限速和每個下載各自的限速（token bucket）。
 - **排程**：只在指定時段（例如 02:00–07:00）下載，跨午夜也可以。
 - **代理伺服器**：HTTP、HTTPS、SOCKS5。
-- **校驗碼**：下載完可自動驗證 MD5 或 SHA-256。
+- **自動驗證完整性**（預設開啟，可在設定關閉）：下載完一定會檢查大小和每一段是否完整；接著在同一個遠端資料夾找校驗檔（`檔名.sha256/.sha512/.b2/.sha1/.md5`、`sha256sums.txt`、`SHA256SUMS`、`b2sums.txt`、`md5sums.txt`、`CHECKSUMS` 等，支援 GNU 和 BSD 格式），也會用伺服器的 `Digest`、`Repr-Digest`、`Content-MD5`、`x-goog-hash` 標頭；ETag 剛好是 MD5 時只當參考。支援 SHA-256、SHA-512、SHA-1、MD5、BLAKE2b-512。比對不符時自動重新下載一次，還是不符就標成「驗證失敗」。清單有「完整性」欄，詳細資料顯示演算法、預期值、實際值和來源。有 `.sig`/`.asc` 時會顯示「有簽章檔」，但目前不驗證 OpenPGP 簽章。也可以在新增下載時貼上雜湊值（依長度判斷演算法，BLAKE2b 請加 `b2:`）。
 - **分類**：依副檔名自動分成影片、音樂、壓縮檔、文件、程式、圖片、其他，可選擇存到各分類的子資料夾。
 - **介面**：工具列、側邊欄篩選（全部／進行中／已完成／分類）、下載清單（名稱、大小、進度、速度、剩餘時間、狀態）、詳細資料區（每一段的進度圖、連線數、限速、優先順序）。
 - **剪貼簿監看**（可選）：複製下載連結時自動跳出新增視窗。
@@ -80,7 +80,7 @@ Downloader is a multi-connection download accelerator and manager written in Rus
 - **Speed limits**: global and per download (token bucket).
 - **Scheduler**: only download inside a time window (e.g. 02:00–07:00, wraps midnight).
 - **Proxy**: HTTP, HTTPS and SOCKS5.
-- **Checksum verification**: MD5 or SHA-256.
+- **Automatic integrity verification** (on by default): size and segment completeness are always checked; then checksum sidecars (`<file>.sha256/.sha512/.b2/.sha1/.md5`) and lists (`sha256sums.txt`, `SHA256SUMS`, `b2sums.txt`, `md5sums.txt`, `CHECKSUMS`, ...; GNU and BSD formats) in the same remote directory, checksum links the browser extension saw on the page, and `Digest` / `Repr-Digest` / `Content-MD5` / `x-goog-hash` headers are used (an MD5-looking ETag is advisory only). SHA-256, SHA-512, SHA-1, MD5 and BLAKE2b-512. A mismatch triggers one full re-download, then the download is marked "Verification failed". `.sig`/`.asc` signatures are detected and reported but not verified. `dlx --verify auto|off|<hash>`.
 - **Categories** by file type (video, music, archives, documents, programs, images, other) with optional per-category sub-folders.
 - **GUI**: toolbar, sidebar filters, download list (name, size, progress, speed, ETA, status), details pane with a per-segment progress map, add-download and settings dialogs.
 - **Clipboard watching** (optional) opens the add dialog when you copy a link.

@@ -25,6 +25,8 @@ pub struct Ctx {
     pub local: Arc<RateLimiter>,
     pub retries: u32,
     pub cancel: CancellationToken,
+    /// Look for checksum files / headers automatically after downloading.
+    pub verify: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +43,7 @@ struct Probe {
     etag: Option<String>,
     last_modified: Option<String>,
     name: Option<String>,
+    checksums: Vec<checksum::Checksum>,
 }
 
 fn hdr(r: &reqwest::Response, h: reqwest::header::HeaderName) -> Option<String> {
@@ -64,6 +67,7 @@ async fn probe(client: &reqwest::Client, url: &str, referer: Option<&str>) -> Re
         name: hdr(&resp, CONTENT_DISPOSITION).and_then(|d| util::name_from_disposition(&d)),
         ..Default::default()
     };
+    p.checksums = checksum::from_headers(resp.headers(), st.as_u16() == 200);
     if st.as_u16() == 206 {
         p.total = hdr(&resp, CONTENT_RANGE).and_then(|c| c.rsplit('/').next().and_then(|t| t.trim().parse().ok()));
         p.range = p.total.is_some();
@@ -303,9 +307,34 @@ async fn probe_retry(ctx: &Ctx, url: &str, referer: Option<&str>) -> Result<Prob
     }
 }
 
-/// Download (or resume) `task`. Segment progress is updated in place so the caller
-/// can persist it at any time. Does not change `task.status` except to `Verifying`.
+/// Download (or resume) `task`, then verify it. Segment progress is updated in place
+/// so the caller can persist it at any time. Does not change `task.status` except to
+/// `Verifying`. On a checksum mismatch the file is downloaded again once.
 pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
+    loop {
+        if run_once(task.clone(), ctx.clone()).await? == Outcome::Cancelled {
+            return Ok(Outcome::Cancelled);
+        }
+        match crate::verify::verify_task(&task, &ctx).await {
+            Ok(()) => return Ok(Outcome::Completed),
+            Err(e) => {
+                let mut t = task.lock().unwrap();
+                if t.verify_retried {
+                    return Err(e);
+                }
+                // We only have a whole-file hash, so we can't tell which part is bad:
+                // download everything again once.
+                t.verify_retried = true;
+                let _ = std::fs::remove_file(t.final_path());
+                t.segments.clear();
+                t.total = None;
+                t.status = Status::Downloading;
+            }
+        }
+    }
+}
+
+async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     let (url, referer) = {
         let t = task.lock().unwrap();
         (t.url.clone(), t.referer.clone())
@@ -343,6 +372,8 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
             s.busy = false;
         }
         t.etag = p.etag.clone();
+        t.final_url = Some(p.url.clone());
+        t.header_checksums = p.checksums.clone();
         t.last_modified = p.last_modified.clone();
         t.resumable = p.range;
         t.error = None;
@@ -377,14 +408,30 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     if ctx.cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
     }
-    let (complete, total, final_path, sum) = {
+    let (complete, total, final_path) = {
         let t = task.lock().unwrap();
         let complete = t.segments.iter().all(Seg::done);
         let total = t.total.unwrap_or_else(|| t.downloaded());
-        (complete, total, t.final_path(), t.checksum.clone())
+        (complete, total, t.final_path())
     };
     if !complete {
         return Err(last_err.unwrap_or_else(|| "download incomplete".into()));
+    }
+    // Every byte of [0, total) must be covered by a finished segment.
+    {
+        let t = task.lock().unwrap();
+        let mut ranges: Vec<(u64, u64)> = t.segments.iter().map(|s| (s.start, s.end)).collect();
+        ranges.sort();
+        let mut covered = 0u64;
+        for (a, b) in ranges {
+            if a > covered {
+                return Err(format!("download incomplete: gap at byte {covered}"));
+            }
+            covered = covered.max(b);
+        }
+        if covered < total {
+            return Err(format!("download incomplete: {covered} of {total} bytes"));
+        }
     }
     {
         let f = std::fs::OpenOptions::new().write(true).open(&part).map_err(|e| e.to_string())?;
@@ -398,12 +445,11 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     } else {
         final_path
     };
-    std::fs::rename(&part, &final_path).map_err(|e| format!("rename failed: {e}"))?;
-    if let Some(c) = sum {
-        task.lock().unwrap().status = Status::Verifying;
-        let fp = final_path.clone();
-        tokio::task::spawn_blocking(move || checksum::verify(&fp, &c)).await.map_err(|e| e.to_string())??;
+    let len = std::fs::metadata(&part).map_err(|e| e.to_string())?.len();
+    if len != total || p.total.is_some_and(|n| n != total) {
+        return Err(format!("size mismatch: file has {len} bytes, server reported {}", p.total.unwrap_or(total)));
     }
+    std::fs::rename(&part, &final_path).map_err(|e| format!("rename failed: {e}"))?;
     Ok(Outcome::Completed)
 }
 

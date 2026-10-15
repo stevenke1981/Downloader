@@ -6,6 +6,9 @@ msgstr ""
 msgid "Active"
 msgstr "Actifs"
 
+msgid "Actual"
+msgstr "Réel"
+
 msgid "Add"
 msgstr "Ajouter"
 
@@ -33,11 +36,11 @@ msgstr "Annuler"
 msgid "Categories"
 msgstr "Catégories"
 
-msgid "Checksum (MD5 / SHA-256, optional)"
-msgstr "Somme de contrôle (MD5 / SHA-256, facultatif)"
+msgid "Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
+msgstr "Somme de contrôle (MD5 / SHA-1 / SHA-256 / SHA-512, facultatif)"
 
-msgid "Checksum must be 32 (MD5) or 64 (SHA-256) hex characters."
-msgstr "La somme doit comporter 32 (MD5) ou 64 (SHA-256) caractères hexadécimaux."
+msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
+msgstr "La somme doit comporter 32, 40, 64 ou 128 caractères hex (préfixe b2: pour BLAKE2b)."
 
 msgid "Completed"
 msgstr "Terminés"
@@ -72,6 +75,9 @@ msgstr "En cours"
 msgid "Error"
 msgstr "Erreur"
 
+msgid "Expected"
+msgstr "Attendu"
+
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "Limite globale (Ko/s, 0 = illimité)"
 
@@ -80,6 +86,9 @@ msgstr "Haute"
 
 msgid "Images"
 msgstr "Images"
+
+msgid "Integrity"
+msgstr "Intégrité"
 
 msgid "Language"
 msgstr "Langue"
@@ -99,11 +108,17 @@ msgstr "Nom"
 msgid "No"
 msgstr "Non"
 
+msgid "No checksum"
+msgstr "Pas de somme"
+
 msgid "No downloads yet. Click \"Add\" or copy a link."
 msgstr "Aucun téléchargement. Cliquez sur « Ajouter » ou copiez un lien."
 
 msgid "Normal"
 msgstr "Normale"
+
+msgid "Not verified"
+msgstr "Non vérifié"
 
 msgid "OK"
 msgstr "OK"
@@ -168,11 +183,17 @@ msgstr "Segments"
 msgid "Settings"
 msgstr "Paramètres"
 
+msgid "Signature available (not verified)"
+msgstr "Signature disponible (non vérifiée)"
+
 msgid "Size"
 msgstr "Taille"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "Ranger par sous-dossiers de catégorie (Vidéo, Musique…)"
+
+msgid "Source"
+msgstr "Source"
 
 msgid "Speed"
 msgstr "Vitesse"
@@ -203,6 +224,15 @@ msgstr "URL"
 
 msgid "Unknown"
 msgstr "Inconnu"
+
+msgid "Verification failed"
+msgstr "Échec de la vérification"
+
+msgid "Verified"
+msgstr "Vérifié"
+
+msgid "Verify downloads automatically (look for checksum files)"
+msgstr "Vérifier automatiquement (chercher les fichiers de sommes)"
 
 msgid "Verifying"
 msgstr "Vérification"
