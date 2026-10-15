@@ -1,5 +1,8 @@
 fn main() {
     let config = slint_build::CompilerConfiguration::new()
+        // Element metadata keeps geometry/accessibility regression tests available
+        // in the same release profile used for distribution and CI screenshots.
+        .with_debug_info(true)
         .with_style("fluent-light".into())
         .with_bundled_translations("lang")
         .with_default_translation_context(slint_build::DefaultTranslationContext::None);

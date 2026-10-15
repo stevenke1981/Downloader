@@ -152,11 +152,16 @@ impl Manager {
 
     pub fn set_settings(&self, s: Settings) -> Result<(), String> {
         let client = s.build_client()?;
-        *self.inner.client.lock().unwrap() = client;
-        self.inner.global.set_rate(s.global_limit);
         let _ = std::fs::create_dir_all(&self.inner.dir);
         let json = serde_json::to_vec_pretty(&s).unwrap();
-        *self.inner.settings.lock().unwrap() = s;
+        {
+            // Serialize settings changes with dispatch. A timer tick must not
+            // start queued jobs using a limit captured before this update.
+            let _dispatch = self.inner.entries.lock().unwrap();
+            *self.inner.client.lock().unwrap() = client;
+            self.inner.global.set_rate(s.global_limit);
+            *self.inner.settings.lock().unwrap() = s;
+        }
         write_atomic(&self.inner.dir.join("settings.json"), &json).map_err(|e| e.to_string())
     }
 
@@ -365,9 +370,9 @@ impl Inner {
     }
 
     fn tick(self: &Arc<Self>, dt: f64) {
+        let mut es = self.entries.lock().unwrap();
         let settings = self.settings.lock().unwrap().clone();
         let allowed = settings.schedule.allows_now();
-        let mut es = self.entries.lock().unwrap();
         // speeds + reap finished jobs
         for e in es.iter_mut() {
             let b = e.task.lock().unwrap().downloaded();
