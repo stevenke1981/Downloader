@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Intégration Downloader"
+ },
+ "extDesc": {
+  "message": "Envoie les téléchargements à l'application Downloader (multi-connexions, reprise)."
+ },
+ "menuDownload": {
+  "message": "Télécharger avec Downloader"
+ },
+ "menuLink": {
+  "message": "Télécharger le lien avec Downloader"
+ },
+ "menuImage": {
+  "message": "Télécharger l'image avec Downloader"
+ },
+ "menuMedia": {
+  "message": "Télécharger le média avec Downloader"
+ },
+ "menuPage": {
+  "message": "Télécharger la page avec Downloader"
+ },
+ "menuAllLinks": {
+  "message": "Télécharger tous les liens avec Downloader"
+ },
+ "optTitle": {
+  "message": "Options de Downloader"
+ },
+ "optIntercept": {
+  "message": "Intercepter les téléchargements du navigateur"
+ },
+ "optMinSize": {
+  "message": "Taille minimale à intercepter (Ko, 0 = toutes)"
+ },
+ "optInclude": {
+  "message": "Uniquement ces types (séparés par des virgules, vide = tous)"
+ },
+ "optExclude": {
+  "message": "Jamais ces types (séparés par des virgules)"
+ },
+ "optAlt": {
+  "message": "Maintenir Alt en cliquant pour laisser le navigateur télécharger"
+ },
+ "optFallback": {
+  "message": "Si Downloader est injoignable, laisser le navigateur télécharger"
+ },
+ "optSave": {
+  "message": "Enregistrer"
+ },
+ "optSaved": {
+  "message": "Enregistré."
+ },
+ "optCheck": {
+  "message": "Vérifier la connexion"
+ },
+ "statusOk": {
+  "message": "Connecté à Downloader $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "Downloader injoignable : $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "$X$ lien(s) envoyé(s) à Downloader",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "Aucun lien sur cette page"
+ }
+}

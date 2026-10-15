@@ -40,10 +40,37 @@ fn apply_lang(code: &str) {
 }
 
 fn state_dir() -> PathBuf {
-    if let Some(d) = std::env::var_os("DOWNLOADER_STATE_DIR") {
-        return d.into();
+    dlcore::ipc::default_state_dir()
+}
+
+/// `--register-browser` / `--unregister-browser`: native messaging host manifests.
+fn browser_flags() -> Option<i32> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.iter().any(|a| a == "--unregister-browser") {
+        dlcore::browser::unregister();
+        println!("browser integration removed");
+        return Some(0);
     }
-    dirs::config_dir().unwrap_or_else(std::env::temp_dir).join("Downloader")
+    if args.iter().any(|a| a == "--register-browser") {
+        let host = std::env::current_exe().ok().map(|p| p.with_file_name(dlcore::browser::host_exe_name()));
+        let Some(host) = host.filter(|h| h.exists()) else {
+            eprintln!("{} not found next to this program", dlcore::browser::host_exe_name());
+            return Some(1);
+        };
+        return Some(match dlcore::browser::register(&host) {
+            Ok(files) => {
+                for f in files {
+                    println!("registered {}", f.display());
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                1
+            }
+        });
+    }
+    None
 }
 
 struct App {
@@ -220,12 +247,42 @@ fn select_renderer() {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
+    if let Some(code) = browser_flags() {
+        std::process::exit(code);
+    }
+    // Single instance: if the app already runs, hand our URLs to it and quit.
+    let cli_urls: Vec<String> = std::env::args().skip(1).filter(|a| looks_like_url(a)).collect();
+    {
+        use dlcore::ipc::{AddRequest, Command};
+        let cmd = if cli_urls.is_empty() {
+            Command::Show
+        } else {
+            Command::Add { downloads: cli_urls.iter().map(|u| AddRequest { url: u.clone(), ..Default::default() }).collect() }
+        };
+        if dlcore::ipc::send_to_app(&state_dir(), cmd).is_ok_and(|r| r.ok) {
+            return Ok(());
+        }
+    }
     select_renderer();
     let mgr = Manager::new(&state_dir());
     let settings = mgr.settings();
     // URLs on the command line are queued right away (e.g. from a browser or script).
-    for a in std::env::args().skip(1).filter(|a| looks_like_url(a)) {
+    for a in cli_urls {
         mgr.add(NewDownload { url: a, start: true, ..Default::default() });
+    }
+    // Local IPC for the browser extension's native host.
+    let (ipc_tx, ipc_rx) = std::sync::mpsc::channel::<dlcore::ipc::Command>();
+    {
+        let tx = std::sync::Mutex::new(ipc_tx);
+        let r = dlcore::ipc::serve(&mgr.runtime(), &state_dir(), move |c| {
+            if !matches!(c, dlcore::ipc::Command::Ping) {
+                let _ = tx.lock().unwrap().send(c);
+            }
+            dlcore::ipc::Reply::ok()
+        });
+        if let Err(e) = r {
+            eprintln!("IPC server failed: {e}");
+        }
     }
 
     let ui = AppWindow::new()?;
@@ -245,6 +302,22 @@ fn main() -> Result<(), slint::PlatformError> {
         timer.start(slint::TimerMode::Repeated, Duration::from_millis(500), move || {
             let Some(ui) = ui_w.upgrade() else { return };
             let mut a = app.borrow_mut();
+            while let Ok(cmd) = ipc_rx.try_recv() {
+                if let dlcore::ipc::Command::Add { downloads } = cmd {
+                    for d in downloads {
+                        let id = a.mgr().add(NewDownload {
+                            url: d.url,
+                            referer: d.referrer,
+                            file_name: d.filename,
+                            start: true,
+                            ..Default::default()
+                        });
+                        a.selected = Some(id);
+                    }
+                }
+                let _ = ui.show();
+                ui.window().set_minimized(false);
+            }
             refresh(&ui, &mut a);
             ticks += 1;
             if ticks % 2 == 0 && a.mgr().settings().watch_clipboard && !ui.get_add_open() && !ui.get_set_open() {
@@ -412,6 +485,7 @@ fn main() -> Result<(), slint::PlatformError> {
 
     ui.run()?;
     drop(timer);
+    let _ = std::fs::remove_file(dlcore::ipc::endpoint_path(&state_dir()));
     if let Some(m) = app.borrow_mut().mgr.take() {
         m.shutdown();
     }

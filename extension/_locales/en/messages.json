@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Downloader integration"
+ },
+ "extDesc": {
+  "message": "Send downloads to the Downloader app (multi-connection, resumable)."
+ },
+ "menuDownload": {
+  "message": "Download with Downloader"
+ },
+ "menuLink": {
+  "message": "Download link with Downloader"
+ },
+ "menuImage": {
+  "message": "Download image with Downloader"
+ },
+ "menuMedia": {
+  "message": "Download media with Downloader"
+ },
+ "menuPage": {
+  "message": "Download page with Downloader"
+ },
+ "menuAllLinks": {
+  "message": "Download all links with Downloader"
+ },
+ "optTitle": {
+  "message": "Downloader options"
+ },
+ "optIntercept": {
+  "message": "Intercept browser downloads"
+ },
+ "optMinSize": {
+  "message": "Minimum file size to intercept (KB, 0 = any)"
+ },
+ "optInclude": {
+  "message": "Only these file types (comma separated, empty = all)"
+ },
+ "optExclude": {
+  "message": "Never these file types (comma separated)"
+ },
+ "optAlt": {
+  "message": "Hold Alt while clicking to let the browser download instead"
+ },
+ "optFallback": {
+  "message": "If the Downloader app can't be reached, let the browser download"
+ },
+ "optSave": {
+  "message": "Save"
+ },
+ "optSaved": {
+  "message": "Saved."
+ },
+ "optCheck": {
+  "message": "Check connection"
+ },
+ "statusOk": {
+  "message": "Connected to Downloader $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "Cannot reach Downloader: $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "Sent $X$ link(s) to Downloader",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "No links found on this page"
+ }
+}

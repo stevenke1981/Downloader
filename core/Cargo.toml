@@ -1,6 +1,6 @@
 [package]
 name = "downloader-core"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 
@@ -11,6 +11,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "dlx"
 path = "src/bin/dlx.rs"
+
+[[bin]]
+name = "downloader-host"
+path = "src/bin/host.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "signal", "fs"] }

@@ -1,7 +1,10 @@
 //! Download engine: segmented multi-connection HTTP(S) downloads, queue, limits, scheduler.
 pub mod category;
 pub mod checksum;
+pub mod browser;
 pub mod engine;
+pub mod ipc;
+pub mod native;
 pub mod limiter;
 pub mod manager;
 pub mod settings;

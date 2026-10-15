@@ -50,16 +50,21 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 chinesetraditional.TaskPath=將 dlx 命令列下載工具加入 PATH
 chinesetraditional.GroupIntegration=整合：
+chinesetraditional.TaskBrowser=註冊 Chrome / Edge 瀏覽器擴充功能的連線元件（Native Messaging）
+english.TaskBrowser=Register the Chrome / Edge extension connector (native messaging host)
 english.TaskPath=Add the dlx command-line downloader to PATH
 english.GroupIntegration=Integration:
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "browser"; Description: "{cm:TaskBrowser}"; GroupDescription: "{cm:GroupIntegration}"
 Name: "addtopath"; Description: "{cm:TaskPath}"; GroupDescription: "{cm:GroupIntegration}"; Flags: unchecked
 
 [Files]
 Source: "{#SrcDir}\downloader.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\dlx.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SrcDir}\downloader-host.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\extension\*"; DestDir: "{app}\extension"; Excludes: "EXTENSION_ID"; Flags: ignoreversion recursesubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 
@@ -68,7 +73,11 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
+Filename: "{app}\{#AppExe}"; Parameters: "--register-browser"; Flags: runhidden waituntilterminated; Tasks: browser; StatusMsg: "{cm:TaskBrowser}"
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+
+[UninstallRun]
+Filename: "{app}\{#AppExe}"; Parameters: "--unregister-browser"; Flags: runhidden waituntilterminated; RunOnceId: "UnregisterBrowser"
 
 [Code]
 function EnvKeyRoot: Integer;

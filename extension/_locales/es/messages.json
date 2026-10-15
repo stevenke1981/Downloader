@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Integración con Downloader"
+ },
+ "extDesc": {
+  "message": "Envía las descargas a la app Downloader (multiconexión, reanudables)."
+ },
+ "menuDownload": {
+  "message": "Descargar con Downloader"
+ },
+ "menuLink": {
+  "message": "Descargar enlace con Downloader"
+ },
+ "menuImage": {
+  "message": "Descargar imagen con Downloader"
+ },
+ "menuMedia": {
+  "message": "Descargar multimedia con Downloader"
+ },
+ "menuPage": {
+  "message": "Descargar página con Downloader"
+ },
+ "menuAllLinks": {
+  "message": "Descargar todos los enlaces con Downloader"
+ },
+ "optTitle": {
+  "message": "Opciones de Downloader"
+ },
+ "optIntercept": {
+  "message": "Interceptar las descargas del navegador"
+ },
+ "optMinSize": {
+  "message": "Tamaño mínimo a interceptar (KB, 0 = cualquiera)"
+ },
+ "optInclude": {
+  "message": "Solo estos tipos (separados por comas, vacío = todos)"
+ },
+ "optExclude": {
+  "message": "Nunca estos tipos (separados por comas)"
+ },
+ "optAlt": {
+  "message": "Mantén Alt al hacer clic para que descargue el navegador"
+ },
+ "optFallback": {
+  "message": "Si no se puede contactar con Downloader, que descargue el navegador"
+ },
+ "optSave": {
+  "message": "Guardar"
+ },
+ "optSaved": {
+  "message": "Guardado."
+ },
+ "optCheck": {
+  "message": "Comprobar conexión"
+ },
+ "statusOk": {
+  "message": "Conectado a Downloader $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "No se puede contactar con Downloader: $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "Se enviaron $X$ enlaces a Downloader",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "No hay enlaces en esta página"
+ }
+}

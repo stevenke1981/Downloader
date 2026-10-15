@@ -26,6 +26,21 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 - **多國語言**：繁體中文、簡體中文、English、日本語、한국어、Español、Deutsch、Français，在設定裡切換立即生效。系統語言是中文時預設繁體中文（簡體中文系統預設簡體）。
 - **命令列工具 `dlx`**：不需要介面的下載，可續傳。
 
+### 瀏覽器擴充功能（Chrome / Edge）
+`extension/` 是 Manifest V3 擴充功能，Chrome、Edge、Brave 都能用：
+- 右鍵選單：用 Downloader 下載連結、圖片、影音、此網頁，以及「下載全部連結」。
+- 自動攔截瀏覽器下載，交給 Downloader（會帶上網址、來源網頁和檔名）。
+- 選項：開關攔截、最小檔案大小、只攔截／不攔截的副檔名、按住 Alt 點擊改用瀏覽器下載、連不上 Downloader 時改用瀏覽器下載。
+- 介面支援和 App 相同的 8 種語言。
+
+**安裝方式**（還沒上架 Chrome 線上應用程式商店）：
+1. 下載 Release 裡的 `downloader-browser-extension.zip` 並解壓縮（Windows 安裝版已放在安裝目錄的 `extension` 資料夾）。
+2. 打開 `chrome://extensions`（Edge 是 `edge://extensions`），開啟「開發人員模式」。
+3. 按「載入未封裝項目」，選擇解壓縮後的資料夾。擴充功能 ID 固定為 `dikofgcelgoincfekonbdlmodjehgaah`。
+4. 註冊連線元件：Windows 安裝程式會自動做（可在安裝時取消勾選）；免安裝版、macOS、Linux 請執行一次 `downloader --register-browser`。移除用 `downloader --unregister-browser`，解除安裝時會自動移除。
+
+運作方式：擴充功能透過 Native Messaging 呼叫 `downloader-host`，它再經由 127.0.0.1 的本機連線（附隨機 token）把下載交給執行中的 Downloader；App 沒開的話會自動啟動。
+
 ### 下載
 到 [Releases](https://github.com/stevenke1981/Downloader/releases) 下載：
 - Windows：`downloader-setup-windows-x64.exe`（安裝程式，繁中／英文）或 `downloader-windows-x64.zip`（免安裝）
@@ -44,7 +59,6 @@ dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha
 - **FTP**：v0.1 還不支援（`ftp://` 連結會被拒絕）。
 - **BitTorrent / 磁力連結**：v0.1 不支援。
 - **系統匣圖示**：還沒有，關閉視窗就是結束程式（進度會保存）。
-- **瀏覽器擴充功能**：還沒有，可以用剪貼簿監看或 `downloader <網址>` 從命令列加入。
 
 ### 建置
 ```
@@ -73,8 +87,15 @@ Downloader is a multi-connection download accelerator and manager written in Rus
 - **8 languages** switchable at runtime: 繁體中文, 简体中文, English, 日本語, 한국어, Español, Deutsch, Français. Traditional Chinese is the default on Chinese systems (Simplified on zh-CN/zh-SG).
 - **`dlx` CLI** for headless, resumable downloads.
 
+### Browser extension (Chrome / Edge)
+`extension/` is a Manifest V3 extension for Chrome, Edge and Brave: context-menu items for links, images, video/audio, the page and "download all links"; automatic interception of browser downloads; options for enabling interception, minimum size, include/exclude file types, Alt+click bypass and falling back to the browser when the app can't be reached. Localized in the same 8 languages.
+
+**Install** (not on the Chrome Web Store): unzip `downloader-browser-extension.zip` from the release (the Windows installer also puts it in `<install dir>\extension`), open `chrome://extensions` or `edge://extensions`, enable Developer mode, click "Load unpacked" and choose the folder. The extension ID is fixed: `dikofgcelgoincfekonbdlmodjehgaah`. The Windows installer registers the native messaging host; otherwise run `downloader --register-browser` once (`--unregister-browser` removes it).
+
+How it works: the extension talks to `downloader-host` via native messaging; the host forwards to the running app over a token-protected 127.0.0.1 connection and starts the app if needed.
+
 ### Not yet supported
-FTP, BitTorrent/magnet links, a system tray icon, and browser extensions are not part of v0.1.
+FTP, BitTorrent/magnet links and a system tray icon are not supported yet.
 
 ### License
 MIT. This is an independent project; it is not affiliated with Free Download Manager, and all icons are original.

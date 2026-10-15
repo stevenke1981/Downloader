@@ -47,8 +47,12 @@ fn hdr(r: &reqwest::Response, h: reqwest::header::HeaderName) -> Option<String> 
     r.headers().get(h).and_then(|v| v.to_str().ok()).map(str::to_string)
 }
 
-async fn probe(client: &reqwest::Client, url: &str) -> Result<Probe, String> {
-    let resp = client.get(url).header(RANGE, "bytes=0-0").send().await.map_err(err_str)?;
+async fn probe(client: &reqwest::Client, url: &str, referer: Option<&str>) -> Result<Probe, String> {
+    let mut req = client.get(url).header(RANGE, "bytes=0-0");
+    if let Some(r) = referer {
+        req = req.header(reqwest::header::REFERER, r);
+    }
+    let resp = req.send().await.map_err(err_str)?;
     let st = resp.status();
     if !st.is_success() {
         return Err(format!("HTTP {st}"));
@@ -146,6 +150,7 @@ struct Shared {
     url: String,
     range: bool,
     etag: Option<String>,
+    referer: Option<String>,
     ctx: Ctx,
 }
 
@@ -164,6 +169,9 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
         return Ok(());
     }
     let mut req = sh.ctx.client.get(&sh.url);
+    if let Some(r) = &sh.referer {
+        req = req.header(reqwest::header::REFERER, r);
+    }
     if sh.range {
         let r = if end == u64::MAX { format!("bytes={pos}-") } else { format!("bytes={pos}-{}", end - 1) };
         req = req.header(RANGE, r);
@@ -274,11 +282,11 @@ async fn worker(sh: Arc<Shared>) -> Result<(), String> {
     }
 }
 
-async fn probe_retry(ctx: &Ctx, url: &str) -> Result<Probe, String> {
+async fn probe_retry(ctx: &Ctx, url: &str, referer: Option<&str>) -> Result<Probe, String> {
     let mut attempt = 0;
     loop {
         let r = tokio::select! {
-            r = probe(&ctx.client, url) => r,
+            r = probe(&ctx.client, url, referer) => r,
             _ = ctx.cancel.cancelled() => return Err(String::new()),
         };
         match r {
@@ -298,8 +306,11 @@ async fn probe_retry(ctx: &Ctx, url: &str) -> Result<Probe, String> {
 /// Download (or resume) `task`. Segment progress is updated in place so the caller
 /// can persist it at any time. Does not change `task.status` except to `Verifying`.
 pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
-    let url = task.lock().unwrap().url.clone();
-    let p = match probe_retry(&ctx, &url).await {
+    let (url, referer) = {
+        let t = task.lock().unwrap();
+        (t.url.clone(), t.referer.clone())
+    };
+    let p = match probe_retry(&ctx, &url, referer.as_deref()).await {
         Ok(p) => p,
         Err(_) if ctx.cancel.is_cancelled() => return Ok(Outcome::Cancelled),
         Err(e) => return Err(e),
@@ -308,7 +319,7 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     let (part, conns) = {
         let mut t = task.lock().unwrap();
         if t.file_name.is_empty() {
-            let name = p.name.clone().unwrap_or_else(|| "download".into());
+            let name = t.suggested_name.as_deref().map(util::sanitize).filter(|n| !n.is_empty()).or_else(|| p.name.clone()).unwrap_or_else(|| "download".into());
             t.file_name = util::unique_name(&t.dir, &name);
             t.category = Category::from_name(&t.file_name);
         }
@@ -351,7 +362,7 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         let _ = file.set_len(n);
     }
 
-    let sh = Arc::new(Shared { task: task.clone(), file, url: p.url.clone(), range: p.range, etag: p.etag.clone(), ctx: ctx.clone() });
+    let sh = Arc::new(Shared { task: task.clone(), file, url: p.url.clone(), range: p.range, etag: p.etag.clone(), referer, ctx: ctx.clone() });
     let mut set = tokio::task::JoinSet::new();
     for _ in 0..conns {
         set.spawn(worker(sh.clone()));

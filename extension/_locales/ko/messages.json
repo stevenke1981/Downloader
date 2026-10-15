@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Downloader 연동"
+ },
+ "extDesc": {
+  "message": "다운로드를 Downloader 앱으로 보냅니다(다중 연결, 이어받기)."
+ },
+ "menuDownload": {
+  "message": "Downloader로 다운로드"
+ },
+ "menuLink": {
+  "message": "링크를 Downloader로 다운로드"
+ },
+ "menuImage": {
+  "message": "이미지를 Downloader로 다운로드"
+ },
+ "menuMedia": {
+  "message": "미디어를 Downloader로 다운로드"
+ },
+ "menuPage": {
+  "message": "페이지를 Downloader로 다운로드"
+ },
+ "menuAllLinks": {
+  "message": "모든 링크를 Downloader로 다운로드"
+ },
+ "optTitle": {
+  "message": "Downloader 옵션"
+ },
+ "optIntercept": {
+  "message": "브라우저 다운로드 가로채기"
+ },
+ "optMinSize": {
+  "message": "가로챌 최소 파일 크기(KB, 0 = 모두)"
+ },
+ "optInclude": {
+  "message": "이 파일 형식만(쉼표로 구분, 비우면 모두)"
+ },
+ "optExclude": {
+  "message": "이 파일 형식 제외(쉼표로 구분)"
+ },
+ "optAlt": {
+  "message": "Alt를 누른 채 클릭하면 브라우저로 다운로드"
+ },
+ "optFallback": {
+  "message": "Downloader에 연결할 수 없으면 브라우저로 다운로드"
+ },
+ "optSave": {
+  "message": "저장"
+ },
+ "optSaved": {
+  "message": "저장했습니다."
+ },
+ "optCheck": {
+  "message": "연결 확인"
+ },
+ "statusOk": {
+  "message": "Downloader $X$에 연결됨",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "Downloader에 연결할 수 없음: $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "링크 $X$개를 Downloader로 보냈습니다",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "이 페이지에 링크가 없습니다"
+ }
+}

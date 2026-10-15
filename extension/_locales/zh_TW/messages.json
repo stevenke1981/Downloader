@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Downloader 整合"
+ },
+ "extDesc": {
+  "message": "把下載交給 Downloader（多連線、可續傳）。"
+ },
+ "menuDownload": {
+  "message": "用 Downloader 下載"
+ },
+ "menuLink": {
+  "message": "用 Downloader 下載連結"
+ },
+ "menuImage": {
+  "message": "用 Downloader 下載圖片"
+ },
+ "menuMedia": {
+  "message": "用 Downloader 下載影音"
+ },
+ "menuPage": {
+  "message": "用 Downloader 下載此網頁"
+ },
+ "menuAllLinks": {
+  "message": "用 Downloader 下載全部連結"
+ },
+ "optTitle": {
+  "message": "Downloader 選項"
+ },
+ "optIntercept": {
+  "message": "攔截瀏覽器下載"
+ },
+ "optMinSize": {
+  "message": "攔截的最小檔案大小（KB，0 = 不限）"
+ },
+ "optInclude": {
+  "message": "只攔截這些檔案類型（以逗號分隔，空白 = 全部）"
+ },
+ "optExclude": {
+  "message": "不攔截這些檔案類型（以逗號分隔）"
+ },
+ "optAlt": {
+  "message": "按住 Alt 點擊時改由瀏覽器下載"
+ },
+ "optFallback": {
+  "message": "連不上 Downloader 時改由瀏覽器下載"
+ },
+ "optSave": {
+  "message": "儲存"
+ },
+ "optSaved": {
+  "message": "已儲存。"
+ },
+ "optCheck": {
+  "message": "檢查連線"
+ },
+ "statusOk": {
+  "message": "已連上 Downloader $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "無法連上 Downloader：$X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "已將 $X$ 個連結交給 Downloader",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "此網頁沒有連結"
+ }
+}

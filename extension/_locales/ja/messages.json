@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Downloader 連携"
+ },
+ "extDesc": {
+  "message": "ダウンロードを Downloader アプリに渡します（マルチ接続・レジューム対応）。"
+ },
+ "menuDownload": {
+  "message": "Downloader でダウンロード"
+ },
+ "menuLink": {
+  "message": "リンクを Downloader でダウンロード"
+ },
+ "menuImage": {
+  "message": "画像を Downloader でダウンロード"
+ },
+ "menuMedia": {
+  "message": "メディアを Downloader でダウンロード"
+ },
+ "menuPage": {
+  "message": "ページを Downloader でダウンロード"
+ },
+ "menuAllLinks": {
+  "message": "すべてのリンクを Downloader でダウンロード"
+ },
+ "optTitle": {
+  "message": "Downloader のオプション"
+ },
+ "optIntercept": {
+  "message": "ブラウザのダウンロードを横取りする"
+ },
+ "optMinSize": {
+  "message": "横取りする最小サイズ（KB、0 = すべて）"
+ },
+ "optInclude": {
+  "message": "対象のファイル種類（カンマ区切り、空 = すべて）"
+ },
+ "optExclude": {
+  "message": "除外するファイル種類（カンマ区切り）"
+ },
+ "optAlt": {
+  "message": "Alt を押しながらクリックするとブラウザでダウンロード"
+ },
+ "optFallback": {
+  "message": "Downloader に接続できないときはブラウザでダウンロード"
+ },
+ "optSave": {
+  "message": "保存"
+ },
+ "optSaved": {
+  "message": "保存しました。"
+ },
+ "optCheck": {
+  "message": "接続を確認"
+ },
+ "statusOk": {
+  "message": "Downloader $X$ に接続しました",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "Downloader に接続できません: $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "$X$ 件のリンクを Downloader に送りました",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "このページにリンクはありません"
+ }
+}

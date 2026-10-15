@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title data-i18n="optTitle"></title>
+<style>
+  body { font: 14px system-ui, "Segoe UI", "Microsoft JhengHei", "PingFang TC", sans-serif; max-width: 640px; margin: 32px auto; color: #222; }
+  h1 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  label { display: block; margin: 14px 0 4px; }
+  input[type=text], input[type=number] { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid #ccd; border-radius: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+  button { padding: 7px 16px; border-radius: 6px; border: 1px solid #1565c0; background: #1e88e5; color: #fff; cursor: pointer; }
+  button.secondary { background: #fff; color: #1565c0; }
+  #status { margin-left: 8px; }
+</style>
+</head>
+<body>
+<h1><img src="icons/icon32.png" width="28" height="28" alt=""><span data-i18n="optTitle"></span></h1>
+<div class="row"><input type="checkbox" id="intercept"><span data-i18n="optIntercept"></span></div>
+<label data-i18n="optMinSize"></label><input type="number" id="minSizeKB" min="0">
+<label data-i18n="optInclude"></label><input type="text" id="include" placeholder="zip, exe, iso, mp4">
+<label data-i18n="optExclude"></label><input type="text" id="exclude">
+<div class="row"><input type="checkbox" id="altBypass"><span data-i18n="optAlt"></span></div>
+<div class="row"><input type="checkbox" id="fallback"><span data-i18n="optFallback"></span></div>
+<div class="row">
+  <button id="save" data-i18n="optSave"></button>
+  <button id="check" class="secondary" data-i18n="optCheck"></button>
+  <span id="status"></span>
+</div>
+<script src="options.js"></script>
+</body>
+</html>

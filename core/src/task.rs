@@ -67,6 +67,10 @@ pub struct Task {
     pub category: Category,
     pub added: i64,
     pub error: Option<String>,
+    /// Referer header sent with every request (e.g. from the browser extension).
+    pub referer: Option<String>,
+    /// File name suggested by the browser; used instead of the server's name.
+    pub suggested_name: Option<String>,
 }
 
 impl Task {

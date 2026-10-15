@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Downloader 集成"
+ },
+ "extDesc": {
+  "message": "把下载交给 Downloader（多连接、可续传）。"
+ },
+ "menuDownload": {
+  "message": "用 Downloader 下载"
+ },
+ "menuLink": {
+  "message": "用 Downloader 下载链接"
+ },
+ "menuImage": {
+  "message": "用 Downloader 下载图片"
+ },
+ "menuMedia": {
+  "message": "用 Downloader 下载音视频"
+ },
+ "menuPage": {
+  "message": "用 Downloader 下载此网页"
+ },
+ "menuAllLinks": {
+  "message": "用 Downloader 下载全部链接"
+ },
+ "optTitle": {
+  "message": "Downloader 选项"
+ },
+ "optIntercept": {
+  "message": "拦截浏览器下载"
+ },
+ "optMinSize": {
+  "message": "拦截的最小文件大小（KB，0 = 不限）"
+ },
+ "optInclude": {
+  "message": "只拦截这些文件类型（逗号分隔，空 = 全部）"
+ },
+ "optExclude": {
+  "message": "不拦截这些文件类型（逗号分隔）"
+ },
+ "optAlt": {
+  "message": "按住 Alt 点击时改由浏览器下载"
+ },
+ "optFallback": {
+  "message": "连不上 Downloader 时改由浏览器下载"
+ },
+ "optSave": {
+  "message": "保存"
+ },
+ "optSaved": {
+  "message": "已保存。"
+ },
+ "optCheck": {
+  "message": "检查连接"
+ },
+ "statusOk": {
+  "message": "已连接 Downloader $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "无法连接 Downloader：$X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "已将 $X$ 个链接交给 Downloader",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "此网页没有链接"
+ }
+}

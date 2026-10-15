@@ -1,0 +1,83 @@
+{
+ "extName": {
+  "message": "Downloader-Integration"
+ },
+ "extDesc": {
+  "message": "Downloads an die Downloader-App übergeben (mehrere Verbindungen, fortsetzbar)."
+ },
+ "menuDownload": {
+  "message": "Mit Downloader herunterladen"
+ },
+ "menuLink": {
+  "message": "Link mit Downloader herunterladen"
+ },
+ "menuImage": {
+  "message": "Bild mit Downloader herunterladen"
+ },
+ "menuMedia": {
+  "message": "Medien mit Downloader herunterladen"
+ },
+ "menuPage": {
+  "message": "Seite mit Downloader herunterladen"
+ },
+ "menuAllLinks": {
+  "message": "Alle Links mit Downloader herunterladen"
+ },
+ "optTitle": {
+  "message": "Downloader-Optionen"
+ },
+ "optIntercept": {
+  "message": "Browser-Downloads abfangen"
+ },
+ "optMinSize": {
+  "message": "Mindestgröße zum Abfangen (KB, 0 = alle)"
+ },
+ "optInclude": {
+  "message": "Nur diese Dateitypen (kommagetrennt, leer = alle)"
+ },
+ "optExclude": {
+  "message": "Nie diese Dateitypen (kommagetrennt)"
+ },
+ "optAlt": {
+  "message": "Alt beim Klicken gedrückt halten, um im Browser herunterzuladen"
+ },
+ "optFallback": {
+  "message": "Wenn Downloader nicht erreichbar ist, im Browser herunterladen"
+ },
+ "optSave": {
+  "message": "Speichern"
+ },
+ "optSaved": {
+  "message": "Gespeichert."
+ },
+ "optCheck": {
+  "message": "Verbindung prüfen"
+ },
+ "statusOk": {
+  "message": "Verbunden mit Downloader $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "statusErr": {
+  "message": "Downloader nicht erreichbar: $X$",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "sentLinks": {
+  "message": "$X$ Link(s) an Downloader gesendet",
+  "placeholders": {
+   "x": {
+    "content": "$1"
+   }
+  }
+ },
+ "noLinks": {
+  "message": "Keine Links auf dieser Seite"
+ }
+}

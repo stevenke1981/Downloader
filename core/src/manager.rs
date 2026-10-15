@@ -72,6 +72,9 @@ pub struct NewDownload {
     pub priority: i32,
     /// false = add paused.
     pub start: bool,
+    pub referer: Option<String>,
+    /// File name to use instead of the server's.
+    pub file_name: Option<String>,
 }
 
 pub struct Manager {
@@ -155,7 +158,7 @@ impl Manager {
     pub fn add(&self, d: NewDownload) -> u64 {
         let s = self.settings();
         let id = self.inner.next_id.fetch_add(1, Ordering::Relaxed);
-        let name = crate::util::name_from_url(&d.url);
+        let name = d.file_name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| crate::util::name_from_url(&d.url));
         let cat = Category::from_name(&name);
         let limit = d.speed_limit.unwrap_or(s.per_download_limit);
         let t = Task {
@@ -169,6 +172,8 @@ impl Manager {
             category: cat,
             status: if d.start { Status::Queued } else { Status::Paused },
             added: chrono::Utc::now().timestamp(),
+            referer: d.referer.filter(|r| r.starts_with("http")),
+            suggested_name: d.file_name,
             ..Default::default()
         };
         self.inner.entries.lock().unwrap().push(Entry {
@@ -299,6 +304,11 @@ impl Manager {
 
     pub fn save(&self) {
         self.inner.save();
+    }
+
+    /// Handle of the manager's tokio runtime (for the IPC server).
+    pub fn runtime(&self) -> tokio::runtime::Handle {
+        self.rt.handle().clone()
     }
 
     /// Cancel everything and persist (call before exit).
