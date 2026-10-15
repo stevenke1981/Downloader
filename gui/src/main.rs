@@ -3,13 +3,100 @@
 
 use dlcore::util::{human_eta, human_size, looks_like_url};
 use dlcore::{Checksum, Manager, NewDownload, Snapshot, Status};
+use slint::winit_030::WinitWindowAccessor;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
 slint::include_modules!();
+mod reveal;
+mod tray;
+
+fn restore_main(ui: &AppWindow, compact: &CompactWindow) {
+    if ui.show().is_ok() {
+        ui.window().set_minimized(false);
+        ui.window().with_winit_window(|w| w.focus_window());
+        let _ = compact.hide();
+    }
+}
+
+fn show_compact(ui: &AppWindow, compact: &CompactWindow) {
+    if ui.get_exit_open() {
+        restore_main(ui, compact);
+        return;
+    }
+    if compact.show().is_ok() {
+        compact.window().set_minimized(false);
+        compact.window().with_winit_window(|w| w.focus_window());
+        let _ = ui.hide();
+    }
+}
+
+fn active(status: Status) -> bool {
+    matches!(
+        status,
+        Status::Queued | Status::Downloading | Status::Verifying
+    )
+}
+
+fn minimize_to_tray(ui: &AppWindow, compact: &CompactWindow, available: bool) {
+    if ui.get_exit_open() {
+        restore_main(ui, compact);
+        return;
+    }
+    if available {
+        let _ = compact.hide();
+        let _ = ui.hide();
+    } else {
+        restore_main(ui, compact);
+        ui.set_notice(ui.global::<Tr>().invoke_tray_unavailable());
+    }
+}
+
+fn request_exit(ui: &AppWindow, compact: &CompactWindow, app: &Rc<RefCell<App>>) {
+    restore_main(ui, compact);
+    let busy = app
+        .borrow()
+        .mgr()
+        .snapshots()
+        .iter()
+        .any(|s| active(s.status));
+    if busy {
+        ui.set_exit_open(true);
+        return;
+    }
+    let _ = slint::quit_event_loop();
+}
+
+fn reveal_download(ui: &AppWindow, app: &App, id: u64) {
+    if ui.get_reveal_busy() {
+        return;
+    }
+    if let Some(s) = app.mgr().snapshots().into_iter().find(|s| s.id == id) {
+        ui.set_reveal_busy(true);
+        let weak = ui.as_weak();
+        std::thread::spawn(move || {
+            let result = reveal::reveal(s.status, &s.path);
+            let _ = weak.upgrade_in_event_loop(move |ui| {
+                let tr = ui.global::<Tr>();
+                let notice = match result {
+                    Ok(()) => SharedString::default(),
+                    Err(reveal::RevealError::NotCompleted) => tr.invoke_unfinished(),
+                    Err(reveal::RevealError::Missing | reveal::RevealError::NotFile) => {
+                        tr.invoke_missing_file()
+                    }
+                    Err(reveal::RevealError::Io(e)) => {
+                        format!("{} {e}", tr.invoke_reveal_failed()).into()
+                    }
+                };
+                ui.set_notice(notice);
+                ui.set_reveal_busy(false);
+            });
+        });
+    }
+}
 
 /// (gettext folder, native name). "en" is the source language.
 const LANGS: [(&str, &str); 8] = [
@@ -26,9 +113,16 @@ const LANGS: [(&str, &str); 8] = [
 /// Map the OS locale to one of our languages. Any Chinese locale other than
 /// Simplified (CN/SG/Hans) uses Traditional Chinese.
 fn system_lang() -> &'static str {
-    let loc = sys_locale::get_locale().unwrap_or_default().to_ascii_lowercase().replace('_', "-");
+    let loc = sys_locale::get_locale()
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .replace('_', "-");
     if loc.starts_with("zh") {
-        return if loc.contains("hans") || loc.ends_with("-cn") || loc.ends_with("-sg") { "zh_CN" } else { "zh_TW" };
+        return if loc.contains("hans") || loc.ends_with("-cn") || loc.ends_with("-sg") {
+            "zh_CN"
+        } else {
+            "zh_TW"
+        };
     }
     let p = loc.split('-').next().unwrap_or("");
     LANGS.iter().map(|l| l.0).find(|c| *c == p).unwrap_or("en")
@@ -52,9 +146,14 @@ fn browser_flags() -> Option<i32> {
         return Some(0);
     }
     if args.iter().any(|a| a == "--register-browser") {
-        let host = std::env::current_exe().ok().map(|p| p.with_file_name(dlcore::browser::host_exe_name()));
+        let host = std::env::current_exe()
+            .ok()
+            .map(|p| p.with_file_name(dlcore::browser::host_exe_name()));
         let Some(host) = host.filter(|h| h.exists()) else {
-            eprintln!("{} not found next to this program", dlcore::browser::host_exe_name());
+            eprintln!(
+                "{} not found next to this program",
+                dlcore::browser::host_exe_name()
+            );
             return Some(1);
         };
         return Some(match dlcore::browser::register(&host) {
@@ -92,7 +191,10 @@ impl App {
 fn matches_filter(s: &Snapshot, f: i32) -> bool {
     match f {
         0 => true,
-        1 => matches!(s.status, Status::Downloading | Status::Queued | Status::Verifying),
+        1 => matches!(
+            s.status,
+            Status::Downloading | Status::Queued | Status::Verifying
+        ),
         2 => s.status == Status::Completed,
         c => s.category.index() == c - 3,
     }
@@ -106,26 +208,10 @@ fn parse_kbs(s: &str) -> Option<u64> {
     if s.is_empty() {
         return Some(0);
     }
-    s.parse::<f64>().ok().filter(|v| *v >= 0.0).map(|v| (v * 1024.0) as u64)
-}
-
-fn open_in_file_manager(path: &Path) {
-    let dir = if path.is_dir() { path.to_path_buf() } else { path.parent().map(Path::to_path_buf).unwrap_or_default() };
-    #[cfg(windows)]
-    let r = if path.is_file() {
-        std::process::Command::new("explorer").arg(format!("/select,{}", path.display())).spawn()
-    } else {
-        std::process::Command::new("explorer").arg(&dir).spawn()
-    };
-    #[cfg(target_os = "macos")]
-    let r = if path.is_file() {
-        std::process::Command::new("open").arg("-R").arg(path).spawn()
-    } else {
-        std::process::Command::new("open").arg(&dir).spawn()
-    };
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let r = std::process::Command::new("xdg-open").arg(&dir).spawn();
-    let _ = r;
+    s.parse::<f64>()
+        .ok()
+        .filter(|v| *v >= 0.0)
+        .map(|v| (v * 1024.0) as u64)
 }
 
 fn verify_index(s: &Snapshot) -> i32 {
@@ -138,6 +224,53 @@ fn verify_index(s: &Snapshot) -> i32 {
         Some(Unverified) => 4,
         None => -1,
     }
+}
+
+fn rows_for<'a>(snaps: impl IntoIterator<Item = &'a Snapshot>, selected: Option<u64>) -> Vec<Row> {
+    snaps
+        .into_iter()
+        .map(|s| {
+            let progress = match s.total {
+                Some(n) if n > 0 => s.downloaded as f32 / n as f32,
+                _ if s.status == Status::Completed => 1.0,
+                _ => 0.0,
+            };
+            Row {
+                id: s.id as i32,
+                name: s.name.clone().into(),
+                size: s
+                    .total
+                    .map(human_size)
+                    .unwrap_or_else(|| {
+                        if s.downloaded > 0 {
+                            human_size(s.downloaded)
+                        } else {
+                            "—".into()
+                        }
+                    })
+                    .into(),
+                progress,
+                progress_text: if s.total.is_some() {
+                    format!("{:.0}%", progress * 100.0)
+                } else {
+                    String::new()
+                }
+                .into(),
+                speed: if s.status == Status::Downloading && s.speed > 0.0 {
+                    format!("{}/s", human_size(s.speed as u64))
+                } else {
+                    String::new()
+                }
+                .into(),
+                eta: s.eta.map(human_eta).unwrap_or_default().into(),
+                status: s.status.index(),
+                category: s.category.index(),
+                selected: Some(s.id) == selected,
+                verify: verify_index(s),
+                verify_progress: s.verify_progress,
+            }
+        })
+        .collect()
 }
 
 fn refresh(ui: &AppWindow, app: &mut App) {
@@ -155,45 +288,32 @@ fn refresh(ui: &AppWindow, app: &mut App) {
     }
     ui.set_counts(ModelRc::new(VecModel::from(counts.clone())));
 
-    let visible: Vec<&Snapshot> = snaps.iter().filter(|s| matches_filter(s, app.filter)).collect();
-    if app.selected.is_some_and(|id| !snaps.iter().any(|s| s.id == id)) {
+    let visible: Vec<&Snapshot> = snaps
+        .iter()
+        .filter(|s| matches_filter(s, app.filter))
+        .collect();
+    if app
+        .selected
+        .is_some_and(|id| !snaps.iter().any(|s| s.id == id))
+    {
         app.selected = None;
     }
     app.visible = visible.iter().map(|s| s.id).collect();
-    let rows: Vec<Row> = visible
-        .iter()
-        .map(|s| {
-            let progress = match s.total {
-                Some(n) if n > 0 => s.downloaded as f32 / n as f32,
-                _ if s.status == Status::Completed => 1.0,
-                _ => 0.0,
-            };
-            Row {
-                id: s.id as i32,
-                name: s.name.clone().into(),
-                size: s.total.map(human_size).unwrap_or_else(|| if s.downloaded > 0 { human_size(s.downloaded) } else { "—".into() }).into(),
-                progress,
-                progress_text: if s.total.is_some() { format!("{:.0}%", progress * 100.0) } else { String::new() }.into(),
-                speed: if s.status == Status::Downloading && s.speed > 0.0 { format!("{}/s", human_size(s.speed as u64)) } else { String::new() }.into(),
-                eta: s.eta.map(human_eta).unwrap_or_default().into(),
-                status: s.status.index(),
-                category: s.category.index(),
-                selected: Some(s.id) == app.selected,
-                verify: verify_index(s),
-                verify_progress: s.verify_progress,
-            }
-        })
-        .collect();
+    let rows = rows_for(visible.iter().copied(), app.selected);
     ui.set_rows(ModelRc::new(VecModel::from(rows)));
 
     let total_speed: f64 = snaps.iter().map(|s| s.speed).sum();
     ui.set_total_speed(format!("{}/s", human_size(total_speed as u64)).into());
     ui.set_status_line(tr.invoke_status_line(snaps.len() as i32, counts[1]));
 
-    let sel = app.selected.and_then(|id| snaps.iter().find(|s| s.id == id));
+    let sel = app
+        .selected
+        .and_then(|id| snaps.iter().find(|s| s.id == id));
     ui.set_has_selection(sel.is_some());
     ui.set_sel_can_start(sel.is_some_and(|s| matches!(s.status, Status::Paused | Status::Error)));
-    ui.set_sel_can_pause(sel.is_some_and(|s| matches!(s.status, Status::Downloading | Status::Queued)));
+    ui.set_sel_can_pause(
+        sel.is_some_and(|s| matches!(s.status, Status::Downloading | Status::Queued)),
+    );
     if let Some(s) = sel {
         ui.set_d_name(s.name.clone().into());
         ui.set_d_url(s.url.clone().into());
@@ -215,11 +335,23 @@ fn refresh(ui: &AppWindow, app: &mut App) {
                 .map(|&(a, p, e)| SegBar {
                     x: a as f32 / total,
                     w: (e.saturating_sub(a)) as f32 / total,
-                    done: if e > a { (p - a) as f32 / (e - a) as f32 } else { 1.0 },
+                    done: if e > a {
+                        (p - a) as f32 / (e - a) as f32
+                    } else {
+                        1.0
+                    },
                 })
                 .collect()
         } else {
-            vec![SegBar { x: 0.0, w: 1.0, done: if s.status == Status::Completed { 1.0 } else { 0.0 } }]
+            vec![SegBar {
+                x: 0.0,
+                w: 1.0,
+                done: if s.status == Status::Completed {
+                    1.0
+                } else {
+                    0.0
+                },
+            }]
         };
         ui.set_d_segs(ModelRc::new(VecModel::from(segs)));
         let v = s.verification.clone().unwrap_or_default();
@@ -234,7 +366,7 @@ fn refresh(ui: &AppWindow, app: &mut App) {
         if app.detail_for != Some(s.id) {
             app.detail_for = Some(s.id);
             ui.set_d_limit(kbs(s.speed_limit).into());
-            ui.set_d_priority((s.priority.clamp(-1, 1) + 1) as i32);
+            ui.set_d_priority(s.priority.clamp(-1, 1) + 1);
         }
     } else {
         app.detail_for = None;
@@ -262,9 +394,15 @@ fn open_add(ui: &AppWindow, app: &App, url: &str) {
 fn select_renderer() {
     #[cfg(windows)]
     if std::env::var_os("SLINT_BACKEND").is_none() {
-        let skia = slint::BackendSelector::new().backend_name("winit".into()).renderer_name("skia".into()).select();
+        let skia = slint::BackendSelector::new()
+            .backend_name("winit".into())
+            .renderer_name("skia".into())
+            .select();
         if skia.is_err() {
-            let _ = slint::BackendSelector::new().backend_name("winit".into()).renderer_name("software".into()).select();
+            let _ = slint::BackendSelector::new()
+                .backend_name("winit".into())
+                .renderer_name("software".into())
+                .select();
         }
     }
 }
@@ -274,13 +412,24 @@ fn main() -> Result<(), slint::PlatformError> {
         std::process::exit(code);
     }
     // Single instance: if the app already runs, hand our URLs to it and quit.
-    let cli_urls: Vec<String> = std::env::args().skip(1).filter(|a| looks_like_url(a)).collect();
+    let cli_urls: Vec<String> = std::env::args()
+        .skip(1)
+        .filter(|a| looks_like_url(a))
+        .collect();
     {
         use dlcore::ipc::{AddRequest, Command};
         let cmd = if cli_urls.is_empty() {
             Command::Show
         } else {
-            Command::Add { downloads: cli_urls.iter().map(|u| AddRequest { url: u.clone(), ..Default::default() }).collect() }
+            Command::Add {
+                downloads: cli_urls
+                    .iter()
+                    .map(|u| AddRequest {
+                        url: u.clone(),
+                        ..Default::default()
+                    })
+                    .collect(),
+            }
         };
         if dlcore::ipc::send_to_app(&state_dir(), cmd).is_ok_and(|r| r.ok) {
             return Ok(());
@@ -291,7 +440,11 @@ fn main() -> Result<(), slint::PlatformError> {
     let settings = mgr.settings();
     // URLs on the command line are queued right away (e.g. from a browser or script).
     for a in cli_urls {
-        mgr.add(NewDownload { url: a, start: true, ..Default::default() });
+        mgr.add(NewDownload {
+            url: a,
+            start: true,
+            ..Default::default()
+        });
     }
     // Local IPC for the browser extension's native host.
     let (ipc_tx, ipc_rx) = std::sync::mpsc::channel::<dlcore::ipc::Command>();
@@ -311,54 +464,166 @@ fn main() -> Result<(), slint::PlatformError> {
     let ui = AppWindow::new()?;
     apply_lang(&settings.language);
     set_languages_model(&ui);
+    let compact = CompactWindow::new()?;
+    let tray = Rc::new(tray::Tray::new().ok());
+    ui.set_tray_available(tray.as_ref().as_ref().is_some_and(|t| t.available()));
+    ui.on_exit_confirmed(|| {
+        let _ = slint::quit_event_loop();
+    });
 
     let mut clipboard = arboard::Clipboard::new().ok();
-    let last_clip = clipboard.as_mut().and_then(|c| c.get_text().ok()).unwrap_or_default();
-    let app = Rc::new(RefCell::new(App { mgr: Some(mgr), filter: 0, selected: None, visible: vec![], detail_for: None, last_clip, clipboard }));
+    let last_clip = clipboard
+        .as_mut()
+        .and_then(|c| c.get_text().ok())
+        .unwrap_or_default();
+    let app = Rc::new(RefCell::new(App {
+        mgr: Some(mgr),
+        filter: 0,
+        selected: None,
+        visible: vec![],
+        detail_for: None,
+        last_clip,
+        clipboard,
+    }));
 
     refresh(&ui, &mut app.borrow_mut());
+
+    {
+        let (uw, cw) = (ui.as_weak(), compact.as_weak());
+        ui.on_compact_clicked(move || {
+            if let (Some(u), Some(c)) = (uw.upgrade(), cw.upgrade()) {
+                show_compact(&u, &c);
+            }
+        });
+        let (uw, cw) = (ui.as_weak(), compact.as_weak());
+        compact.on_restore(move || {
+            if let (Some(u), Some(c)) = (uw.upgrade(), cw.upgrade()) {
+                restore_main(&u, &c);
+            }
+        });
+        let (uw, cw) = (ui.as_weak(), compact.as_weak());
+        compact.window().on_close_requested(move || {
+            if let (Some(u), Some(c)) = (uw.upgrade(), cw.upgrade()) {
+                restore_main(&u, &c);
+            }
+            slint::CloseRequestResponse::KeepWindowShown
+        });
+        let (uw, cw, t) = (ui.as_weak(), compact.as_weak(), tray.clone());
+        ui.on_tray_clicked(move || {
+            if let (Some(u), Some(c)) = (uw.upgrade(), cw.upgrade()) {
+                minimize_to_tray(&u, &c, t.as_ref().as_ref().is_some_and(|t| t.available()));
+            }
+        });
+        let (uw, cw, a) = (ui.as_weak(), compact.as_weak(), app.clone());
+        ui.on_exit_clicked(move || {
+            if let (Some(u), Some(c)) = (uw.upgrade(), cw.upgrade()) {
+                request_exit(&u, &c, &a);
+            }
+        });
+        let (uw, cw, a) = (ui.as_weak(), compact.as_weak(), app.clone());
+        ui.window().on_close_requested(move || {
+            if let (Some(u), Some(c)) = (uw.upgrade(), cw.upgrade()) {
+                request_exit(&u, &c, &a);
+            }
+            slint::CloseRequestResponse::KeepWindowShown
+        });
+    }
 
     let timer = slint::Timer::default();
     {
         let (ui_w, app) = (ui.as_weak(), app.clone());
+        let (compact_w, tray) = (compact.as_weak(), tray.clone());
         let mut ticks = 0u32;
-        timer.start(slint::TimerMode::Repeated, Duration::from_millis(500), move || {
-            let Some(ui) = ui_w.upgrade() else { return };
-            let mut a = app.borrow_mut();
-            while let Ok(cmd) = ipc_rx.try_recv() {
-                if let dlcore::ipc::Command::Add { downloads } = cmd {
-                    for d in downloads {
-                        let id = a.mgr().add(NewDownload {
-                            url: d.url,
-                            referer: d.referrer,
-                            file_name: d.filename,
-                            checksum_urls: d.checksum_urls,
-                            checksum: d.checksum.as_deref().and_then(dlcore::Checksum::guess),
-                            start: true,
-                            ..Default::default()
-                        });
-                        a.selected = Some(id);
+        timer.start(
+            slint::TimerMode::Repeated,
+            Duration::from_millis(500),
+            move || {
+                let Some(ui) = ui_w.upgrade() else { return };
+                let Some(compact) = compact_w.upgrade() else {
+                    return;
+                };
+                let available = tray.as_ref().as_ref().is_some_and(|t| t.available());
+                ui.set_tray_available(available);
+                if !available && !ui.window().is_visible() && !compact.window().is_visible() {
+                    minimize_to_tray(&ui, &compact, false);
+                }
+                if let Some(t) = tray.as_ref() {
+                    for action in t.actions() {
+                        match action {
+                            tray::Action::Restore => restore_main(&ui, &compact),
+                            tray::Action::Compact => show_compact(&ui, &compact),
+                            tray::Action::Exit => request_exit(&ui, &compact, &app),
+                        }
                     }
                 }
-                let _ = ui.show();
-                ui.window().set_minimized(false);
-            }
-            refresh(&ui, &mut a);
-            ticks += 1;
-            if ticks % 2 == 0 && a.mgr().settings().watch_clipboard && !ui.get_add_open() && !ui.get_set_open() {
-                let text = a.clipboard.as_mut().and_then(|c| c.get_text().ok()).unwrap_or_default();
-                if text != a.last_clip {
-                    a.last_clip = text.clone();
-                    let t = text.trim();
-                    if looks_like_url(t) && !a.mgr().snapshots().iter().any(|s| s.url == t) {
-                        open_add(&ui, &a, t);
+                let mut a = app.borrow_mut();
+                while let Ok(cmd) = ipc_rx.try_recv() {
+                    if let dlcore::ipc::Command::Add { downloads } = cmd {
+                        for d in downloads {
+                            let id = a.mgr().add(NewDownload {
+                                url: d.url,
+                                referer: d.referrer,
+                                file_name: d.filename,
+                                checksum_urls: d.checksum_urls,
+                                checksum: d.checksum.as_deref().and_then(dlcore::Checksum::guess),
+                                start: true,
+                                ..Default::default()
+                            });
+                            a.selected = Some(id);
+                        }
+                    }
+                    restore_main(&ui, &compact);
+                }
+                refresh(&ui, &mut a);
+                compact.set_total_speed(ui.get_total_speed());
+                compact.set_status_line(ui.get_status_line());
+                let all = a.mgr().snapshots();
+                compact.set_rows(ModelRc::new(VecModel::from(rows_for(
+                    all.iter(),
+                    a.selected,
+                ))));
+                if let Some(t) = tray.as_ref() {
+                    t.update(&format!(
+                        "{} · {}",
+                        ui.get_status_line(),
+                        ui.get_total_speed()
+                    ));
+                }
+                ticks += 1;
+                if ticks.is_multiple_of(2)
+                    && a.mgr().settings().watch_clipboard
+                    && !ui.get_add_open()
+                    && !ui.get_set_open()
+                {
+                    let text = a
+                        .clipboard
+                        .as_mut()
+                        .and_then(|c| c.get_text().ok())
+                        .unwrap_or_default();
+                    if text != a.last_clip {
+                        a.last_clip = text.clone();
+                        let t = text.trim();
+                        if looks_like_url(t) && !a.mgr().snapshots().iter().any(|s| s.url == t) {
+                            open_add(&ui, &a, t);
+                        }
                     }
                 }
-            }
-        });
+            },
+        );
     }
 
     macro_rules! on {
+        ($ui:ident, $app:ident, $setter:ident, || $body:block) => {{
+            let ui_w = $ui.as_weak();
+            let app_c = $app.clone();
+            $ui.$setter(move || {
+                #[allow(unused_variables)]
+                let $ui = ui_w.upgrade().unwrap();
+                #[allow(unused_mut)]
+                let mut $app = app_c.borrow_mut();
+                $body
+            });
+        }};
         ($ui:ident, $app:ident, $setter:ident, |$($arg:ident),*| $body:block) => {{
             let ui_w = $ui.as_weak();
             let app_c = $app.clone();
@@ -372,17 +637,19 @@ fn main() -> Result<(), slint::PlatformError> {
         }};
     }
 
-    on!(ui, app, on_add_clicked, | | {
+    on!(ui, app, on_add_clicked, || {
         open_add(&ui, &app, "");
     });
-    on!(ui, app, on_add_ok, | | {
+    on!(ui, app, on_add_ok, || {
         let url = ui.get_add_url().trim().to_string();
         if !(url.starts_with("http://") || url.starts_with("https://")) || !looks_like_url(&url) {
             ui.set_add_error(ui.global::<Tr>().invoke_invalid_url());
             return;
         }
         let sum = ui.get_add_checksum().trim().to_string();
-        let checksum = if sum.is_empty() { None } else {
+        let checksum = if sum.is_empty() {
+            None
+        } else {
             match Checksum::guess(&sum) {
                 Some(c) => Some(c),
                 None => {
@@ -404,24 +671,30 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.set_add_open(false);
         refresh(&ui, &mut app);
     });
-    on!(ui, app, on_start_clicked, | | {
-        if let Some(id) = app.selected { app.mgr().start(id); }
+    on!(ui, app, on_start_clicked, || {
+        if let Some(id) = app.selected {
+            app.mgr().start(id);
+        }
         refresh(&ui, &mut app);
     });
-    on!(ui, app, on_pause_clicked, | | {
-        if let Some(id) = app.selected { app.mgr().pause(id); }
+    on!(ui, app, on_pause_clicked, || {
+        if let Some(id) = app.selected {
+            app.mgr().pause(id);
+        }
         refresh(&ui, &mut app);
     });
-    on!(ui, app, on_start_all, | | {
+    on!(ui, app, on_start_all, || {
         app.mgr().start_all();
         refresh(&ui, &mut app);
     });
-    on!(ui, app, on_pause_all, | | {
+    on!(ui, app, on_pause_all, || {
         app.mgr().pause_all();
         refresh(&ui, &mut app);
     });
-    on!(ui, app, on_delete_confirmed, | | {
-        if let Some(id) = app.selected.take() { app.mgr().remove(id, ui.get_del_file()); }
+    on!(ui, app, on_delete_confirmed, || {
+        if let Some(id) = app.selected.take() {
+            app.mgr().remove(id, ui.get_del_file());
+        }
         refresh(&ui, &mut app);
     });
     on!(ui, app, on_filter_clicked, |f| {
@@ -432,39 +705,55 @@ fn main() -> Result<(), slint::PlatformError> {
     on!(ui, app, on_row_clicked, |i| {
         app.selected = app.visible.get(i as usize).copied();
         refresh(&ui, &mut app);
-    });
-    on!(ui, app, on_row_double_clicked, |i| {
-        if let Some(id) = app.visible.get(i as usize).copied() {
-            if let Some(s) = app.mgr().snapshots().into_iter().find(|s| s.id == id) {
-                open_in_file_manager(&s.path);
-            }
+        if let Some(id) = app.selected
+            && app
+                .mgr()
+                .snapshots()
+                .iter()
+                .any(|s| s.id == id && s.status == Status::Completed)
+        {
+            reveal_download(&ui, &app, id);
         }
     });
-    on!(ui, app, on_open_folder, | | {
+    on!(ui, app, on_open_folder, || {
         if let Some(id) = app.selected {
-            if let Some(s) = app.mgr().snapshots().into_iter().find(|s| s.id == id) {
-                open_in_file_manager(&s.path);
-            }
+            reveal_download(&ui, &app, id);
         }
     });
-    on!(ui, app, on_detail_apply, | | {
+    on!(ui, app, on_detail_apply, || {
         if let Some(id) = app.selected {
-            if let Some(v) = parse_kbs(&ui.get_d_limit()) { app.mgr().set_speed_limit(id, v); }
+            if let Some(v) = parse_kbs(&ui.get_d_limit()) {
+                app.mgr().set_speed_limit(id, v);
+            }
             app.mgr().set_priority(id, ui.get_d_priority() - 1);
             app.mgr().save();
         }
     });
     on!(ui, app, on_browse, |which| {
-        let current = if which == 0 { ui.get_add_folder() } else { ui.get_s_folder() };
-        let start = if current.is_empty() { app.mgr().settings().download_dir } else { PathBuf::from(current.as_str()) };
+        let current = if which == 0 {
+            ui.get_add_folder()
+        } else {
+            ui.get_s_folder()
+        };
+        let start = if current.is_empty() {
+            app.mgr().settings().download_dir
+        } else {
+            PathBuf::from(current.as_str())
+        };
         match rfd::FileDialog::new().set_directory(&start).pick_folder() {
             Some(p) => p.display().to_string().into(),
             None => current,
         }
     });
-    on!(ui, app, on_settings_clicked, | | {
+    on!(ui, app, on_settings_clicked, || {
         let s = app.mgr().settings();
-        ui.set_s_language(LANGS.iter().position(|l| l.0 == s.language).map(|i| i as i32 + 1).unwrap_or(0));
+        ui.set_s_language(
+            LANGS
+                .iter()
+                .position(|l| l.0 == s.language)
+                .map(|i| i as i32 + 1)
+                .unwrap_or(0),
+        );
         ui.set_s_folder(s.download_dir.display().to_string().into());
         ui.set_s_catfolders(s.category_folders);
         ui.set_s_concurrent(s.max_concurrent as i32);
@@ -481,10 +770,14 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.set_s_error("".into());
         ui.set_set_open(true);
     });
-    on!(ui, app, on_settings_ok, | | {
+    on!(ui, app, on_settings_ok, || {
         let mut s = app.mgr().settings();
         let li = ui.get_s_language();
-        s.language = if li <= 0 { String::new() } else { LANGS[(li - 1) as usize].0.to_string() };
+        s.language = if li <= 0 {
+            String::new()
+        } else {
+            LANGS[(li - 1) as usize].0.to_string()
+        };
         s.download_dir = PathBuf::from(ui.get_s_folder().trim());
         s.category_folders = ui.get_s_catfolders();
         s.max_concurrent = ui.get_s_concurrent().clamp(1, 20) as u32;
@@ -498,23 +791,159 @@ fn main() -> Result<(), slint::PlatformError> {
         s.auto_verify = ui.get_s_verify();
         let (g, p) = (parse_kbs(&ui.get_s_global()), parse_kbs(&ui.get_s_perdl()));
         let tr = ui.global::<Tr>();
-        let (Some(g), Some(p)) = (g, p) else { ui.set_s_error(tr.invoke_invalid_number()); return; };
-        if !s.schedule.valid() { ui.set_s_error(tr.invoke_invalid_number()); return; }
+        let (Some(g), Some(p)) = (g, p) else {
+            ui.set_s_error(tr.invoke_invalid_number());
+            return;
+        };
+        if !s.schedule.valid() {
+            ui.set_s_error(tr.invoke_invalid_number());
+            return;
+        }
         s.global_limit = g;
         s.per_download_limit = p;
         let lang = s.language.clone();
-        if let Err(e) = app.mgr().set_settings(s) { ui.set_s_error(e.into()); return; }
+        if let Err(e) = app.mgr().set_settings(s) {
+            ui.set_s_error(e.into());
+            return;
+        }
         apply_lang(&lang);
         set_languages_model(&ui);
         ui.set_set_open(false);
         refresh(&ui, &mut app);
     });
 
-    ui.run()?;
+    ui.show()?;
+    let result = slint::run_event_loop_until_quit();
     drop(timer);
     let _ = std::fs::remove_file(dlcore::ipc::endpoint_path(&state_dir()));
     if let Some(m) = app.borrow_mut().mgr.take() {
         m.shutdown();
     }
-    Ok(())
+    result
+}
+
+#[cfg(test)]
+#[path = "../../core/tests/server/mod.rs"]
+#[rustfmt::skip]
+mod fixture_server;
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    #[test]
+    fn exit_protects_queued_downloading_and_verifying() {
+        for s in [Status::Queued, Status::Downloading, Status::Verifying] {
+            assert!(active(s));
+        }
+        for s in [Status::Paused, Status::Completed, Status::Error] {
+            assert!(!active(s));
+        }
+    }
+
+    #[test]
+    fn repeated_window_switches_keep_download_and_exit_confirmation_state() {
+        use std::time::Instant;
+        i_slint_backend_testing::init_no_event_loop();
+        let state = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let mgr = Manager::new(state.path());
+        let mut settings = mgr.settings();
+        settings.download_dir = downloads.path().into();
+        settings.auto_verify = false;
+        settings.max_connections = 1;
+        mgr.set_settings(settings).unwrap();
+        let bytes = fixture_server::test_data(256 * 1024);
+        let server = mgr
+            .runtime()
+            .block_on(fixture_server::start(bytes.clone(), true, 128 * 1024));
+        let app = Rc::new(RefCell::new(App {
+            mgr: Some(mgr),
+            filter: 0,
+            selected: None,
+            visible: vec![],
+            detail_for: None,
+            last_clip: String::new(),
+            clipboard: None,
+        }));
+        // Gate HTTP responses so confirmation cannot race a fast download.
+        // Declared after App so a failed assertion releases the gate before Runtime drops.
+        let gate = server.data.lock().unwrap();
+        let id = app.borrow().mgr().add(NewDownload {
+            url: server.url("fixture.bin"),
+            start: true,
+            ..Default::default()
+        });
+        app.borrow_mut().selected = Some(id);
+        let ui = AppWindow::new().unwrap();
+        let compact = CompactWindow::new().unwrap();
+        ui.show().unwrap();
+        assert!(!compact.get_pinned());
+        for _ in 0..30 {
+            show_compact(&ui, &compact);
+            assert!(compact.window().is_visible());
+            assert!(!ui.window().is_visible());
+            restore_main(&ui, &compact);
+            assert!(ui.window().is_visible());
+            assert!(!compact.window().is_visible());
+        }
+        request_exit(&ui, &compact, &app);
+        assert!(ui.get_exit_open());
+        request_exit(&ui, &compact, &app);
+        assert!(ui.get_exit_open());
+        minimize_to_tray(&ui, &compact, true);
+        assert!(
+            ui.window().is_visible(),
+            "exit confirmation must stay accessible"
+        );
+        show_compact(&ui, &compact);
+        assert!(ui.window().is_visible());
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyPressed {
+                text: slint::platform::Key::Tab.into(),
+            });
+        assert!(ui.get_exit_choice());
+        assert!(ui.get_exit_open());
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyReleased {
+                text: slint::platform::Key::Tab.into(),
+            });
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyPressed {
+                text: slint::platform::Key::Escape.into(),
+            });
+        assert!(!ui.get_exit_open());
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyReleased {
+                text: slint::platform::Key::Escape.into(),
+            });
+        ui.hide().unwrap(); // Same operation as minimize-to-tray, with no native tray in this backend.
+        drop(gate);
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            let snaps = app.borrow().mgr().snapshots();
+            assert_eq!(snaps.len(), 1, "switching must not duplicate downloads");
+            assert_eq!(snaps[0].id, id);
+            assert_ne!(snaps[0].status, Status::Error, "{:?}", snaps[0].error);
+            if snaps[0].status == Status::Completed {
+                break;
+            }
+            assert!(Instant::now() < deadline, "fixture download timed out");
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        assert_eq!(
+            std::fs::read(downloads.path().join("fixture.bin")).unwrap(),
+            bytes
+        );
+        restore_main(&ui, &compact);
+        assert!(ui.window().is_visible());
+        assert!(!ui.get_exit_open());
+        ui.hide().unwrap();
+        minimize_to_tray(&ui, &compact, false);
+        assert!(
+            ui.window().is_visible(),
+            "a missing tray must never strand the user"
+        );
+        assert!(!ui.get_notice().is_empty());
+        app.borrow_mut().mgr.take().unwrap().shutdown();
+    }
 }

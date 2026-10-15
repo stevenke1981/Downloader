@@ -248,3 +248,48 @@ msgstr "是"
 
 msgid "{0} downloads, {1} active"
 msgstr "共 {0} 個下載，{1} 個進行中"
+
+msgid "Click a completed download to locate its file."
+msgstr "點擊已完成的下載，即可開啟檔案所在資料夾。"
+
+msgid "Compact window"
+msgstr "精簡視窗"
+
+msgid "The system tray is unavailable. The main window has been restored."
+msgstr "目前無法使用系統匣，已還原主視窗。"
+
+msgid "Minimize to tray"
+msgstr "縮小至系統匣"
+
+msgid "Exit"
+msgstr "退出"
+
+msgid "Dismiss"
+msgstr "關閉提示"
+
+msgid "Downloader — compact"
+msgstr "Downloader — 精簡視窗"
+
+msgid "Always on top"
+msgstr "保持置頂"
+
+msgid "Closing this window restores the main window."
+msgstr "關閉精簡視窗會還原主視窗，下載繼續執行。"
+
+msgid "Restore main window"
+msgstr "還原主視窗"
+
+msgid "This download is not complete. Wait for completion before locating the file."
+msgstr "這個項目尚未下載完成，完成後才能定位檔案。"
+
+msgid "The file was moved or deleted. Its saved location is no longer available."
+msgstr "檔案已被移動或刪除，原儲存位置已無法找到檔案。"
+
+msgid "Could not open the file location:"
+msgstr "無法開啟檔案位置："
+
+msgid "Exit Downloader?"
+msgstr "要退出 Downloader 嗎？"
+
+msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
+msgstr "仍有排程中、下載中或驗證中的項目。確定要退出並暫停嗎？下次開啟 Downloader 可繼續下載。"

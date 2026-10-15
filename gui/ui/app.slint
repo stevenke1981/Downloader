@@ -24,6 +24,12 @@ export struct SegBar {
 }
 
 export global Tr {
+    pure public function tray-unavailable() -> string { return @tr("The system tray is unavailable. The main window has been restored."); }
+    pure public function unfinished() -> string { return @tr("This download is not complete. Wait for completion before locating the file."); }
+    pure public function missing-file() -> string { return @tr("The file was moved or deleted. Its saved location is no longer available."); }
+    pure public function reveal-failed() -> string { return @tr("Could not open the file location:"); }
+    pure public function exit-title() -> string { return @tr("Exit Downloader?"); }
+    pure public function exit-warning() -> string { return @tr("Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."); }
     pure public function status(s: int) -> string {
         if (s == 0) { return @tr("Queued"); }
         if (s == 1) { return @tr("Downloading"); }
@@ -183,6 +189,19 @@ export component AppWindow inherits Window {
     min-height: 480px;
     background: #f6f8fb;
     default-font-size: 13px;
+    in property <bool> tray-available;
+    in-out property <string> notice;
+    in property <bool> reveal-busy;
+    callback compact-clicked();
+    callback tray-clicked();
+    callback exit-clicked();
+    in-out property <bool> exit-open;
+    in-out property <bool> exit-choice;
+    private property <bool> exit-key-held;
+    callback exit-confirmed();
+    changed exit-open => {
+        if root.exit-open { root.exit-choice = false; keyboard-guard.focus(); }
+    }
 
     in property <[Row]> rows;
     in property <int> filter: 0;
@@ -253,14 +272,44 @@ export component AppWindow inherits Window {
     callback settings-clicked();
     callback filter-clicked(int);
     callback row-clicked(int);
-    callback row-double-clicked(int);
     callback add-ok();
     callback settings-ok();
     callback browse(int) -> string;
     callback detail-apply();
     callback open-folder();
 
+    keyboard-guard := FocusScope {
+    capture-key-pressed(event) => {
+        if root.exit-open {
+            root.exit-key-held = true;
+            if event.text == Key.Tab { root.exit-choice = !root.exit-choice; }
+            if event.text == Key.Escape { root.exit-open = false; }
+            if event.text == Key.Return || event.text == " " {
+                if root.exit-choice { root.exit-confirmed(); }
+                else { root.exit-open = false; }
+            }
+            return accept;
+        }
+        return reject;
+    }
+    capture-key-released(event) => {
+        if root.exit-key-held { root.exit-key-held = false; return accept; }
+        return root.exit-open ? accept : reject;
+    }
     VerticalLayout {
+        HorizontalLayout {
+            padding: 6px;
+            spacing: 8px;
+            Text { text: @tr("Click a completed download to locate its file."); vertical-alignment: center; horizontal-stretch: 1; }
+            Button { text: @tr("Compact window"); clicked => { root.compact-clicked(); } }
+            Button { text: @tr("Minimize to tray"); enabled: root.tray-available; clicked => { root.tray-clicked(); } }
+            Button { text: @tr("Exit"); clicked => { root.exit-clicked(); } }
+        }
+        if root.notice != "": HorizontalLayout {
+            padding: 8px;
+            Text { text: root.notice; color: #a03020; wrap: word-wrap; horizontal-stretch: 1; }
+            Button { text: @tr("Dismiss"); clicked => { root.notice = ""; } }
+        }
         // ---------- toolbar ----------
         Rectangle {
             height: 66px;
@@ -343,7 +392,6 @@ export component AppWindow inherits Window {
                             background: r.selected ? #dcebfb : (rta.has-hover ? #f3f8fd : (mod(i, 2) == 1 ? #fbfcfe : white));
                             rta := TouchArea {
                                 clicked => { root.row-clicked(i); }
-                                double-clicked => { root.row-double-clicked(i); }
                             }
                             HorizontalLayout {
                                 padding-left: 12px;
@@ -541,5 +589,50 @@ export component AppWindow inherits Window {
             Button { text: @tr("Cancel"); clicked => { root.set-open = false; } }
             Button { text: @tr("OK"); primary: true; clicked => { root.settings-ok(); } }
         }
+    }
+    if root.exit-open: Dialog {
+        title: Tr.exit-title();
+        Text { text: Tr.exit-warning(); wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            Button { text: @tr("Cancel"); primary: !root.exit-choice; clicked => { root.exit-open = false; } }
+            Button { text: @tr("Exit"); primary: root.exit-choice; clicked => { root.exit-confirmed(); } }
+        }
+    }
+    }
+}
+
+export component CompactWindow inherits Window {
+    title: @tr("Downloader — compact");
+    icon: @image-url("icons/app.svg");
+    preferred-width: 400px;
+    preferred-height: 300px;
+    min-width: 340px;
+    min-height: 240px;
+    background: #f6f8fb;
+    in-out property <bool> pinned: false;
+    always-on-top: root.pinned;
+    in property <[Row]> rows;
+    in property <string> status-line;
+    in property <string> total-speed;
+    callback restore();
+    VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        Text { text: root.total-speed; font-size: 22px; font-weight: 600; color: #1565c0; }
+        Text { text: root.status-line; }
+        ListView {
+            for r in root.rows: VerticalLayout {
+                padding: 4px;
+                spacing: 3px;
+                Text { text: r.name; overflow: elide; }
+                Bar { value: r.progress; status: r.status; }
+                Text { text: Tr.status(r.status) + "  " + r.progress-text + "  " + r.speed; font-size: 12px; }
+            }
+        }
+        CheckBox { text: @tr("Always on top"); checked <=> root.pinned; }
+        Text { text: @tr("Closing this window restores the main window."); font-size: 11px; wrap: word-wrap; }
+        Button { text: @tr("Restore main window"); clicked => { root.restore(); } }
     }
 }

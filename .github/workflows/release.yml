@@ -41,6 +41,8 @@ jobs:
           N=downloader-${{ matrix.name }}
           mkdir -p dist/$N
           cp README.md LICENSE dist/$N/
+          cp docs/desktop-controls.zh-TW.md dist/$N/
+          cp docs/validation-0.4.0.md dist/$N/
           cp -r extension dist/$N/extension
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp target/release/downloader.exe target/release/dlx.exe target/release/downloader-host.exe dist/$N/

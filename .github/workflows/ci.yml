@@ -27,6 +27,10 @@ jobs:
             libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgl1-mesa-dev libwayland-dev libfontconfig1-dev
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Format GUI
+        run: cargo fmt -p downloader --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets --locked
       - name: Build (release)
         run: cargo build --release --locked
       - name: Test
