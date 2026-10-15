@@ -62,7 +62,7 @@ jobs:
             Where-Object { $_.reason -eq 'compiler-artifact' -and $_.profile.test -and $_.target.name -eq 'downloader' } |
             Select-Object -ExpandProperty executable -Last 1
           if (!$testExe) { throw 'GUI test executable missing' }
-          foreach ($scene in @('details', 'settings')) {
+          foreach ($scene in @('details', 'details-scrolled', 'settings', 'settings-scrolled')) {
             $env:DOWNLOADER_UI_FIXTURE = $scene
             ./scripts/win-screenshot.ps1 -Exe $testExe -Out "win-layout-$scene.png" -Arguments @('--exact', 'lifecycle_tests::render_layout_fixture', '--ignored', '--nocapture')
           }

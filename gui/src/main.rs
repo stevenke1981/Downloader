@@ -862,7 +862,10 @@ mod lifecycle_tests {
     fn render_layout_fixture() {
         assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
         let scene = std::env::var("DOWNLOADER_UI_FIXTURE").unwrap();
-        assert!(matches!(scene.as_str(), "details" | "settings"));
+        assert!(matches!(
+            scene.as_str(),
+            "details" | "settings" | "details-scrolled" | "settings-scrolled"
+        ));
         select_renderer();
         let ui = AppWindow::new().unwrap();
         apply_lang("zh_TW");
@@ -892,10 +895,29 @@ mod lifecycle_tests {
             verify: 1,
             ..Default::default()
         }])));
-        ui.set_set_open(scene == "settings");
+        ui.set_set_open(scene.starts_with("settings"));
         ui.window().set_size(slint::LogicalSize::new(760.0, 480.0));
         ui.show().unwrap();
         schedule_initial_placement(&ui);
+        if scene.ends_with("-scrolled") {
+            let weak = ui.as_weak();
+            let position = if scene.starts_with("settings") {
+                slint::LogicalPosition::new(673.0, 240.0)
+            } else {
+                slint::LogicalPosition::new(753.0, 358.0)
+            };
+            slint::Timer::single_shot(Duration::from_millis(500), move || {
+                if let Some(ui) = weak.upgrade() {
+                    // Internal widget event, not OS/native mouse automation.
+                    ui.window()
+                        .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+                            position,
+                            delta_x: 0.0,
+                            delta_y: -2000.0,
+                        });
+                }
+            });
+        }
         // Bound the fixture lifetime even if the screenshot helper fails.
         slint::Timer::single_shot(Duration::from_secs(30), || {
             let _ = slint::quit_event_loop();
@@ -940,6 +962,66 @@ mod lifecycle_tests {
                 .mock_single_click(slint::platform::PointerEventButton::Left);
         }
         assert_eq!(compact_calls.get(), 3);
+    }
+
+    #[test]
+    fn small_window_scrolls_to_detail_and_settings_actions() {
+        use i_slint_backend_testing::ElementHandle;
+        use std::cell::Cell;
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = AppWindow::new().unwrap();
+        apply_lang("en");
+        ui.set_has_selection(true);
+        ui.set_d_verify(1);
+        ui.set_d_expected("a".repeat(64).into());
+        ui.set_d_actual("a".repeat(64).into());
+        let applied = Rc::new(Cell::new(false));
+        let observed = applied.clone();
+        ui.on_detail_apply(move || observed.set(true));
+        ui.show().unwrap();
+        ui.window().set_size(slint::LogicalSize::new(760.0, 480.0));
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+                position: slint::LogicalPosition::new(753.0, 358.0),
+                delta_x: 0.0,
+                delta_y: -2000.0,
+            });
+        let apply = ElementHandle::find_by_accessible_label(&ui, "Apply")
+            .next()
+            .unwrap();
+        let p = apply.absolute_position();
+        let s = apply.size();
+        assert!(
+            p.x >= 197.0 && p.y >= 262.0 && p.x + s.width <= 760.5 && p.y + s.height <= 454.5,
+            "Apply must be fully visible in the details viewport: {p:?}, {s:?}"
+        );
+        apply.mock_single_click(slint::platform::PointerEventButton::Left);
+        assert!(
+            applied.get(),
+            "detail Apply must be reachable after scrolling"
+        );
+
+        ui.set_set_open(true);
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+                position: slint::LogicalPosition::new(673.0, 240.0),
+                delta_x: 0.0,
+                delta_y: -2000.0,
+            });
+        let cancel = ElementHandle::find_by_accessible_label(&ui, "Cancel")
+            .next()
+            .unwrap();
+        let p = cancel.absolute_position();
+        let s = cancel.size();
+        assert!(
+            p.x >= 80.0 && p.y >= 12.0 && p.x + s.width <= 680.5 && p.y + s.height <= 468.5,
+            "Cancel must be fully visible in the dialog viewport: {p:?}, {s:?}"
+        );
+        cancel.mock_single_click(slint::platform::PointerEventButton::Left);
+        assert!(
+            !ui.get_set_open(),
+            "settings Cancel must be reachable after scrolling"
+        );
     }
 
     #[test]

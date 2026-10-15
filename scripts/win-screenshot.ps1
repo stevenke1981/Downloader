@@ -56,6 +56,7 @@ try {
         source_sha = $env:GITHUB_SHA
         fixture = $(if ($env:DOWNLOADER_UI_FIXTURE) { $env:DOWNLOADER_UI_FIXTURE } else { 'empty-main' })
         native_mouse_interaction = 'not performed'
+        synthetic_widget_scroll = $env:DOWNLOADER_UI_FIXTURE -like '*-scrolled'
     } | ConvertTo-Json -Depth 4 | Set-Content ([IO.Path]::ChangeExtension($Out, '.json')) -Encoding utf8
     $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
     $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -64,6 +65,12 @@ try {
     Write-Host "saved $Out ($($b.Width)x$($b.Height)); client $($client.Right)x$($client.Bottom); DPI $([WindowGeometry]::GetDpiForWindow($hwnd))"
     if ($b.Width -ne 1024 -or $b.Height -ne 768) { throw 'Expected a real 1024x768 desktop; do not substitute a larger screenshot.' }
     if (!$contained) { throw 'Application frame extends outside the monitor work area.' }
+    if ($env:DOWNLOADER_UI_FIXTURE) {
+        $scale = [WindowGeometry]::GetDpiForWindow($hwnd) / 96.0
+        if ([Math]::Abs($client.Right / $scale - 760) -gt 1 -or [Math]::Abs($client.Bottom / $scale - 480) -gt 1) {
+            throw 'Layout fixture must use the real 760x480 logical client size.'
+        }
+    }
 } finally {
     if ($g) { $g.Dispose() }
     if ($bmp) { $bmp.Dispose() }
