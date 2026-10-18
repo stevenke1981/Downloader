@@ -1,12 +1,12 @@
 [package]
 name = "downloader"
-version = "0.3.0"
+version = "0.5.0"
 edition = "2024"
 license = "MIT"
 
 [dependencies]
 dlcore = { package = "downloader-core", path = "../core" }
-slint = { version = "1.18.1", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-systemfonts"] }
+slint = { version = "=1.18.1", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-systemfonts", "unstable-winit-030"] }
 rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
 arboard = { version = "3", default-features = false }
 sys-locale = "0.3"
@@ -16,6 +16,13 @@ dirs = "6"
 # leaves parts of the window unpainted/transparent on some systems, so use Skia there.
 [target.'cfg(windows)'.dependencies]
 slint = { version = "1.18.1", default-features = false, features = ["renderer-skia"] }
+tray-icon = { version = "=0.24.2", default-features = false }
+windows = { version = "0.62", features = ["Win32_UI_Shell", "Win32_UI_Shell_Common", "Win32_System_Com", "Win32_Graphics_Gdi"] }
+
+[dev-dependencies]
+tempfile = "3"
+i-slint-backend-testing = "=1.18.1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "time"] }
 
 [build-dependencies]
 slint-build = "1.18.1"

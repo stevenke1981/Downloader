@@ -24,6 +24,12 @@ export struct SegBar {
 }
 
 export global Tr {
+    pure public function tray-unavailable() -> string { return @tr("The system tray is unavailable. The main window has been restored."); }
+    pure public function unfinished() -> string { return @tr("This download is not complete. Wait for completion before locating the file."); }
+    pure public function missing-file() -> string { return @tr("The file was moved or deleted. Its saved location is no longer available."); }
+    pure public function reveal-failed() -> string { return @tr("Could not open the file location:"); }
+    pure public function exit-title() -> string { return @tr("Exit Downloader?"); }
+    pure public function exit-warning() -> string { return @tr("Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."); }
     pure public function status(s: int) -> string {
         if (s == 0) { return @tr("Queued"); }
         if (s == 1) { return @tr("Downloading"); }
@@ -54,6 +60,7 @@ export global Tr {
     pure public function invalid-url() -> string { return @tr("Please enter a valid http(s) URL."); }
     pure public function invalid-checksum() -> string { return @tr("Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."); }
     pure public function invalid-number() -> string { return @tr("Please enter valid numbers and times (HH:MM)."); }
+    pure public function invalid-folder() -> string { return @tr("Please choose a download folder."); }
     pure public function system-default() -> string { return @tr("System default"); }
     pure public function unknown() -> string { return @tr("Unknown"); }
 }
@@ -150,19 +157,23 @@ component Dialog inherits Rectangle {
     background: #00000060;
     TouchArea { }
     Rectangle {
-        width: root.dialog-width;
-        height: content.preferred-height;
+        width: min(root.dialog-width, parent.width - 24px);
+        height: min(content.preferred-height, parent.height - 24px);
         x: (parent.width - self.width) / 2;
-        y: max(20px, (parent.height - self.height) / 2);
+        y: (parent.height - self.height) / 2;
         background: white;
         border-radius: 10px;
         drop-shadow-blur: 18px;
         drop-shadow-color: #00000050;
+        ScrollView {
+        content-width: self.width;
+        horizontal-scrollbar-policy: always-off;
         content := VerticalLayout {
             padding: 18px;
             spacing: 10px;
             Text { text: root.title; font-size: 17px; font-weight: 700; color: #1d1d1d; }
             @children
+        }
         }
     }
 }
@@ -177,12 +188,25 @@ component Field inherits HorizontalLayout {
 export component AppWindow inherits Window {
     title: "Downloader";
     icon: @image-url("icons/app.svg");
-    preferred-width: 1120px;
-    preferred-height: 700px;
+    preferred-width: 960px;
+    preferred-height: 640px;
     min-width: 760px;
     min-height: 480px;
     background: #f6f8fb;
     default-font-size: 13px;
+    in property <bool> tray-available;
+    in-out property <string> notice;
+    in property <bool> reveal-busy;
+    callback compact-clicked();
+    callback tray-clicked();
+    callback exit-clicked();
+    in-out property <bool> exit-open;
+    in-out property <bool> exit-choice;
+    private property <bool> exit-key-held;
+    callback exit-confirmed();
+    changed exit-open => {
+        if root.exit-open { root.exit-choice = false; keyboard-guard.focus(); }
+    }
 
     in property <[Row]> rows;
     in property <int> filter: 0;
@@ -260,7 +284,38 @@ export component AppWindow inherits Window {
     callback detail-apply();
     callback open-folder();
 
+    keyboard-guard := FocusScope {
+    capture-key-pressed(event) => {
+        if root.exit-open {
+            root.exit-key-held = true;
+            if event.text == Key.Tab { root.exit-choice = !root.exit-choice; }
+            if event.text == Key.Escape { root.exit-open = false; }
+            if event.text == Key.Return || event.text == " " {
+                if root.exit-choice { root.exit-confirmed(); }
+                else { root.exit-open = false; }
+            }
+            return accept;
+        }
+        return reject;
+    }
+    capture-key-released(event) => {
+        if root.exit-key-held { root.exit-key-held = false; return accept; }
+        return root.exit-open ? accept : reject;
+    }
     VerticalLayout {
+        HorizontalLayout {
+            padding: 6px;
+            spacing: 8px;
+            Text { text: @tr("Double-click a completed download to locate its file."); vertical-alignment: center; horizontal-stretch: 1; min-width: 0px; wrap: word-wrap; }
+            Button { text: @tr("Compact window"); clicked => { root.compact-clicked(); } }
+            Button { text: @tr("Minimize to tray"); enabled: root.tray-available; clicked => { root.tray-clicked(); } }
+            Button { text: @tr("Exit"); clicked => { root.exit-clicked(); } }
+        }
+        if root.notice != "": HorizontalLayout {
+            padding: 8px;
+            Text { text: root.notice; color: #a03020; wrap: word-wrap; horizontal-stretch: 1; }
+            Button { text: @tr("Dismiss"); clicked => { root.notice = ""; } }
+        }
         // ---------- toolbar ----------
         Rectangle {
             height: 66px;
@@ -294,6 +349,9 @@ export component AppWindow inherits Window {
             Rectangle {
                 width: 196px;
                 background: #f0f3f7;
+                ScrollView {
+                content-width: self.width;
+                horizontal-scrollbar-policy: always-off;
                 VerticalLayout {
                     padding: 10px;
                     spacing: 2px;
@@ -310,11 +368,21 @@ export component AppWindow inherits Window {
                     }
                     Rectangle { vertical-stretch: 1; }
                 }
+                }
             }
             Rectangle { width: 1px; background: #e3e6ea; }
 
             VerticalLayout {
                 horizontal-stretch: 1;
+                // One horizontal owner keeps fixed-width headers and rows aligned.
+                // The ListView inside owns only vertical scrolling.
+                table-scroll := ScrollView {
+                vertical-stretch: 1;
+                content-width: max(850px, self.width);
+                content-height: self.height;
+                vertical-scrollbar-policy: always-off;
+                VerticalLayout {
+                padding-bottom: table-scroll.width < 850px ? 16px : 0px;
                 // ---------- list header ----------
                 Rectangle {
                     height: 30px;
@@ -394,12 +462,22 @@ export component AppWindow inherits Window {
                         vertical-alignment: center;
                     }
                 }
+                }
+                }
                 // ---------- details ----------
                 Rectangle { height: 1px; background: #e3e6ea; }
                 Rectangle {
-                    height: root.has-selection ? 300px : 0px;
+                    // Share the column with the list (about 40%, at most 300px) via stretch;
+                    // referring to root.height here makes a layout binding loop.
+                    min-height: 0px;
+                    preferred-height: 0px;
+                    max-height: root.has-selection ? 300px : 0px;
+                    vertical-stretch: root.has-selection ? 0.67 : 0;
                     visible: root.has-selection;
                     background: #fbfcfd;
+                    ScrollView {
+                    content-width: self.width;
+                    horizontal-scrollbar-policy: always-off;
                     VerticalLayout {
                         padding: 12px;
                         spacing: 6px;
@@ -450,13 +528,17 @@ export component AppWindow inherits Window {
                         }
                         HorizontalLayout {
                             spacing: 8px;
-                            Text { text: @tr("Speed limit (KB/s, 0 = unlimited)"); vertical-alignment: center; font-size: 12px; }
+                            Text { text: @tr("Speed limit (KB/s, 0 = unlimited)"); vertical-alignment: center; font-size: 12px; horizontal-stretch: 1; wrap: word-wrap; }
                             LineEdit { text <=> root.d-limit; width: 90px; }
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
                             Text { text: @tr("Priority"); vertical-alignment: center; font-size: 12px; }
-                            ComboBox { model: [@tr("Low"), @tr("Normal"), @tr("High")]; current-index <=> root.d-priority; width: 110px; }
+                            ComboBox { model: [@tr("Low"), @tr("Normal"), @tr("High")]; current-index <=> root.d-priority; width: 90px; }
                             Button { text: @tr("Apply"); clicked => { root.detail-apply(); } }
                             Rectangle { horizontal-stretch: 1; }
                         }
+                    }
                     }
                 }
             }
@@ -541,5 +623,50 @@ export component AppWindow inherits Window {
             Button { text: @tr("Cancel"); clicked => { root.set-open = false; } }
             Button { text: @tr("OK"); primary: true; clicked => { root.settings-ok(); } }
         }
+    }
+    if root.exit-open: Dialog {
+        title: Tr.exit-title();
+        Text { text: Tr.exit-warning(); wrap: word-wrap; }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: end;
+            Button { text: @tr("Cancel"); primary: !root.exit-choice; clicked => { root.exit-open = false; } }
+            Button { text: @tr("Exit"); primary: root.exit-choice; clicked => { root.exit-confirmed(); } }
+        }
+    }
+    }
+}
+
+export component CompactWindow inherits Window {
+    title: @tr("Downloader — compact");
+    icon: @image-url("icons/app.svg");
+    preferred-width: 400px;
+    preferred-height: 300px;
+    min-width: 340px;
+    min-height: 240px;
+    background: #f6f8fb;
+    in-out property <bool> pinned: false;
+    always-on-top: root.pinned;
+    in property <[Row]> rows;
+    in property <string> status-line;
+    in property <string> total-speed;
+    callback restore();
+    VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        Text { text: root.total-speed; font-size: 22px; font-weight: 600; color: #1565c0; }
+        Text { text: root.status-line; }
+        ListView {
+            for r in root.rows: VerticalLayout {
+                padding: 4px;
+                spacing: 3px;
+                Text { text: r.name; overflow: elide; }
+                Bar { value: r.progress; status: r.status; }
+                Text { text: Tr.status(r.status) + "  " + r.progress-text + "  " + r.speed; font-size: 12px; }
+            }
+        }
+        CheckBox { text: @tr("Always on top"); checked <=> root.pinned; }
+        Text { text: @tr("Closing this window restores the main window."); font-size: 11px; wrap: word-wrap; }
+        Button { text: @tr("Restore main window"); clicked => { root.restore(); } }
     }
 }

@@ -19,6 +19,8 @@ pub struct AddRequest {
     pub checksum_urls: Vec<String>,
     /// A hash the user typed (algorithm detected by length).
     pub checksum: Option<String>,
+    /// `Cookie` header value for the URL (from the browser extension).
+    pub cookie: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -89,7 +91,7 @@ pub fn serve(
     let token = random_token();
     let ep = Endpoint { port, token: token.clone() };
     std::fs::create_dir_all(state_dir)?;
-    std::fs::write(endpoint_path(state_dir), serde_json::to_vec(&ep).unwrap())?;
+    write_endpoint(&endpoint_path(state_dir), &serde_json::to_vec(&ep).unwrap())?;
     let handler = std::sync::Arc::new(handler);
     rt.spawn(async move {
         let listener = tokio::net::TcpListener::from_std(std_listener).unwrap();
@@ -98,16 +100,18 @@ pub fn serve(
             let (handler, token) = (handler.clone(), token.clone());
             tokio::spawn(async move {
                 let (r, mut w) = sock.into_split();
-                let mut lines = tokio::io::BufReader::new(r.take(1 << 20)).lines();
+                // Bound per connection. A "download all links" batch can exceed 1 MiB, and the native host accepts up to 4 MiB.
+                let mut lines = tokio::io::BufReader::new(r.take(8 << 20)).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    let reply = match serde_json::from_str::<Envelope>(&line) {
-                        Ok(env) if env.token == token => handler(env.command),
-                        Ok(_) => Reply::err("bad token"),
-                        Err(e) => Reply::err(format!("bad request: {e}")),
+                    // A wrong token closes the connection after the error reply.
+                    let (reply, close) = match serde_json::from_str::<Envelope>(&line) {
+                        Ok(env) if ct_eq(&env.token, &token) => (handler(env.command), false),
+                        Ok(_) => (Reply::err("bad token"), true),
+                        Err(e) => (Reply::err(format!("bad request: {e}")), false),
                     };
                     let mut out = serde_json::to_vec(&reply).unwrap();
                     out.push(b'\n');
-                    if w.write_all(&out).await.is_err() {
+                    if w.write_all(&out).await.is_err() || close {
                         break;
                     }
                 }
@@ -115,6 +119,35 @@ pub fn serve(
         }
     });
     Ok(ep)
+}
+
+/// Compare two secrets without an early exit on the first differing byte.
+fn ct_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut diff = (a.len() != b.len()) as u8;
+    for i in 0..a.len().max(b.len()) {
+        diff |= a.get(i).copied().unwrap_or(0) ^ b.get(i).copied().unwrap_or(0);
+    }
+    diff == 0
+}
+
+/// Write the endpoint file (it holds the token). On unix it is readable by the owner only.
+fn write_endpoint(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let mut f = opts.open(path)?;
+    #[cfg(unix)]
+    {
+        // The mode applies only when the file is created; tighten a pre-existing file too.
+        use std::os::unix::fs::PermissionsExt;
+        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    f.write_all(bytes)
 }
 
 use tokio::io::AsyncReadExt as _;

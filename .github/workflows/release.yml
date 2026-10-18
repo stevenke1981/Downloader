@@ -1,12 +1,10 @@
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -41,6 +39,8 @@ jobs:
           N=downloader-${{ matrix.name }}
           mkdir -p dist/$N
           cp README.md LICENSE dist/$N/
+          cp docs/desktop-controls.zh-TW.md dist/$N/
+          cp docs/validation-0.5.0.md docs/small-window-validation.zh-TW.md dist/$N/
           cp -r extension dist/$N/extension
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp target/release/downloader.exe target/release/dlx.exe target/release/downloader-host.exe dist/$N/
@@ -54,6 +54,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./scripts/build-installer.ps1
+      - name: Verify packaged Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/installer-smoke.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: downloader-${{ matrix.name }}
@@ -62,15 +66,6 @@ jobs:
             dist/*.tar.gz
             dist/*.exe
           if-no-files-found: error
-      - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.zip
-            dist/*.tar.gz
-            dist/*.exe
-          generate_release_notes: true
 
   macos:
     name: Build macOS universal .app
@@ -90,11 +85,3 @@ jobs:
             dist/*.zip
             dist/*.tar.gz
           if-no-files-found: error
-      - name: Attach to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.zip
-            dist/*.tar.gz
-          generate_release_notes: true

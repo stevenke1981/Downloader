@@ -21,6 +21,9 @@ msgstr "Alle Downloads"
 msgid "Also delete the file from disk"
 msgstr "Datei auch von der Festplatte löschen"
 
+msgid "Always on top"
+msgstr "Immer im Vordergrund"
+
 msgid "Apply"
 msgstr "Anwenden"
 
@@ -42,6 +45,12 @@ msgstr "Prüfsumme (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "Die Prüfsumme muss 32, 40, 64 oder 128 Hex-Zeichen haben (Präfix b2: für BLAKE2b)."
 
+msgid "Closing this window restores the main window."
+msgstr "Beim Schließen dieses Fensters wird das Hauptfenster wiederhergestellt. Downloads laufen weiter."
+
+msgid "Compact window"
+msgstr "Kompaktfenster"
+
 msgid "Completed"
 msgstr "Abgeschlossen"
 
@@ -50,6 +59,9 @@ msgstr "Verbindungen"
 
 msgid "Connections per download"
 msgstr "Verbindungen pro Download"
+
+msgid "Could not open the file location:"
+msgstr "Der Dateispeicherort konnte nicht geöffnet werden:"
 
 msgid "Default folder for the file type"
 msgstr "Standardordner für den Dateityp"
@@ -63,17 +75,35 @@ msgstr "Löschen"
 msgid "Delete download"
 msgstr "Download löschen"
 
+msgid "Dismiss"
+msgstr "Ausblenden"
+
 msgid "Documents"
 msgstr "Dokumente"
+
+msgid "Double-click a completed download to locate its file."
+msgstr "Doppelklicken Sie auf einen abgeschlossenen Download, um die Datei zu finden."
 
 msgid "Download folder"
 msgstr "Download-Ordner"
 
+msgid "Downloader — compact"
+msgstr "Downloader — Kompakt"
+
 msgid "Downloading"
 msgstr "Lädt herunter"
 
+msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
+msgstr "Downloads sind noch in Warteschlange, laufen oder werden geprüft. Beenden und pausieren? Sie können sie beim nächsten Start von Downloader fortsetzen."
+
 msgid "Error"
 msgstr "Fehler"
+
+msgid "Exit"
+msgstr "Beenden"
+
+msgid "Exit Downloader?"
+msgstr "Downloader beenden?"
 
 msgid "Expected"
 msgstr "Erwartet"
@@ -98,6 +128,9 @@ msgstr "Niedrig"
 
 msgid "Max simultaneous downloads"
 msgstr "Max. gleichzeitige Downloads"
+
+msgid "Minimize to tray"
+msgstr "In den Infobereich minimieren"
 
 msgid "Music"
 msgstr "Musik"
@@ -141,6 +174,9 @@ msgstr "Alle pausieren"
 msgid "Paused"
 msgstr "Pausiert"
 
+msgid "Please choose a download folder."
+msgstr "Bitte wählen Sie einen Download-Ordner."
+
 msgid "Please enter a valid http(s) URL."
 msgstr "Bitte eine gültige http(s)-URL eingeben."
 
@@ -164,6 +200,9 @@ msgstr "Warteschlange"
 
 msgid "Remove the selected download from the list?"
 msgstr "Ausgewählten Download aus der Liste entfernen?"
+
+msgid "Restore main window"
+msgstr "Hauptfenster wiederherstellen"
 
 msgid "Resume support"
 msgstr "Fortsetzbar"
@@ -215,6 +254,15 @@ msgstr "Status"
 
 msgid "System default"
 msgstr "Systemstandard"
+
+msgid "The file was moved or deleted. Its saved location is no longer available."
+msgstr "Die Datei wurde verschoben oder gelöscht. Der gespeicherte Speicherort ist nicht mehr verfügbar."
+
+msgid "The system tray is unavailable. The main window has been restored."
+msgstr "Der Infobereich ist nicht verfügbar. Das Hauptfenster wurde wiederhergestellt."
+
+msgid "This download is not complete. Wait for completion before locating the file."
+msgstr "Dieser Download ist noch nicht abgeschlossen. Warten Sie auf den Abschluss, bevor Sie die Datei suchen."
 
 msgid "Time left"
 msgstr "Restzeit"

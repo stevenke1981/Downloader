@@ -4,6 +4,7 @@
 use crate::checksum::{self, Algo, Checksum};
 use crate::engine::Ctx;
 use crate::task::{Status, Task, Verification, VerifyState};
+use futures_util::StreamExt as _;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -62,7 +63,8 @@ async fn exists(client: &reqwest::Client, url: &str) -> bool {
 /// page), then sidecar files, then common checksum lists in the same directory.
 pub async fn discover(client: &reqwest::Client, file_url: &str, extra: &[String]) -> Option<Checksum> {
     let (dir, name) = split_url(file_url)?;
-    let mut cands: Vec<String> = extra.iter().filter(|u| u.starts_with("http")).cloned().collect();
+    let mut cands: Vec<String> =
+        extra.iter().filter(|u| u.starts_with("http://") || u.starts_with("https://")).take(50).cloned().collect();
     for e in SIDE_EXT {
         cands.push(format!("{dir}{}.{e}", encode(&name)));
     }
@@ -70,12 +72,17 @@ pub async fn discover(client: &reqwest::Client, file_url: &str, extra: &[String]
         cands.push(format!("{dir}{l}"));
     }
     let mut seen = std::collections::HashSet::new();
+    cands.retain(|u| seen.insert(u.clone()));
+    // Fetch with bounded concurrency; `buffered` yields results in candidate order.
+    let mut fetched = futures_util::stream::iter(cands)
+        .map(|url| async move {
+            let text = fetch_text(client, &url).await;
+            (url, text)
+        })
+        .buffered(6);
     let mut best: Option<Checksum> = None;
-    for url in cands {
-        if !seen.insert(url.clone()) {
-            continue;
-        }
-        let Some(text) = fetch_text(client, &url).await else { continue };
+    while let Some((url, text)) = fetched.next().await {
+        let Some(text) = text else { continue };
         let list_name = url.rsplit('/').next().unwrap_or("");
         let single = list_name.starts_with(&encode(&name)) || list_name.starts_with(name.as_str());
         if let Some(mut c) = checksum::find_in_list(&text, &name, Algo::from_file_name(list_name), single) {
@@ -83,7 +90,7 @@ pub async fn discover(client: &reqwest::Client, file_url: &str, extra: &[String]
             if best.as_ref().is_none_or(|b| c.algo.strength() > b.algo.strength()) {
                 best = Some(c);
             }
-            // Strong enough; stop probing.
+            // Strong enough; stop probing (remaining in-flight fetches are dropped).
             if best.as_ref().is_some_and(|b| b.algo.strength() >= Algo::Sha256.strength()) {
                 break;
             }

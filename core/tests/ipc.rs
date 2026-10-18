@@ -56,6 +56,57 @@ fn ipc_add_and_token_check() {
 }
 
 #[test]
+fn ipc_accepts_large_batch() {
+    // A "download all links" batch can exceed 1 MiB on one connection; the limit is 8 MiB.
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let got: Arc<Mutex<Vec<AddRequest>>> = Arc::default();
+    let g = got.clone();
+    let ep = ipc::serve(rt.handle(), dir.path(), move |c| {
+        if let Command::Add { downloads } = c {
+            g.lock().unwrap().extend(downloads);
+        }
+        Reply::ok()
+    })
+    .unwrap();
+    let downloads: Vec<AddRequest> = (0..4000).map(|i| AddRequest { url: format!("https://files.example.org/archive/{i:05}/{}", "x".repeat(300)), ..Default::default() }).collect();
+    assert!(serde_json::to_vec(&downloads).unwrap().len() > 1 << 20, "batch should exceed the old 1 MiB limit");
+    let r = ipc::send(&ep, Command::Add { downloads }).unwrap();
+    assert!(r.ok, "{:?}", r.error);
+    assert_eq!(got.lock().unwrap().len(), 4000);
+}
+
+#[test]
+fn bad_token_closes_connection() {
+    use std::io::{BufRead, BufReader, Write};
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let ep = ipc::serve(rt.handle(), dir.path(), |_| Reply::ok()).unwrap();
+    let mut s = std::net::TcpStream::connect(("127.0.0.1", ep.port)).unwrap();
+    s.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+    // A bad token is answered, then the connection is closed even though a valid request follows.
+    let bad = json!({"token": "wrong", "cmd": "ping"});
+    let good = json!({"token": ep.token, "cmd": "ping"});
+    s.write_all(format!("{bad}\n{good}\n").as_bytes()).unwrap();
+    let mut r = BufReader::new(s);
+    let mut line = String::new();
+    r.read_line(&mut line).unwrap();
+    assert!(line.contains("bad token"), "got {line}");
+    line.clear();
+    assert_eq!(r.read_line(&mut line).unwrap(), 0, "connection must be closed, got {line}");
+}
+
+#[test]
+fn add_message_carries_cookie() {
+    // The native host deserializes each "downloads" entry into AddRequest; cookie must survive.
+    let msg = json!({"type": "add", "downloads": [{"url": "https://e.com/a.zip", "cookie": "k1=v1; k2=v2"}]});
+    let items: Vec<AddRequest> = serde_json::from_value(msg["downloads"].clone()).unwrap();
+    assert_eq!(items[0].cookie.as_deref(), Some("k1=v1; k2=v2"));
+    let plain: AddRequest = serde_json::from_value(json!({"url": "https://e.com/b.zip"})).unwrap();
+    assert_eq!(plain.cookie, None);
+}
+
+#[test]
 fn native_host_end_to_end() {
     // Spawn the real host binary with the app endpoint in a temp state dir.
     let rt = tokio::runtime::Runtime::new().unwrap();

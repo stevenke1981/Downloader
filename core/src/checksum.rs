@@ -174,18 +174,20 @@ pub fn find_in_list(text: &str, file_name: &str, hint: Option<Algo>, single_file
     let all: Vec<&str> = lines.by_ref().collect();
     for l in &all {
         // BSD style
-        if let Some((left, hexv)) = l.rsplit_once(" = ").or_else(|| l.rsplit_once(")=")) {
-            if let (Some(open), true) = (left.find(" ("), left.ends_with(')') || l.contains(")=")) {
-                let algo = Algo::parse(&left[..open]);
-                let name = left[open + 2..].trim_end_matches(')');
-                let h = hexv.trim().to_ascii_lowercase();
-                if let Some(a) = algo {
-                    if base_name(name) == file_name && is_hex(&h) && h.len() == a.hex_len() {
-                        return Some(Checksum { algo: a, expected: h, source: String::new() });
-                    }
-                }
-                continue;
+        if let Some((left, hexv)) = l.rsplit_once(" = ").or_else(|| l.rsplit_once(")="))
+            && let (Some(open), true) = (left.find(" ("), left.ends_with(')') || l.contains(")="))
+        {
+            let algo = Algo::parse(&left[..open]);
+            let name = left[open + 2..].trim_end_matches(')');
+            let h = hexv.trim().to_ascii_lowercase();
+            if let Some(a) = algo
+                && base_name(name) == file_name
+                && is_hex(&h)
+                && h.len() == a.hex_len()
+            {
+                return Some(Checksum { algo: a, expected: h, source: String::new() });
             }
+            continue;
         }
         // GNU style
         let mut it = l.splitn(2, char::is_whitespace);
@@ -200,10 +202,10 @@ pub fn find_in_list(text: &str, file_name: &str, hint: Option<Algo>, single_file
     }
     if single_file && all.len() == 1 {
         let h = all[0].split_whitespace().next().unwrap_or("").to_ascii_lowercase();
-        if is_hex(&h) {
-            if let Some(a) = by_len(&h, hint) {
-                return Some(Checksum { algo: a, expected: h, source: String::new() });
-            }
+        if is_hex(&h)
+            && let Some(a) = by_len(&h, hint)
+        {
+            return Some(Checksum { algo: a, expected: h, source: String::new() });
         }
     }
     None
@@ -243,16 +245,16 @@ pub fn from_headers(h: &reqwest::header::HeaderMap, full_body: bool) -> Vec<Chec
         }
     }
     for part in get("x-goog-hash").split(',') {
-        if let Some(("md5", v)) = part.trim().split_once('=') {
-            if let Some(hex) = b64_to_hex(v).filter(|x| x.len() == 32) {
-                out.push(Checksum { algo: Algo::Md5, expected: hex, source: "header: x-goog-hash".into() });
-            }
+        if let Some(("md5", v)) = part.trim().split_once('=')
+            && let Some(hex) = b64_to_hex(v).filter(|x| x.len() == 32)
+        {
+            out.push(Checksum { algo: Algo::Md5, expected: hex, source: "header: x-goog-hash".into() });
         }
     }
-    if full_body {
-        if let Some(hex) = b64_to_hex(&get("content-md5")).filter(|x| x.len() == 32) {
-            out.push(Checksum { algo: Algo::Md5, expected: hex, source: "header: Content-MD5".into() });
-        }
+    if full_body
+        && let Some(hex) = b64_to_hex(&get("content-md5")).filter(|x| x.len() == 32)
+    {
+        out.push(Checksum { algo: Algo::Md5, expected: hex, source: "header: Content-MD5".into() });
     }
     out
 }

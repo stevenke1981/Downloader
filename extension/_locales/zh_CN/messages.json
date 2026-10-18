@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "连不上 Downloader 时改由浏览器下载"
  },
+ "optSendCookies": {
+  "message": "下载时附带该网站的 Cookie（需要登录才能下载的文件必须开启）"
+ },
  "optSave": {
   "message": "保存"
  },

@@ -21,6 +21,9 @@ msgstr "すべて"
 msgid "Also delete the file from disk"
 msgstr "ディスクからファイルも削除する"
 
+msgid "Always on top"
+msgstr "常に手前に表示"
+
 msgid "Apply"
 msgstr "適用"
 
@@ -42,6 +45,12 @@ msgstr "チェックサム（MD5 / SHA-1 / SHA-256 / SHA-512、任意）"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "チェックサムは 32・40・64・128 文字の16進数で入力してください（BLAKE2b は b2: を付ける）。"
 
+msgid "Closing this window restores the main window."
+msgstr "このウィンドウを閉じるとメインウィンドウが復元されます。ダウンロードは続行されます。"
+
+msgid "Compact window"
+msgstr "コンパクトウィンドウ"
+
 msgid "Completed"
 msgstr "完了"
 
@@ -50,6 +59,9 @@ msgstr "接続数"
 
 msgid "Connections per download"
 msgstr "ダウンロードごとの接続数"
+
+msgid "Could not open the file location:"
+msgstr "ファイルの場所を開けませんでした:"
 
 msgid "Default folder for the file type"
 msgstr "ファイル種類ごとの既定フォルダー"
@@ -63,17 +75,35 @@ msgstr "削除"
 msgid "Delete download"
 msgstr "ダウンロードを削除"
 
+msgid "Dismiss"
+msgstr "閉じる"
+
 msgid "Documents"
 msgstr "ドキュメント"
+
+msgid "Double-click a completed download to locate its file."
+msgstr "完了したダウンロードをダブルクリックすると、ファイルの場所を開きます。"
 
 msgid "Download folder"
 msgstr "ダウンロードフォルダー"
 
+msgid "Downloader — compact"
+msgstr "Downloader — コンパクト"
+
 msgid "Downloading"
 msgstr "ダウンロード中"
 
+msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
+msgstr "待機中、ダウンロード中、または検証中の項目があります。終了して一時停止しますか？次回 Downloader を開いたときに再開できます。"
+
 msgid "Error"
 msgstr "エラー"
+
+msgid "Exit"
+msgstr "終了"
+
+msgid "Exit Downloader?"
+msgstr "Downloader を終了しますか？"
 
 msgid "Expected"
 msgstr "期待値"
@@ -98,6 +128,9 @@ msgstr "低"
 
 msgid "Max simultaneous downloads"
 msgstr "同時ダウンロード数"
+
+msgid "Minimize to tray"
+msgstr "トレイに最小化"
 
 msgid "Music"
 msgstr "音楽"
@@ -141,6 +174,9 @@ msgstr "すべて一時停止"
 msgid "Paused"
 msgstr "一時停止中"
 
+msgid "Please choose a download folder."
+msgstr "ダウンロードフォルダーを選択してください。"
+
 msgid "Please enter a valid http(s) URL."
 msgstr "有効な http(s) URL を入力してください。"
 
@@ -164,6 +200,9 @@ msgstr "待機中"
 
 msgid "Remove the selected download from the list?"
 msgstr "選択したダウンロードを一覧から削除しますか？"
+
+msgid "Restore main window"
+msgstr "メインウィンドウを復元"
 
 msgid "Resume support"
 msgstr "レジューム対応"
@@ -215,6 +254,15 @@ msgstr "状態"
 
 msgid "System default"
 msgstr "システムに従う"
+
+msgid "The file was moved or deleted. Its saved location is no longer available."
+msgstr "ファイルが移動または削除されました。保存先は利用できなくなっています。"
+
+msgid "The system tray is unavailable. The main window has been restored."
+msgstr "システムトレイを利用できません。メインウィンドウを復元しました。"
+
+msgid "This download is not complete. Wait for completion before locating the file."
+msgstr "このダウンロードはまだ完了していません。完了してからファイルの場所を確認してください。"
 
 msgid "Time left"
 msgstr "残り時間"

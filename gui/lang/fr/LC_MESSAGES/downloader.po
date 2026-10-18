@@ -21,6 +21,9 @@ msgstr "Tous"
 msgid "Also delete the file from disk"
 msgstr "Supprimer aussi le fichier du disque"
 
+msgid "Always on top"
+msgstr "Toujours au premier plan"
+
 msgid "Apply"
 msgstr "Appliquer"
 
@@ -42,6 +45,12 @@ msgstr "Somme de contrôle (MD5 / SHA-1 / SHA-256 / SHA-512, facultatif)"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "La somme doit comporter 32, 40, 64 ou 128 caractères hex (préfixe b2: pour BLAKE2b)."
 
+msgid "Closing this window restores the main window."
+msgstr "Fermer cette fenêtre restaure la fenêtre principale. Les téléchargements continuent."
+
+msgid "Compact window"
+msgstr "Fenêtre compacte"
+
 msgid "Completed"
 msgstr "Terminés"
 
@@ -50,6 +59,9 @@ msgstr "Connexions"
 
 msgid "Connections per download"
 msgstr "Connexions par téléchargement"
+
+msgid "Could not open the file location:"
+msgstr "Impossible d'ouvrir l'emplacement du fichier :"
 
 msgid "Default folder for the file type"
 msgstr "Dossier par défaut selon le type"
@@ -63,17 +75,35 @@ msgstr "Supprimer"
 msgid "Delete download"
 msgstr "Supprimer le téléchargement"
 
+msgid "Dismiss"
+msgstr "Masquer"
+
 msgid "Documents"
 msgstr "Documents"
+
+msgid "Double-click a completed download to locate its file."
+msgstr "Double-cliquez sur un téléchargement terminé pour localiser son fichier."
 
 msgid "Download folder"
 msgstr "Dossier de téléchargement"
 
+msgid "Downloader — compact"
+msgstr "Downloader — compact"
+
 msgid "Downloading"
 msgstr "En cours"
 
+msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
+msgstr "Des téléchargements sont encore en attente, en cours ou en vérification. Quitter et les suspendre ? Vous pourrez les reprendre à la prochaine ouverture de Downloader."
+
 msgid "Error"
 msgstr "Erreur"
+
+msgid "Exit"
+msgstr "Quitter"
+
+msgid "Exit Downloader?"
+msgstr "Quitter Downloader ?"
 
 msgid "Expected"
 msgstr "Attendu"
@@ -98,6 +128,9 @@ msgstr "Basse"
 
 msgid "Max simultaneous downloads"
 msgstr "Téléchargements simultanés max."
+
+msgid "Minimize to tray"
+msgstr "Réduire dans la zone de notification"
 
 msgid "Music"
 msgstr "Musique"
@@ -141,6 +174,9 @@ msgstr "Tout suspendre"
 msgid "Paused"
 msgstr "Suspendu"
 
+msgid "Please choose a download folder."
+msgstr "Veuillez choisir un dossier de téléchargement."
+
 msgid "Please enter a valid http(s) URL."
 msgstr "Veuillez saisir une URL http(s) valide."
 
@@ -164,6 +200,9 @@ msgstr "En file d'attente"
 
 msgid "Remove the selected download from the list?"
 msgstr "Retirer le téléchargement sélectionné de la liste ?"
+
+msgid "Restore main window"
+msgstr "Restaurer la fenêtre principale"
 
 msgid "Resume support"
 msgstr "Reprise possible"
@@ -215,6 +254,15 @@ msgstr "État"
 
 msgid "System default"
 msgstr "Langue du système"
+
+msgid "The file was moved or deleted. Its saved location is no longer available."
+msgstr "Le fichier a été déplacé ou supprimé. Son emplacement enregistré n'est plus disponible."
+
+msgid "The system tray is unavailable. The main window has been restored."
+msgstr "La zone de notification est indisponible. La fenêtre principale a été restaurée."
+
+msgid "This download is not complete. Wait for completion before locating the file."
+msgstr "Ce téléchargement n'est pas terminé. Attendez la fin avant de localiser le fichier."
 
 msgid "Time left"
 msgstr "Restant"

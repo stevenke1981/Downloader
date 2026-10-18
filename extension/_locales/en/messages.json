@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "If the Downloader app can't be reached, let the browser download"
  },
+ "optSendCookies": {
+  "message": "Send the site's cookies with downloads (needed for downloads that require login)"
+ },
  "optSave": {
   "message": "Save"
  },

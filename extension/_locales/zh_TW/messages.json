@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "連不上 Downloader 時改由瀏覽器下載"
  },
+ "optSendCookies": {
+  "message": "下載時附帶該網站的 Cookie（需要登入才能下載的檔案必須開啟）"
+ },
  "optSave": {
   "message": "儲存"
  },

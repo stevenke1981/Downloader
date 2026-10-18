@@ -7,6 +7,7 @@ const DEFAULTS = {
   exclude: "html,htm,php,json,xml,txt,crx",
   altBypass: true,
   fallback: true,
+  sendCookies: true,
 };
 const t = (k, a) => chrome.i18n.getMessage(k, a) || k;
 
@@ -30,10 +31,59 @@ function native(msg) {
   });
 }
 
+// The app's HTTP library rejects header values outside visible ASCII, which would fail the whole download,
+// so such cookies are skipped. A cookie string over MAX_COOKIE_CHARS is dropped entirely, and a batch whose
+// cookies together exceed MAX_BATCH_COOKIE_CHARS is sent without cookies (native messaging caps messages at 4 MB).
+const COOKIE_TOKEN_RE = /^[\x21-\x7E]*$/;
+const MAX_COOKIE_CHARS = 8192;
+const MAX_BATCH_COOKIE_CHARS = 3000000;
+
+// Cookie header value for a URL ("k1=v1; k2=v2"), or undefined when there are none or the lookup fails.
+async function cookieFor(url) {
+  try {
+    const cookies = await chrome.cookies.getAll({ url });
+    const usable = (cookies || []).filter((c) => COOKIE_TOKEN_RE.test(c.name) && COOKIE_TOKEN_RE.test(c.value));
+    if (!usable.length) return undefined;
+    const header = usable.map((c) => `${c.name}=${c.value}`).join("; ");
+    return header.length > MAX_COOKIE_CHARS ? undefined : header;
+  } catch (_) {
+    return undefined;
+  }
+}
+
+const originOf = (u) => {
+  try { return new URL(u).origin; } catch (_) { return u; }
+};
+
+// Attach each download's cookies (when enabled) so the app can fetch logged-in URLs.
+// A single download uses its exact URL; a batch looks cookies up once per origin.
+async function withCookies(list) {
+  const single = list.length === 1;
+  const cache = new Map(); // key -> Promise<cookie string | undefined>
+  const attached = await Promise.all(list.map(async (d) => {
+    const key = single ? d.url : originOf(d.url);
+    if (!cache.has(key)) cache.set(key, cookieFor(single ? d.url : `${key}/`));
+    const cookie = await cache.get(key);
+    return cookie ? { ...d, cookie } : d;
+  }));
+  const total = attached.reduce((sum, d) => sum + (d.cookie ? d.cookie.length : 0), 0);
+  return total > MAX_BATCH_COOKIE_CHARS ? list : attached;
+}
+
 async function sendToApp(downloads) {
-  const list = downloads.filter((d) => /^https?:\/\//i.test(d.url));
+  let list = downloads.filter((d) => /^https?:\/\//i.test(d.url));
   if (!list.length) return { ok: false, error: "no http(s) URL" };
+  if ((await options()).sendCookies) list = await withCookies(list);
   return native({ type: "add", downloads: list });
+}
+
+// Let the browser fetch a URL when the app is unreachable. chrome.downloads.download only accepts a bare
+// relative filename, so retry without it if Chrome rejects the name.
+async function startBrowserDownload(url, filename) {
+  if (filename) {
+    try { await chrome.downloads.download({ url, filename }); return; } catch (_) {}
+  }
+  try { await chrome.downloads.download({ url }); } catch (_) { passThrough.delete(url); }
 }
 
 function extOf(name) {
@@ -139,7 +189,7 @@ chrome.downloads.onCreated.addListener(async (item) => {
   // Take the download away from the browser.
   try { await chrome.downloads.cancel(item.id); } catch (_) {}
   try { await chrome.downloads.erase({ id: item.id }); } catch (_) {}
-  const filename = item.filename ? item.filename.split(/[\\/]/).pop() : undefined;
+  const filename = (item.filename || "").split(/[\\/]/).pop() || undefined;
   const tab = await tabForPage(item.referrer).catch(() => null);
   const checksum_urls = await checksumLinks(tab?.id);
   const r = await sendToApp([{ url, referrer: item.referrer || undefined, filename, checksum_urls }]);
@@ -147,7 +197,7 @@ chrome.downloads.onCreated.addListener(async (item) => {
     badge("1", "#1e88e5");
   } else if (o.fallback) {
     passThrough.add(url);
-    chrome.downloads.download({ url });
+    await startBrowserDownload(url, filename);
     badge("!", "#f39c12");
   } else {
     badge("!", "#d32f2f");

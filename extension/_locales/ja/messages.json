@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "Downloader に接続できないときはブラウザでダウンロード"
  },
+ "optSendCookies": {
+  "message": "ダウンロード時にサイトの Cookie を送信する（ログインが必要なダウンロードに必要）"
+ },
  "optSave": {
   "message": "保存"
  },

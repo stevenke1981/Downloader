@@ -1,15 +1,20 @@
 # Builds dist\downloader-setup-windows-x64.exe with Inno Setup.
-# Expects target\release\downloader.exe and rarc.exe to exist already.
+# Expects all three target\release Downloader executables to exist already.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
-if (-not (Test-Path $iscc)) {
+$candidates = @(
+    (Join-Path $env:ProgramFiles 'Inno Setup 7\ISCC.exe'),
+    (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe')
+)
+$iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $iscc -and $env:GITHUB_ACTIONS -eq 'true') {
     choco install innosetup -y --no-progress
     if ($LASTEXITCODE -ne 0) { throw "choco install innosetup failed" }
+    $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
-if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+if (-not $iscc -or -not (Test-Path -LiteralPath $iscc)) { throw 'Inno Setup 6 or 7 is required.' }
 
 $isl = 'installer\ChineseTraditional.isl'
 if (-not (Test-Path $isl)) {

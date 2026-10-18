@@ -50,10 +50,38 @@ fn hdr(r: &reqwest::Response, h: reqwest::header::HeaderName) -> Option<String> 
     r.headers().get(h).and_then(|v| v.to_str().ok()).map(str::to_string)
 }
 
-async fn probe(client: &reqwest::Client, url: &str, referer: Option<&str>) -> Result<Probe, String> {
+/// HTTP status code from an error string such as "HTTP 404 Not Found".
+fn http_code(e: &str) -> Option<u16> {
+    e.strip_prefix("HTTP ")?.get(..3)?.parse().ok()
+}
+
+/// 4xx responses won't fix themselves on retry, except 408 (timeout) and 429 (rate limit).
+fn permanent(code: u16) -> bool {
+    (400..500).contains(&code) && code != 408 && code != 429
+}
+
+/// True when `a` and `b` share scheme, host and port (default ports count as the same). Anything unparseable is not.
+fn same_origin(a: &str, b: &str) -> bool {
+    match (reqwest::Url::parse(a), reqwest::Url::parse(b)) {
+        (Ok(x), Ok(y)) => x.scheme() == y.scheme() && x.host_str().is_some() && x.host_str() == y.host_str() && x.port_or_known_default() == y.port_or_known_default(),
+        _ => false,
+    }
+}
+
+const COOKIE_HINT: &str = " — login cookies are not kept after a restart; add the download again from the browser";
+
+/// Adds a hint to a 401/403 when the login cookie used before a restart is gone (cookies are never persisted).
+fn with_cookie_hint(err: String, lost_cookie: bool) -> String {
+    if lost_cookie && matches!(http_code(&err), Some(401 | 403)) { format!("{err}{COOKIE_HINT}") } else { err }
+}
+
+async fn probe(client: &reqwest::Client, url: &str, referer: Option<&str>, cookie: Option<&str>) -> Result<Probe, String> {
     let mut req = client.get(url).header(RANGE, "bytes=0-0");
     if let Some(r) = referer {
         req = req.header(reqwest::header::REFERER, r);
+    }
+    if let Some(c) = cookie {
+        req = req.header(reqwest::header::COOKIE, c);
     }
     let resp = req.send().await.map_err(err_str)?;
     let st = resp.status();
@@ -155,6 +183,7 @@ struct Shared {
     range: bool,
     etag: Option<String>,
     referer: Option<String>,
+    cookie: Option<String>,
     ctx: Ctx,
 }
 
@@ -176,6 +205,9 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
     if let Some(r) = &sh.referer {
         req = req.header(reqwest::header::REFERER, r);
     }
+    if let Some(c) = &sh.cookie {
+        req = req.header(reqwest::header::COOKIE, c);
+    }
     if sh.range {
         let r = if end == u64::MAX { format!("bytes={pos}-") } else { format!("bytes={pos}-{}", end - 1) };
         req = req.header(RANGE, r);
@@ -191,14 +223,14 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
     if sh.range && st.as_u16() != 206 {
         return Err(if st.as_u16() == 200 {
             FetchErr::Fatal("the file changed on the server (range request answered with the whole file)".into())
-        } else if st.is_client_error() && st.as_u16() != 429 {
+        } else if permanent(st.as_u16()) {
             FetchErr::Fatal(format!("HTTP {st}"))
         } else {
             FetchErr::Retry(format!("HTTP {st}"))
         });
     }
     if !st.is_success() {
-        return Err(if st.is_client_error() && st.as_u16() != 429 {
+        return Err(if permanent(st.as_u16()) {
             FetchErr::Fatal(format!("HTTP {st}"))
         } else {
             FetchErr::Retry(format!("HTTP {st}"))
@@ -257,11 +289,18 @@ async fn worker(sh: Arc<Shared>) -> Result<(), String> {
         };
         let mut attempt = 0u32;
         let res = loop {
+            let before = sh.task.lock().unwrap().segments[idx].pos;
             match fetch(&sh, idx).await {
                 Ok(()) => break Ok(()),
                 Err(FetchErr::Cancelled) => break Err(None),
                 Err(FetchErr::Fatal(e)) => break Err(Some(e)),
                 Err(FetchErr::Retry(e)) => {
+                    // A connection that moved the segment forward was healthy, so only count consecutive
+                    // failures without progress. Non-range fetches restart from the segment start every time,
+                    // so their progress never carries over and they keep counting.
+                    if sh.range && sh.task.lock().unwrap().segments[idx].pos > before {
+                        attempt = 0;
+                    }
                     attempt += 1;
                     if attempt > sh.ctx.retries {
                         break Err(Some(e));
@@ -286,16 +325,16 @@ async fn worker(sh: Arc<Shared>) -> Result<(), String> {
     }
 }
 
-async fn probe_retry(ctx: &Ctx, url: &str, referer: Option<&str>) -> Result<Probe, String> {
+async fn probe_retry(ctx: &Ctx, url: &str, referer: Option<&str>, cookie: Option<&str>) -> Result<Probe, String> {
     let mut attempt = 0;
     loop {
         let r = tokio::select! {
-            r = probe(&ctx.client, url, referer) => r,
+            r = probe(&ctx.client, url, referer, cookie) => r,
             _ = ctx.cancel.cancelled() => return Err(String::new()),
         };
         match r {
             Ok(p) => return Ok(p),
-            Err(e) if attempt >= ctx.retries || e.starts_with("HTTP 4") => return Err(e),
+            Err(e) if attempt >= ctx.retries || http_code(&e).is_some_and(permanent) => return Err(e),
             Err(_) => {
                 attempt += 1;
                 tokio::select! {
@@ -335,14 +374,24 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
 }
 
 async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
-    let (url, referer) = {
+    let (url, referer, cookie, had_cookie) = {
         let t = task.lock().unwrap();
-        (t.url.clone(), t.referer.clone())
+        (t.url.clone(), t.referer.clone(), t.cookie.clone().filter(|c| !c.trim().is_empty()), t.had_cookie)
     };
-    let p = match probe_retry(&ctx, &url, referer.as_deref()).await {
+    let lost_cookie = had_cookie && cookie.is_none();
+    let p = match probe_retry(&ctx, &url, referer.as_deref(), cookie.as_deref()).await {
         Ok(p) => p,
         Err(_) if ctx.cancel.is_cancelled() => return Ok(Outcome::Cancelled),
-        Err(e) => return Err(e),
+        Err(e) => return Err(with_cookie_hint(e, lost_cookie)),
+    };
+    // The probe follows redirects (reqwest drops Cookie on cross-origin hops), but the workers add the cookie
+    // by hand to `p.url`. Only keep it when the redirect target is the same origin as the task URL.
+    let cookie = match cookie {
+        Some(_) if !same_origin(&url, &p.url) => {
+            eprintln!("login cookie not sent: the download was redirected to another origin");
+            None
+        }
+        c => c,
     };
 
     let (part, conns) = {
@@ -393,7 +442,7 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         let _ = file.set_len(n);
     }
 
-    let sh = Arc::new(Shared { task: task.clone(), file, url: p.url.clone(), range: p.range, etag: p.etag.clone(), referer, ctx: ctx.clone() });
+    let sh = Arc::new(Shared { task: task.clone(), file, url: p.url.clone(), range: p.range, etag: p.etag.clone(), referer, cookie, ctx: ctx.clone() });
     let mut set = tokio::task::JoinSet::new();
     for _ in 0..conns {
         set.spawn(worker(sh.clone()));
@@ -415,7 +464,7 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         (complete, total, t.final_path())
     };
     if !complete {
-        return Err(last_err.unwrap_or_else(|| "download incomplete".into()));
+        return Err(with_cookie_hint(last_err.unwrap_or_else(|| "download incomplete".into()), lost_cookie));
     }
     // Every byte of [0, total) must be covered by a finished segment.
     {
@@ -456,6 +505,28 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn same_origin_rules() {
+        assert!(same_origin("https://a.example/x.zip", "https://a.example/y/z.zip?q=1"));
+        assert!(same_origin("https://a.example/x", "https://A.example:443/x"), "default port and host case");
+        assert!(!same_origin("https://a.example/x", "https://cdn.example/x"), "different host");
+        assert!(!same_origin("https://a.example/x", "http://a.example/x"), "scheme downgrade");
+        assert!(!same_origin("https://a.example/x", "https://a.example:8443/x"), "different port");
+        assert!(!same_origin("https://a.example/x", "not a url"));
+        assert!(!same_origin("", ""));
+    }
+
+    #[test]
+    fn cookie_hint_only_for_auth_errors_after_restart() {
+        let h = with_cookie_hint("HTTP 403 Forbidden".into(), true);
+        assert!(h.starts_with("HTTP 403 Forbidden — login cookies are not kept after a restart"), "{h}");
+        assert!(h.ends_with("add the download again from the browser"), "{h}");
+        assert!(with_cookie_hint("HTTP 401 Unauthorized".into(), true).contains("not kept after a restart"));
+        assert_eq!(with_cookie_hint("HTTP 404 Not Found".into(), true), "HTTP 404 Not Found");
+        assert_eq!(with_cookie_hint("HTTP 403 Forbidden".into(), false), "HTTP 403 Forbidden");
+        assert_eq!(with_cookie_hint("connection reset".into(), true), "connection reset");
+    }
+
     #[test]
     fn plan_and_steal() {
         let mut s = plan_segments(10 << 20, 4);
