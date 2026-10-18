@@ -4,7 +4,7 @@
 use dlcore::util::{human_eta, human_size, looks_like_url};
 use dlcore::{Checksum, Manager, NewDownload, Snapshot, Status};
 use slint::winit_030::WinitWindowAccessor;
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -195,6 +195,66 @@ fn browser_flags() -> Option<i32> {
     None
 }
 
+/// List models that live as long as the windows. They are updated in place so
+/// ListView rows are only re-created when the list actually changes.
+struct Models {
+    rows: Rc<VecModel<Row>>,
+    compact_rows: Rc<VecModel<Row>>,
+    counts: Rc<VecModel<i32>>,
+}
+
+impl Models {
+    fn new() -> Self {
+        Self {
+            rows: Rc::new(VecModel::from(Vec::new())),
+            compact_rows: Rc::new(VecModel::from(Vec::new())),
+            counts: Rc::new(VecModel::from(vec![0; 10])),
+        }
+    }
+}
+
+fn bind_models(ui: &AppWindow, compact: &CompactWindow, models: &Models) {
+    ui.set_rows(ModelRc::from(models.rows.clone()));
+    ui.set_counts(ModelRc::from(models.counts.clone()));
+    compact.set_rows(ModelRc::from(models.compact_rows.clone()));
+}
+
+/// Makes `model` equal to `items`. Changed rows are replaced in place, surplus rows
+/// are removed from the tail and new rows are appended, so unchanged rows are not touched.
+fn sync_model<T: Clone + PartialEq + 'static>(model: &VecModel<T>, items: Vec<T>) {
+    let shared = model.row_count().min(items.len());
+    for (i, item) in items.iter().enumerate().take(shared) {
+        if model.row_data(i).as_ref() != Some(item) {
+            model.set_row_data(i, item.clone());
+        }
+    }
+    while model.row_count() > items.len() {
+        model.remove(model.row_count() - 1);
+    }
+    for item in items.into_iter().skip(shared) {
+        model.push(item);
+    }
+}
+
+/// Copies the compact window's summary and rows from the current UI state and one snapshot.
+fn sync_compact(ui: &AppWindow, compact: &CompactWindow, app: &App, snaps: &[Snapshot]) {
+    compact.set_total_speed(ui.get_total_speed());
+    compact.set_status_line(ui.get_status_line());
+    sync_model(
+        &app.models.compact_rows,
+        rows_for(snaps.iter(), app.selected),
+    );
+}
+
+/// Shows the compact window with rows taken now, not left stale until the next timer tick.
+fn open_compact(ui: &AppWindow, compact: &CompactWindow, app: &RefCell<App>) {
+    show_compact(ui, compact);
+    let mut a = app.borrow_mut();
+    let snaps = a.mgr().snapshots();
+    refresh(ui, &mut a, &snaps);
+    sync_compact(ui, compact, &a, &snaps);
+}
+
 struct App {
     mgr: Option<Manager>,
     filter: i32,
@@ -203,6 +263,7 @@ struct App {
     detail_for: Option<u64>,
     last_clip: String,
     clipboard: Option<arboard::Clipboard>,
+    models: Models,
 }
 
 impl App {
@@ -296,11 +357,11 @@ fn rows_for<'a>(snaps: impl IntoIterator<Item = &'a Snapshot>, selected: Option<
         .collect()
 }
 
-fn refresh(ui: &AppWindow, app: &mut App) {
-    let snaps = app.mgr().snapshots();
+/// Refreshes every view from one snapshot taken by the caller.
+fn refresh(ui: &AppWindow, app: &mut App, snaps: &[Snapshot]) {
     let tr = ui.global::<Tr>();
     let mut counts = vec![snaps.len() as i32, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    for s in &snaps {
+    for s in snaps {
         if matches_filter(s, 1) {
             counts[1] += 1;
         }
@@ -309,7 +370,7 @@ fn refresh(ui: &AppWindow, app: &mut App) {
         }
         counts[3 + s.category.index() as usize] += 1;
     }
-    ui.set_counts(ModelRc::new(VecModel::from(counts.clone())));
+    sync_model(&app.models.counts, counts.clone());
 
     let visible: Vec<&Snapshot> = snaps
         .iter()
@@ -322,8 +383,10 @@ fn refresh(ui: &AppWindow, app: &mut App) {
         app.selected = None;
     }
     app.visible = visible.iter().map(|s| s.id).collect();
-    let rows = rows_for(visible.iter().copied(), app.selected);
-    ui.set_rows(ModelRc::new(VecModel::from(rows)));
+    sync_model(
+        &app.models.rows,
+        rows_for(visible.iter().copied(), app.selected),
+    );
 
     let total_speed: f64 = snaps.iter().map(|s| s.speed).sum();
     ui.set_total_speed(format!("{}/s", human_size(total_speed as u64)).into());
@@ -394,6 +457,12 @@ fn refresh(ui: &AppWindow, app: &mut App) {
     } else {
         app.detail_for = None;
     }
+}
+
+/// For callbacks that change state and do not already hold a snapshot.
+fn refresh_now(ui: &AppWindow, app: &mut App) {
+    let snaps = app.mgr().snapshots();
+    refresh(ui, app, &snaps);
 }
 
 fn set_languages_model(ui: &AppWindow) {
@@ -507,15 +576,17 @@ fn main() -> Result<(), slint::PlatformError> {
         detail_for: None,
         last_clip,
         clipboard,
+        models: Models::new(),
     }));
+    bind_models(&ui, &compact, &app.borrow().models);
 
-    refresh(&ui, &mut app.borrow_mut());
+    refresh_now(&ui, &mut app.borrow_mut());
 
     {
-        let (uw, cw) = (ui.as_weak(), compact.as_weak());
+        let (uw, cw, a) = (ui.as_weak(), compact.as_weak(), app.clone());
         ui.on_compact_clicked(move || {
             if let (Some(u), Some(c)) = (uw.upgrade(), cw.upgrade()) {
-                show_compact(&u, &c);
+                open_compact(&u, &c, &a);
             }
         });
         let (uw, cw) = (ui.as_weak(), compact.as_weak());
@@ -574,7 +645,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     for action in t.actions() {
                         match action {
                             tray::Action::Restore => restore_main(&ui, &compact),
-                            tray::Action::Compact => show_compact(&ui, &compact),
+                            tray::Action::Compact => open_compact(&ui, &compact, &app),
                             tray::Action::Exit => request_exit(&ui, &compact, &app),
                         }
                     }
@@ -589,6 +660,7 @@ fn main() -> Result<(), slint::PlatformError> {
                                 file_name: d.filename,
                                 checksum_urls: d.checksum_urls,
                                 checksum: d.checksum.as_deref().and_then(dlcore::Checksum::guess),
+                                cookie: d.cookie,
                                 start: true,
                                 ..Default::default()
                             });
@@ -597,14 +669,12 @@ fn main() -> Result<(), slint::PlatformError> {
                     }
                     restore_main(&ui, &compact);
                 }
-                refresh(&ui, &mut a);
-                compact.set_total_speed(ui.get_total_speed());
-                compact.set_status_line(ui.get_status_line());
-                let all = a.mgr().snapshots();
-                compact.set_rows(ModelRc::new(VecModel::from(rows_for(
-                    all.iter(),
-                    a.selected,
-                ))));
+                // One snapshot per tick, shared by every view and the clipboard check.
+                let snaps = a.mgr().snapshots();
+                refresh(&ui, &mut a, &snaps);
+                if compact.window().is_visible() {
+                    sync_compact(&ui, &compact, &a, &snaps);
+                }
                 if let Some(t) = tray.as_ref() {
                     t.update(&format!(
                         "{} · {}",
@@ -626,7 +696,7 @@ fn main() -> Result<(), slint::PlatformError> {
                     if text != a.last_clip {
                         a.last_clip = text.clone();
                         let t = text.trim();
-                        if looks_like_url(t) && !a.mgr().snapshots().iter().any(|s| s.url == t) {
+                        if looks_like_url(t) && !snaps.iter().any(|s| s.url == t) {
                             open_add(&ui, &a, t);
                         }
                     }
@@ -692,48 +762,54 @@ fn main() -> Result<(), slint::PlatformError> {
         });
         app.selected = Some(id);
         ui.set_add_open(false);
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_start_clicked, || {
         if let Some(id) = app.selected {
             app.mgr().start(id);
         }
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_pause_clicked, || {
         if let Some(id) = app.selected {
             app.mgr().pause(id);
         }
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_start_all, || {
         app.mgr().start_all();
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_pause_all, || {
         app.mgr().pause_all();
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_delete_confirmed, || {
         if let Some(id) = app.selected.take() {
             app.mgr().remove(id, ui.get_del_file());
         }
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_filter_clicked, |f| {
         app.filter = f;
         ui.set_filter(f);
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_row_clicked, |i| {
         app.selected = app.visible.get(i as usize).copied();
-        refresh(&ui, &mut app);
-        if let Some(id) = app.selected
-            && app
-                .mgr()
-                .snapshots()
-                .iter()
-                .any(|s| s.id == id && s.status == Status::Completed)
+        refresh_now(&ui, &mut app);
+    });
+    on!(ui, app, on_row_double_clicked, |i| {
+        let Some(id) = app.visible.get(i as usize).copied() else {
+            return;
+        };
+        app.selected = Some(id);
+        refresh_now(&ui, &mut app);
+        if app
+            .mgr()
+            .snapshots()
+            .iter()
+            .any(|s| s.id == id && s.status == Status::Completed)
         {
             reveal_download(&ui, &app, id);
         }
@@ -745,9 +821,11 @@ fn main() -> Result<(), slint::PlatformError> {
     });
     on!(ui, app, on_detail_apply, || {
         if let Some(id) = app.selected {
-            if let Some(v) = parse_kbs(&ui.get_d_limit()) {
-                app.mgr().set_speed_limit(id, v);
-            }
+            let Some(v) = parse_kbs(&ui.get_d_limit()) else {
+                ui.set_notice(ui.global::<Tr>().invoke_invalid_number());
+                return;
+            };
+            app.mgr().set_speed_limit(id, v);
             app.mgr().set_priority(id, ui.get_d_priority() - 1);
             app.mgr().save();
         }
@@ -801,7 +879,6 @@ fn main() -> Result<(), slint::PlatformError> {
         } else {
             LANGS[(li - 1) as usize].0.to_string()
         };
-        s.download_dir = PathBuf::from(ui.get_s_folder().trim());
         s.category_folders = ui.get_s_catfolders();
         s.max_concurrent = ui.get_s_concurrent().clamp(1, 20) as u32;
         s.max_connections = ui.get_s_conns().clamp(1, 32) as u32;
@@ -812,8 +889,14 @@ fn main() -> Result<(), slint::PlatformError> {
         s.schedule.stop = ui.get_s_stop().trim().to_string();
         s.watch_clipboard = ui.get_s_clip();
         s.auto_verify = ui.get_s_verify();
+        let folder = ui.get_s_folder().trim().to_string();
         let (g, p) = (parse_kbs(&ui.get_s_global()), parse_kbs(&ui.get_s_perdl()));
         let tr = ui.global::<Tr>();
+        if folder.is_empty() {
+            ui.set_s_error(tr.invoke_invalid_folder());
+            return;
+        }
+        s.download_dir = PathBuf::from(folder);
         let (Some(g), Some(p)) = (g, p) else {
             ui.set_s_error(tr.invoke_invalid_number());
             return;
@@ -832,7 +915,7 @@ fn main() -> Result<(), slint::PlatformError> {
         apply_lang(&lang);
         set_languages_model(&ui);
         ui.set_set_open(false);
-        refresh(&ui, &mut app);
+        refresh_now(&ui, &mut app);
     });
 
     ui.show()?;
@@ -850,6 +933,22 @@ fn main() -> Result<(), slint::PlatformError> {
 #[path = "../../core/tests/server/mod.rs"]
 #[rustfmt::skip]
 mod fixture_server;
+
+#[cfg(test)]
+mod model_sync_tests {
+    use super::*;
+
+    #[test]
+    fn sync_model_matches_items_for_growth_change_and_shrink() {
+        let model = VecModel::from(vec![1, 2, 3]);
+        sync_model(&model, vec![1, 9, 3, 4]);
+        assert_eq!(model.iter().collect::<Vec<_>>(), vec![1, 9, 3, 4]);
+        sync_model(&model, vec![7]);
+        assert_eq!(model.iter().collect::<Vec<_>>(), vec![7]);
+        sync_model(&model, Vec::new());
+        assert_eq!(model.row_count(), 0);
+    }
+}
 
 #[cfg(test)]
 mod lifecycle_tests {
@@ -955,6 +1054,14 @@ mod lifecycle_tests {
                         && p.y + s.height <= height + 0.5,
                     "{label} at {p:?} size {s:?} outside {width}x{height}"
                 );
+                if label == "Open folder" {
+                    // The details pane takes roughly the lower 40% (at most 300px).
+                    let pane = height - p.y;
+                    assert!(
+                        pane > 120.0 && pane < 330.0,
+                        "details pane height ~{pane} at {width}x{height}"
+                    );
+                }
             }
             ElementHandle::find_by_accessible_label(&ui, "Compact window")
                 .next()
@@ -1035,6 +1142,41 @@ mod lifecycle_tests {
     }
 
     #[test]
+    fn compact_rows_are_current_as_soon_as_it_opens() {
+        i_slint_backend_testing::init_no_event_loop();
+        let state = tempfile::tempdir().unwrap();
+        let app = Rc::new(RefCell::new(App {
+            mgr: Some(Manager::new(state.path())),
+            filter: 0,
+            selected: None,
+            visible: vec![],
+            detail_for: None,
+            last_clip: String::new(),
+            clipboard: None,
+            models: Models::new(),
+        }));
+        let ui = AppWindow::new().unwrap();
+        let compact = CompactWindow::new().unwrap();
+        bind_models(&ui, &compact, &app.borrow().models);
+        refresh_now(&ui, &mut app.borrow_mut());
+        // Not started, so no network is touched.
+        let id = app.borrow().mgr().add(NewDownload {
+            url: "https://example.invalid/fixture.bin".into(),
+            start: false,
+            ..Default::default()
+        });
+        open_compact(&ui, &compact, &app);
+        assert!(compact.window().is_visible());
+        assert_eq!(compact.get_rows().row_count(), 1);
+        restore_main(&ui, &compact);
+        // The 500 ms timer has not run yet, so the compact model still holds the removed row.
+        app.borrow().mgr().remove(id, false);
+        open_compact(&ui, &compact, &app);
+        assert_eq!(compact.get_rows().row_count(), 0);
+        restore_main(&ui, &compact);
+    }
+
+    #[test]
     fn repeated_window_switches_keep_download_and_exit_confirmation_state() {
         use std::time::Instant;
         i_slint_backend_testing::init_no_event_loop();
@@ -1058,6 +1200,7 @@ mod lifecycle_tests {
             detail_for: None,
             last_clip: String::new(),
             clipboard: None,
+            models: Models::new(),
         }));
         // Gate HTTP responses so confirmation cannot race a fast download.
         // Declared after App so a failed assertion releases the gate before Runtime drops.

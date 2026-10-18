@@ -21,6 +21,9 @@ msgstr "全部下载"
 msgid "Also delete the file from disk"
 msgstr "同时从磁盘删除文件"
 
+msgid "Always on top"
+msgstr "保持置顶"
+
 msgid "Apply"
 msgstr "应用"
 
@@ -42,6 +45,12 @@ msgstr "校验码（MD5 / SHA-1 / SHA-256 / SHA-512，可选）"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "校验码必须是 32、40、64 或 128 个十六进制字符（BLAKE2b 请加 b2:）。"
 
+msgid "Closing this window restores the main window."
+msgstr "关闭精简窗口会还原主窗口，下载继续进行。"
+
+msgid "Compact window"
+msgstr "精简窗口"
+
 msgid "Completed"
 msgstr "已完成"
 
@@ -50,6 +59,9 @@ msgstr "连接数"
 
 msgid "Connections per download"
 msgstr "每个下载的连接数"
+
+msgid "Could not open the file location:"
+msgstr "无法打开文件位置："
 
 msgid "Default folder for the file type"
 msgstr "按文件类型的默认文件夹"
@@ -63,17 +75,35 @@ msgstr "删除"
 msgid "Delete download"
 msgstr "删除下载"
 
+msgid "Dismiss"
+msgstr "关闭提示"
+
 msgid "Documents"
 msgstr "文档"
+
+msgid "Double-click a completed download to locate its file."
+msgstr "双击已完成的下载，即可打开文件所在文件夹。"
 
 msgid "Download folder"
 msgstr "下载文件夹"
 
+msgid "Downloader — compact"
+msgstr "Downloader — 精简窗口"
+
 msgid "Downloading"
 msgstr "下载中"
 
+msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
+msgstr "仍有排队、下载或校验中的项目。要退出并暂停它们吗？下次打开 Downloader 时可以继续。"
+
 msgid "Error"
 msgstr "错误"
+
+msgid "Exit"
+msgstr "退出"
+
+msgid "Exit Downloader?"
+msgstr "要退出 Downloader 吗？"
 
 msgid "Expected"
 msgstr "预期"
@@ -98,6 +128,9 @@ msgstr "低"
 
 msgid "Max simultaneous downloads"
 msgstr "同时下载数上限"
+
+msgid "Minimize to tray"
+msgstr "最小化到托盘"
 
 msgid "Music"
 msgstr "音乐"
@@ -141,6 +174,9 @@ msgstr "全部暂停"
 msgid "Paused"
 msgstr "已暂停"
 
+msgid "Please choose a download folder."
+msgstr "请选择下载文件夹。"
+
 msgid "Please enter a valid http(s) URL."
 msgstr "请输入有效的 http(s) 网址。"
 
@@ -164,6 +200,9 @@ msgstr "排队中"
 
 msgid "Remove the selected download from the list?"
 msgstr "要从列表中移除选中的下载吗？"
+
+msgid "Restore main window"
+msgstr "还原主窗口"
 
 msgid "Resume support"
 msgstr "支持续传"
@@ -215,6 +254,15 @@ msgstr "状态"
 
 msgid "System default"
 msgstr "跟随系统"
+
+msgid "The file was moved or deleted. Its saved location is no longer available."
+msgstr "文件已被移动或删除，原保存位置已无法找到文件。"
+
+msgid "The system tray is unavailable. The main window has been restored."
+msgstr "系统托盘不可用，已还原主窗口。"
+
+msgid "This download is not complete. Wait for completion before locating the file."
+msgstr "此下载尚未完成，请等待完成后再定位文件。"
 
 msgid "Time left"
 msgstr "剩余时间"

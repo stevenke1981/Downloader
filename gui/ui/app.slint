@@ -60,6 +60,7 @@ export global Tr {
     pure public function invalid-url() -> string { return @tr("Please enter a valid http(s) URL."); }
     pure public function invalid-checksum() -> string { return @tr("Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."); }
     pure public function invalid-number() -> string { return @tr("Please enter valid numbers and times (HH:MM)."); }
+    pure public function invalid-folder() -> string { return @tr("Please choose a download folder."); }
     pure public function system-default() -> string { return @tr("System default"); }
     pure public function unknown() -> string { return @tr("Unknown"); }
 }
@@ -165,7 +166,7 @@ component Dialog inherits Rectangle {
         drop-shadow-blur: 18px;
         drop-shadow-color: #00000050;
         ScrollView {
-        viewport-width: self.width;
+        content-width: self.width;
         horizontal-scrollbar-policy: always-off;
         content := VerticalLayout {
             padding: 18px;
@@ -276,6 +277,7 @@ export component AppWindow inherits Window {
     callback settings-clicked();
     callback filter-clicked(int);
     callback row-clicked(int);
+    callback row-double-clicked(int);
     callback add-ok();
     callback settings-ok();
     callback browse(int) -> string;
@@ -304,7 +306,7 @@ export component AppWindow inherits Window {
         HorizontalLayout {
             padding: 6px;
             spacing: 8px;
-            Text { text: @tr("Click a completed download to locate its file."); vertical-alignment: center; horizontal-stretch: 1; min-width: 0px; wrap: word-wrap; }
+            Text { text: @tr("Double-click a completed download to locate its file."); vertical-alignment: center; horizontal-stretch: 1; min-width: 0px; wrap: word-wrap; }
             Button { text: @tr("Compact window"); clicked => { root.compact-clicked(); } }
             Button { text: @tr("Minimize to tray"); enabled: root.tray-available; clicked => { root.tray-clicked(); } }
             Button { text: @tr("Exit"); clicked => { root.exit-clicked(); } }
@@ -348,7 +350,7 @@ export component AppWindow inherits Window {
                 width: 196px;
                 background: #f0f3f7;
                 ScrollView {
-                viewport-width: self.width;
+                content-width: self.width;
                 horizontal-scrollbar-policy: always-off;
                 VerticalLayout {
                     padding: 10px;
@@ -376,8 +378,8 @@ export component AppWindow inherits Window {
                 // The ListView inside owns only vertical scrolling.
                 table-scroll := ScrollView {
                 vertical-stretch: 1;
-                viewport-width: max(850px, self.width);
-                viewport-height: self.height;
+                content-width: max(850px, self.width);
+                content-height: self.height;
                 vertical-scrollbar-policy: always-off;
                 VerticalLayout {
                 padding-bottom: table-scroll.width < 850px ? 16px : 0px;
@@ -409,6 +411,7 @@ export component AppWindow inherits Window {
                             background: r.selected ? #dcebfb : (rta.has-hover ? #f3f8fd : (mod(i, 2) == 1 ? #fbfcfe : white));
                             rta := TouchArea {
                                 clicked => { root.row-clicked(i); }
+                                double-clicked => { root.row-double-clicked(i); }
                             }
                             HorizontalLayout {
                                 padding-left: 12px;
@@ -464,11 +467,16 @@ export component AppWindow inherits Window {
                 // ---------- details ----------
                 Rectangle { height: 1px; background: #e3e6ea; }
                 Rectangle {
-                    height: root.has-selection ? min(300px, root.height * 0.4) : 0px;
+                    // Share the column with the list (about 40%, at most 300px) via stretch;
+                    // referring to root.height here makes a layout binding loop.
+                    min-height: 0px;
+                    preferred-height: 0px;
+                    max-height: root.has-selection ? 300px : 0px;
+                    vertical-stretch: root.has-selection ? 0.67 : 0;
                     visible: root.has-selection;
                     background: #fbfcfd;
                     ScrollView {
-                    viewport-width: self.width;
+                    content-width: self.width;
                     horizontal-scrollbar-policy: always-off;
                     VerticalLayout {
                         padding: 12px;

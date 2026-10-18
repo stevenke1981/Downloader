@@ -21,6 +21,9 @@ msgstr "모든 다운로드"
 msgid "Also delete the file from disk"
 msgstr "디스크에서 파일도 삭제"
 
+msgid "Always on top"
+msgstr "항상 위에 표시"
+
 msgid "Apply"
 msgstr "적용"
 
@@ -42,6 +45,12 @@ msgstr "체크섬 (MD5 / SHA-1 / SHA-256 / SHA-512, 선택)"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "체크섬은 32, 40, 64, 128자 16진수여야 합니다 (BLAKE2b는 b2: 접두사)."
 
+msgid "Closing this window restores the main window."
+msgstr "이 창을 닫으면 기본 창이 복원됩니다. 다운로드는 계속됩니다."
+
+msgid "Compact window"
+msgstr "간략 창"
+
 msgid "Completed"
 msgstr "완료"
 
@@ -50,6 +59,9 @@ msgstr "연결 수"
 
 msgid "Connections per download"
 msgstr "다운로드당 연결 수"
+
+msgid "Could not open the file location:"
+msgstr "파일 위치를 열 수 없습니다:"
 
 msgid "Default folder for the file type"
 msgstr "파일 형식별 기본 폴더"
@@ -63,17 +75,35 @@ msgstr "삭제"
 msgid "Delete download"
 msgstr "다운로드 삭제"
 
+msgid "Dismiss"
+msgstr "닫기"
+
 msgid "Documents"
 msgstr "문서"
+
+msgid "Double-click a completed download to locate its file."
+msgstr "완료된 다운로드를 더블 클릭하면 파일 위치를 엽니다."
 
 msgid "Download folder"
 msgstr "다운로드 폴더"
 
+msgid "Downloader — compact"
+msgstr "Downloader — 간략 창"
+
 msgid "Downloading"
 msgstr "다운로드 중"
 
+msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
+msgstr "대기, 다운로드 또는 확인 중인 항목이 있습니다. 종료하고 일시 중지할까요? Downloader를 다시 열면 재개할 수 있습니다."
+
 msgid "Error"
 msgstr "오류"
+
+msgid "Exit"
+msgstr "종료"
+
+msgid "Exit Downloader?"
+msgstr "Downloader를 종료할까요?"
 
 msgid "Expected"
 msgstr "예상"
@@ -98,6 +128,9 @@ msgstr "낮음"
 
 msgid "Max simultaneous downloads"
 msgstr "최대 동시 다운로드"
+
+msgid "Minimize to tray"
+msgstr "트레이로 최소화"
 
 msgid "Music"
 msgstr "음악"
@@ -141,6 +174,9 @@ msgstr "모두 일시 중지"
 msgid "Paused"
 msgstr "일시 중지됨"
 
+msgid "Please choose a download folder."
+msgstr "다운로드 폴더를 선택하세요."
+
 msgid "Please enter a valid http(s) URL."
 msgstr "올바른 http(s) URL을 입력하세요."
 
@@ -164,6 +200,9 @@ msgstr "대기 중"
 
 msgid "Remove the selected download from the list?"
 msgstr "선택한 다운로드를 목록에서 제거할까요?"
+
+msgid "Restore main window"
+msgstr "기본 창 복원"
 
 msgid "Resume support"
 msgstr "이어받기 지원"
@@ -215,6 +254,15 @@ msgstr "상태"
 
 msgid "System default"
 msgstr "시스템 기본값"
+
+msgid "The file was moved or deleted. Its saved location is no longer available."
+msgstr "파일이 이동되었거나 삭제되었습니다. 저장된 위치를 더 이상 사용할 수 없습니다."
+
+msgid "The system tray is unavailable. The main window has been restored."
+msgstr "시스템 트레이를 사용할 수 없습니다. 기본 창을 복원했습니다."
+
+msgid "This download is not complete. Wait for completion before locating the file."
+msgstr "이 다운로드는 아직 완료되지 않았습니다. 완료된 후 파일 위치를 찾으세요."
 
 msgid "Time left"
 msgstr "남은 시간"

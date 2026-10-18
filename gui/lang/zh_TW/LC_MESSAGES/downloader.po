@@ -21,6 +21,9 @@ msgstr "全部下載"
 msgid "Also delete the file from disk"
 msgstr "同時從磁碟刪除檔案"
 
+msgid "Always on top"
+msgstr "保持置頂"
+
 msgid "Apply"
 msgstr "套用"
 
@@ -42,6 +45,12 @@ msgstr "校驗碼（MD5 / SHA-1 / SHA-256 / SHA-512，選填）"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "校驗碼必須是 32、40、64 或 128 個十六進位字元（BLAKE2b 請加上 b2:）。"
 
+msgid "Closing this window restores the main window."
+msgstr "關閉精簡視窗會還原主視窗，下載繼續執行。"
+
+msgid "Compact window"
+msgstr "精簡視窗"
+
 msgid "Completed"
 msgstr "已完成"
 
@@ -50,6 +59,9 @@ msgstr "連線數"
 
 msgid "Connections per download"
 msgstr "每個下載的連線數"
+
+msgid "Could not open the file location:"
+msgstr "無法開啟檔案位置："
 
 msgid "Default folder for the file type"
 msgstr "依檔案類型的預設資料夾"
@@ -63,17 +75,35 @@ msgstr "刪除"
 msgid "Delete download"
 msgstr "刪除下載"
 
+msgid "Dismiss"
+msgstr "關閉提示"
+
 msgid "Documents"
 msgstr "文件"
+
+msgid "Double-click a completed download to locate its file."
+msgstr "雙擊已完成的下載，即可開啟檔案所在資料夾。"
 
 msgid "Download folder"
 msgstr "下載資料夾"
 
+msgid "Downloader — compact"
+msgstr "Downloader — 精簡視窗"
+
 msgid "Downloading"
 msgstr "下載中"
 
+msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
+msgstr "仍有排程中、下載中或驗證中的項目。確定要退出並暫停嗎？下次開啟 Downloader 可繼續下載。"
+
 msgid "Error"
 msgstr "錯誤"
+
+msgid "Exit"
+msgstr "退出"
+
+msgid "Exit Downloader?"
+msgstr "要退出 Downloader 嗎？"
 
 msgid "Expected"
 msgstr "預期"
@@ -98,6 +128,9 @@ msgstr "低"
 
 msgid "Max simultaneous downloads"
 msgstr "同時下載數上限"
+
+msgid "Minimize to tray"
+msgstr "縮小至系統匣"
 
 msgid "Music"
 msgstr "音樂"
@@ -141,6 +174,9 @@ msgstr "全部暫停"
 msgid "Paused"
 msgstr "已暫停"
 
+msgid "Please choose a download folder."
+msgstr "請選擇下載資料夾。"
+
 msgid "Please enter a valid http(s) URL."
 msgstr "請輸入有效的 http(s) 網址。"
 
@@ -164,6 +200,9 @@ msgstr "排隊中"
 
 msgid "Remove the selected download from the list?"
 msgstr "要從清單中移除選取的下載嗎？"
+
+msgid "Restore main window"
+msgstr "還原主視窗"
 
 msgid "Resume support"
 msgstr "支援續傳"
@@ -216,6 +255,15 @@ msgstr "狀態"
 msgid "System default"
 msgstr "跟隨系統"
 
+msgid "The file was moved or deleted. Its saved location is no longer available."
+msgstr "檔案已被移動或刪除，原儲存位置已無法找到檔案。"
+
+msgid "The system tray is unavailable. The main window has been restored."
+msgstr "目前無法使用系統匣，已還原主視窗。"
+
+msgid "This download is not complete. Wait for completion before locating the file."
+msgstr "這個項目尚未下載完成，完成後才能定位檔案。"
+
 msgid "Time left"
 msgstr "剩餘時間"
 
@@ -248,48 +296,3 @@ msgstr "是"
 
 msgid "{0} downloads, {1} active"
 msgstr "共 {0} 個下載，{1} 個進行中"
-
-msgid "Click a completed download to locate its file."
-msgstr "點擊已完成的下載，即可開啟檔案所在資料夾。"
-
-msgid "Compact window"
-msgstr "精簡視窗"
-
-msgid "The system tray is unavailable. The main window has been restored."
-msgstr "目前無法使用系統匣，已還原主視窗。"
-
-msgid "Minimize to tray"
-msgstr "縮小至系統匣"
-
-msgid "Exit"
-msgstr "退出"
-
-msgid "Dismiss"
-msgstr "關閉提示"
-
-msgid "Downloader — compact"
-msgstr "Downloader — 精簡視窗"
-
-msgid "Always on top"
-msgstr "保持置頂"
-
-msgid "Closing this window restores the main window."
-msgstr "關閉精簡視窗會還原主視窗，下載繼續執行。"
-
-msgid "Restore main window"
-msgstr "還原主視窗"
-
-msgid "This download is not complete. Wait for completion before locating the file."
-msgstr "這個項目尚未下載完成，完成後才能定位檔案。"
-
-msgid "The file was moved or deleted. Its saved location is no longer available."
-msgstr "檔案已被移動或刪除，原儲存位置已無法找到檔案。"
-
-msgid "Could not open the file location:"
-msgstr "無法開啟檔案位置："
-
-msgid "Exit Downloader?"
-msgstr "要退出 Downloader 嗎？"
-
-msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
-msgstr "仍有排程中、下載中或驗證中的項目。確定要退出並暫停嗎？下次開啟 Downloader 可繼續下載。"
