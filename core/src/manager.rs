@@ -536,8 +536,8 @@ fn read_retrying(mut read: impl FnMut() -> std::io::Result<Vec<u8>>, retries: u3
 
 /// Load a JSON state file. A missing file means defaults. A file that exists but doesn't parse is
 /// moved to `<name>.corrupt` (replacing an older one) so the next save can't silently overwrite it.
-/// A file that can't be read at all returns `false` as the second value: the caller must not write it,
-/// or the list would be replaced by defaults.
+/// A file that can't be read at all, or a corrupt one that can't be moved aside, returns `false` as the
+/// second value: the caller must not write it, or the list would be replaced by defaults.
 fn load_json<T: serde::de::DeserializeOwned + Default>(path: &Path) -> (T, bool) {
     let bytes = match read_retrying(|| std::fs::read(path), 5, Duration::from_millis(100)) {
         Ok(Some(bytes)) => bytes,
@@ -553,10 +553,15 @@ fn load_json<T: serde::de::DeserializeOwned + Default>(path: &Path) -> (T, bool)
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             let bad = path.with_file_name(format!("{name}.corrupt"));
             match std::fs::rename(path, &bad) {
-                Ok(()) => eprintln!("{} is unreadable ({e}); moved it to {}", path.display(), bad.display()),
-                Err(re) => eprintln!("{} is unreadable ({e}) and could not be moved aside ({re})", path.display()),
+                Ok(()) => {
+                    eprintln!("{} is unreadable ({e}); moved it to {}", path.display(), bad.display());
+                    (T::default(), true)
+                }
+                Err(re) => {
+                    eprintln!("{} is unreadable ({e}) and could not be moved aside ({re}); not overwriting it this session", path.display());
+                    (T::default(), false)
+                }
             }
-            (T::default(), true)
         }
     }
 }
