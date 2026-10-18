@@ -6,7 +6,7 @@ use crate::limiter::RateLimiter;
 use crate::settings::Settings;
 use crate::task::{Status, Task};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::task::JoinHandle;
@@ -35,6 +35,11 @@ struct Inner {
     dir: PathBuf,
     next_id: AtomicU64,
     rt: tokio::runtime::Handle,
+    /// Bytes of the last downloads.json written, so unchanged autosaves are skipped.
+    last_saved: Mutex<Vec<u8>>,
+    /// Set when downloads.json existed but could not be read: saves go to downloads.json.recovered so the
+    /// user's list is never replaced with this session's.
+    save_disabled: AtomicBool,
 }
 
 /// A point-in-time view of one download for the UI.
@@ -80,6 +85,8 @@ pub struct NewDownload {
     pub file_name: Option<String>,
     /// Checksum list / sidecar URLs seen on the page.
     pub checksum_urls: Vec<String>,
+    /// `Cookie` header sent with every request (kept in memory only).
+    pub cookie: Option<String>,
 }
 
 pub struct Manager {
@@ -91,14 +98,8 @@ impl Manager {
     /// `dir` holds settings.json and downloads.json.
     pub fn new(dir: &Path) -> Manager {
         let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(4).build().expect("tokio runtime");
-        let settings: Settings = std::fs::read(dir.join("settings.json"))
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
-        let mut tasks: Vec<Task> = std::fs::read(dir.join("downloads.json"))
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
+        let (settings, _) = load_json::<Settings>(&dir.join("settings.json"));
+        let (mut tasks, tasks_readable) = load_json::<Vec<Task>>(&dir.join("downloads.json"));
         for t in &mut tasks {
             if matches!(t.status, Status::Downloading | Status::Verifying) {
                 t.status = Status::Queued;
@@ -111,11 +112,12 @@ impl Manager {
             .into_iter()
             .map(|t| Entry {
                 limiter: Arc::new(RateLimiter::new(t.speed_limit)),
+                // Start counting from what's already on disk, or a resumed job shows a bogus speed spike.
+                last_bytes: t.downloaded(),
                 task: Arc::new(Mutex::new(t)),
                 cancel: None,
                 handle: None,
                 speed: 0.0,
-                last_bytes: 0,
             })
             .collect();
         let inner = Arc::new(Inner {
@@ -126,6 +128,8 @@ impl Manager {
             dir: dir.to_path_buf(),
             next_id: AtomicU64::new(next),
             rt: rt.handle().clone(),
+            last_saved: Mutex::new(Vec::new()),
+            save_disabled: AtomicBool::new(!tasks_readable),
         });
         let tick = inner.clone();
         rt.spawn(async move {
@@ -171,6 +175,16 @@ impl Manager {
         let name = d.file_name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| crate::util::name_from_url(&d.url));
         let cat = Category::from_name(&name);
         let limit = d.speed_limit.unwrap_or(s.per_download_limit);
+        let cookie = match d.cookie.filter(|c| !c.trim().is_empty()) {
+            Some(c) if usable_cookie(&c) => Some(c),
+            Some(_) => {
+                // Never print the value: it is a session secret.
+                eprintln!("a cookie was dropped: it is not a valid HTTP header value or is longer than 8 KiB");
+                None
+            }
+            None => None,
+        };
+        let had_cookie = cookie.is_some();
         let t = Task {
             id,
             url: d.url.trim().to_string(),
@@ -185,19 +199,29 @@ impl Manager {
             referer: d.referer.filter(|r| r.starts_with("http")),
             suggested_name: d.file_name,
             checksum_urls: d.checksum_urls,
+            cookie,
+            had_cookie,
             ..Default::default()
         };
+        let last_bytes = t.downloaded();
         self.inner.entries.lock().unwrap().push(Entry {
             task: Arc::new(Mutex::new(t)),
             limiter: Arc::new(RateLimiter::new(limit)),
             cancel: None,
             handle: None,
             speed: 0.0,
-            last_bytes: 0,
+            last_bytes,
         });
-        self.inner.save();
-        self.inner.tick(0.5);
+        self.save_async();
+        self.inner.dispatch();
         id
+    }
+
+    /// Persist on the runtime, not the caller's thread: saving fsyncs, which can stall the GUI on a slow disk.
+    /// `save_with` holds its lock across snapshot and write, so the last queued save always writes the newest state.
+    fn save_async(&self) {
+        let me = self.inner.clone();
+        self.rt.spawn_blocking(move || me.save());
     }
 
     fn with<R>(&self, id: u64, f: impl FnOnce(&mut Entry) -> R) -> Option<R> {
@@ -215,7 +239,7 @@ impl Manager {
                 t.verify_retried = false;
             }
         });
-        self.inner.tick(0.5);
+        self.inner.dispatch();
     }
 
     pub fn pause(&self, id: u64) {
@@ -228,7 +252,7 @@ impl Manager {
                 }
             }
         });
-        self.inner.save();
+        self.save_async();
     }
 
     pub fn start_all(&self) {
@@ -263,7 +287,7 @@ impl Manager {
                 }
             }
         });
-        self.inner.save();
+        self.save_async();
     }
 
     pub fn set_priority(&self, id: u64, p: i32) {
@@ -317,7 +341,7 @@ impl Manager {
     }
 
     pub fn save(&self) {
-        self.inner.save();
+        self.save_async();
     }
 
     /// Handle of the manager's tokio runtime (for the IPC server).
@@ -352,6 +376,8 @@ impl Inner {
         self.save_with(|_| {});
     }
     fn save_with(&self, f: impl Fn(&mut Task)) {
+        // Held across snapshot + write so an older snapshot can't overwrite a newer one.
+        let mut last = self.last_saved.lock().unwrap();
         let tasks: Vec<Task> = self
             .entries
             .lock()
@@ -363,22 +389,40 @@ impl Inner {
                 t
             })
             .collect();
-        let _ = std::fs::create_dir_all(&self.dir);
         if let Ok(json) = serde_json::to_vec(&tasks) {
-            let _ = write_atomic(&self.dir.join("downloads.json"), &json);
+            if *last == json {
+                return;
+            }
+            let _ = std::fs::create_dir_all(&self.dir);
+            // downloads.json couldn't be read at startup: never overwrite it, but keep this session's list
+            // in a side file so it can be recovered by hand.
+            let name = if self.save_disabled.load(Ordering::Relaxed) { "downloads.json.recovered" } else { "downloads.json" };
+            if write_atomic(&self.dir.join(name), &json).is_ok() {
+                *last = json;
+            }
         }
     }
 
+    /// Timer loop only: update speeds from the bytes moved over the real elapsed `dt`, then dispatch.
     fn tick(self: &Arc<Self>, dt: f64) {
+        {
+            let mut es = self.entries.lock().unwrap();
+            for e in es.iter_mut() {
+                let b = e.task.lock().unwrap().downloaded();
+                let inst = b.saturating_sub(e.last_bytes) as f64 / dt;
+                e.speed = if e.speed == 0.0 { inst } else { e.speed * 0.6 + inst * 0.4 };
+                e.last_bytes = b;
+            }
+        }
+        self.dispatch();
+    }
+
+    /// Reap finished jobs and start queued ones. Never touches speeds (no real dt here).
+    fn dispatch(self: &Arc<Self>) {
         let mut es = self.entries.lock().unwrap();
         let settings = self.settings.lock().unwrap().clone();
         let allowed = settings.schedule.allows_now();
-        // speeds + reap finished jobs
         for e in es.iter_mut() {
-            let b = e.task.lock().unwrap().downloaded();
-            let inst = b.saturating_sub(e.last_bytes) as f64 / dt;
-            e.speed = if e.speed == 0.0 { inst } else { e.speed * 0.6 + inst * 0.4 };
-            e.last_bytes = b;
             if e.handle.as_ref().is_some_and(|h| h.is_finished()) {
                 e.handle = None;
                 e.cancel = None;
@@ -416,8 +460,15 @@ impl Inner {
         for (_, _, i) in queued.into_iter().take(slots) {
             let e = &mut es[i];
             let cancel = CancellationToken::new();
-            e.task.lock().unwrap().status = Status::Downloading;
-            e.limiter.set_rate(e.task.lock().unwrap().speed_limit);
+            let (downloaded, speed_limit) = {
+                let mut t = e.task.lock().unwrap();
+                t.status = Status::Downloading;
+                (t.downloaded(), t.speed_limit)
+            };
+            e.limiter.set_rate(speed_limit);
+            // Measure this run's speed from where it resumes, not from zero.
+            e.last_bytes = downloaded;
+            e.speed = 0.0;
             let ctx = Ctx {
                 client: client.clone(),
                 global: self.global.clone(),
@@ -456,7 +507,117 @@ impl Inner {
 }
 
 fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
     let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, data)?;
+    let mut f = std::fs::File::create(&tmp)?;
+    f.write_all(data)?;
+    // Flush to disk before the rename, so a power loss can't leave an empty file behind.
+    f.sync_all()?;
+    drop(f);
     std::fs::rename(&tmp, path)
+}
+
+/// Read a state file. `Ok(None)` when it doesn't exist. Other errors (a sharing violation or an antivirus lock on
+/// Windows is usually brief) are retried `retries` times, `pause` apart, before the error is returned.
+fn read_retrying(mut read: impl FnMut() -> std::io::Result<Vec<u8>>, retries: u32, pause: Duration) -> std::io::Result<Option<Vec<u8>>> {
+    let mut left = retries;
+    loop {
+        match read() {
+            Ok(bytes) => return Ok(Some(bytes)),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) if left == 0 => return Err(e),
+            Err(_) => {
+                left -= 1;
+                std::thread::sleep(pause);
+            }
+        }
+    }
+}
+
+/// Load a JSON state file. A missing file means defaults. A file that exists but doesn't parse is
+/// moved to `<name>.corrupt` (replacing an older one) so the next save can't silently overwrite it.
+/// A file that can't be read at all returns `false` as the second value: the caller must not write it,
+/// or the list would be replaced by defaults.
+fn load_json<T: serde::de::DeserializeOwned + Default>(path: &Path) -> (T, bool) {
+    let bytes = match read_retrying(|| std::fs::read(path), 5, Duration::from_millis(100)) {
+        Ok(Some(bytes)) => bytes,
+        Ok(None) => return (T::default(), true),
+        Err(e) => {
+            eprintln!("{} cannot be read ({e}); starting empty and not overwriting it this session", path.display());
+            return (T::default(), false);
+        }
+    };
+    match serde_json::from_slice(&bytes) {
+        Ok(v) => (v, true),
+        Err(e) => {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let bad = path.with_file_name(format!("{name}.corrupt"));
+            match std::fs::rename(path, &bad) {
+                Ok(()) => eprintln!("{} is unreadable ({e}); moved it to {}", path.display(), bad.display()),
+                Err(re) => eprintln!("{} is unreadable ({e}) and could not be moved aside ({re})", path.display()),
+            }
+            (T::default(), true)
+        }
+    }
+}
+
+/// A cookie can be sent as a header value and is within a sane size. Anything else would make every request fail to build.
+fn usable_cookie(c: &str) -> bool {
+    reqwest::header::HeaderValue::from_str(c).is_ok() && c.len() <= 8192
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Error, ErrorKind};
+
+    #[test]
+    fn usable_cookie_rules() {
+        assert!(usable_cookie("sid=abc; uid=42"));
+        // http 1.x accepts UTF-8 bytes in header values, so such a cookie is kept.
+        assert!(usable_cookie("name=中文"));
+        assert!(!usable_cookie("sid=a\nSet-Cookie: x=y"), "CR/LF must never reach a header");
+        assert!(!usable_cookie("sid=a\u{1}b"), "control characters are not header bytes");
+        assert!(usable_cookie(&format!("k={}", "a".repeat(8190))), "8192 bytes is the limit");
+        assert!(!usable_cookie(&format!("k={}", "a".repeat(8191))));
+    }
+
+    #[test]
+    fn state_read_retries_then_gives_up() {
+        let mut calls = 0;
+        let r = read_retrying(
+            || {
+                calls += 1;
+                Err(Error::new(ErrorKind::PermissionDenied, "locked"))
+            },
+            5,
+            Duration::ZERO,
+        );
+        assert!(r.is_err());
+        assert_eq!(calls, 6, "one try plus five retries");
+
+        let mut calls = 0;
+        let r = read_retrying(
+            || {
+                calls += 1;
+                if calls < 3 { Err(Error::new(ErrorKind::PermissionDenied, "locked")) } else { Ok(b"[]".to_vec()) }
+            },
+            5,
+            Duration::ZERO,
+        );
+        assert_eq!(r.unwrap(), Some(b"[]".to_vec()));
+        assert_eq!(calls, 3);
+
+        let mut calls = 0;
+        let r = read_retrying(
+            || {
+                calls += 1;
+                Err(Error::new(ErrorKind::NotFound, "gone"))
+            },
+            5,
+            Duration::ZERO,
+        );
+        assert_eq!(r.unwrap(), None);
+        assert_eq!(calls, 1, "a missing file is not retried");
+    }
 }

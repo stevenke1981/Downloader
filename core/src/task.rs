@@ -79,6 +79,12 @@ pub struct Task {
     pub header_checksums: Vec<Checksum>,
     pub verification: Option<Verification>,
     pub verify_retried: bool,
+    /// A login cookie was used for this download (it is never persisted, so this flag survives a restart).
+    #[serde(default)]
+    pub had_cookie: bool,
+    /// `Cookie` header sent with every request. Never persisted.
+    #[serde(skip)]
+    pub cookie: Option<String>,
     /// Bytes hashed so far while verifying (not persisted).
     #[serde(skip)]
     pub verify_done: std::sync::Arc<std::sync::atomic::AtomicU64>,

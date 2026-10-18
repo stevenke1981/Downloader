@@ -167,6 +167,106 @@ async fn unique_name_when_file_exists() {
     assert!(std::fs::read(dir.path().join("dup (1).txt")).unwrap() == data);
 }
 
+#[tokio::test]
+async fn cookie_is_sent_with_every_request() {
+    let data = server::test_data(2 << 20);
+    let s = server::start(data.clone(), true, 0).await;
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("cookie.bin"), dir.path(), 4);
+    t.lock().unwrap().cookie = Some("sid=abc; uid=42".into());
+    assert_eq!(engine::run(t.clone(), ctx(0)).await.unwrap(), Outcome::Completed);
+    assert!(std::fs::read(dir.path().join("cookie.bin")).unwrap() == data);
+    let seen = s.cookies.lock().unwrap().clone();
+    assert_eq!(seen.len(), s.requests.load(Ordering::SeqCst), "every request must be recorded");
+    assert!(seen.len() >= 5, "expected probe + segment requests, got {}", seen.len());
+    assert!(seen.iter().all(|c| c == "sid=abc; uid=42"), "requests without the cookie: {seen:?}");
+}
+
+#[tokio::test]
+async fn cookie_not_sent_across_redirect_to_other_origin() {
+    let data = server::test_data(2 << 20);
+    let origin = server::start(data.clone(), true, 0).await;
+    let mirror = server::start(data.clone(), true, 0).await;
+    // The origin hands the file to a mirror on another origin ("localhost" is a different host string than 127.0.0.1).
+    *origin.redirect.lock().unwrap() = Some(format!("http://localhost:{}/files/", mirror.port));
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(origin.url("moved.bin"), dir.path(), 4);
+    t.lock().unwrap().cookie = Some("sid=secret".into());
+    assert_eq!(engine::run(t.clone(), ctx(0)).await.unwrap(), Outcome::Completed);
+    assert!(std::fs::read(dir.path().join("moved.bin")).unwrap() == data);
+    assert!(origin.cookies.lock().unwrap().iter().any(|c| c == "sid=secret"), "the probe to the origin should carry the cookie");
+    let leaked: Vec<String> = mirror.cookies.lock().unwrap().iter().filter(|c| !c.is_empty()).cloned().collect();
+    assert!(leaked.is_empty(), "cookie leaked to the redirect target: {} requests", leaked.len());
+    assert!(mirror.requests.load(Ordering::SeqCst) >= 2, "segments should have been fetched from the mirror");
+}
+
+#[tokio::test]
+async fn auth_failure_after_restart_explains_lost_cookie() {
+    let data = server::test_data(300_000);
+    let s = server::start(data, true, 0).await;
+    s.require_cookie.store(true, Ordering::SeqCst);
+    let dir = tempfile::tempdir().unwrap();
+    // As after a restart: the task remembers a cookie was used, but the value is gone.
+    let t = task(s.url("login.bin"), dir.path(), 2);
+    t.lock().unwrap().had_cookie = true;
+    let e = engine::run(t, ctx(0)).await.unwrap_err();
+    assert!(e.starts_with("HTTP 403") && e.contains("login cookies are not kept after a restart"), "{e}");
+    // Without a previous cookie the plain error stays as it was.
+    let t = task(s.url("login2.bin"), dir.path(), 2);
+    let e = engine::run(t, ctx(0)).await.unwrap_err();
+    assert_eq!(e, "HTTP 403 Forbidden");
+}
+
+#[test]
+fn unusable_cookie_is_dropped_and_download_still_succeeds() {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let s = rt.block_on(server::start(server::test_data(1 << 20), true, 0));
+    let state = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let m = dlcore::Manager::new(state.path());
+    let mut st = m.settings();
+    st.download_dir = out.path().into();
+    m.set_settings(st).unwrap();
+    // A control character can't be sent in a header; before validation every request would fail to build.
+    let id = m.add(dlcore::NewDownload { url: s.url("ctl.bin"), start: true, cookie: Some("sid=a\u{1}b".into()), ..Default::default() });
+    let status = |m: &dlcore::Manager| m.snapshots().iter().find(|x| x.id == id).map(|x| (x.status, x.error.clone())).unwrap();
+    let t0 = Instant::now();
+    while status(&m).0 != Status::Completed && status(&m).0 != Status::Error && t0.elapsed() < Duration::from_secs(20) {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let (st, err) = status(&m);
+    assert_eq!(st, Status::Completed, "error: {err:?}");
+    assert_eq!(std::fs::read(out.path().join("ctl.bin")).unwrap().len(), 1 << 20);
+    assert!(s.cookies.lock().unwrap().iter().all(|c| c.is_empty()), "the dropped cookie must not be sent");
+    m.shutdown();
+}
+
+#[test]
+fn cookie_value_is_not_persisted_but_had_cookie_is() {
+    let state = tempfile::tempdir().unwrap();
+    let m = dlcore::Manager::new(state.path());
+    // Added paused, so nothing is fetched.
+    m.add(dlcore::NewDownload { url: "http://127.0.0.1:9/never.bin".into(), start: false, cookie: Some("sid=secret123".into()), ..Default::default() });
+    m.shutdown();
+    let saved = std::fs::read_to_string(state.path().join("downloads.json")).unwrap();
+    assert!(!saved.contains("secret123"), "cookie value written to disk");
+    assert!(saved.contains("\"had_cookie\":true"), "{saved}");
+    let m = dlcore::Manager::new(state.path());
+    assert_eq!(m.snapshots().len(), 1);
+    m.shutdown();
+}
+
+#[test]
+fn manager_moves_corrupt_downloads_json_aside() {
+    let state = tempfile::tempdir().unwrap();
+    std::fs::write(state.path().join("downloads.json"), b"{not json").unwrap();
+    let m = dlcore::Manager::new(state.path());
+    assert!(m.snapshots().is_empty());
+    assert!(!state.path().join("downloads.json").exists(), "corrupt file should have been moved");
+    assert_eq!(std::fs::read(state.path().join("downloads.json.corrupt")).unwrap(), b"{not json");
+    m.shutdown();
+}
+
 #[test]
 fn manager_queue_and_persistence() {
     let rt = tokio::runtime::Runtime::new().unwrap();

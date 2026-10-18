@@ -131,7 +131,17 @@ async fn main() {
                 let _ = std::io::stderr().flush();
             }
         }
-        let r = job.await.unwrap();
+        let r = match job.await {
+            Ok(r) => r,
+            Err(e) => {
+                if !a.quiet {
+                    eprintln!();
+                }
+                eprintln!("error: {url}: download task failed: {e}");
+                code = 1;
+                continue;
+            }
+        };
         let t = task.lock().unwrap().clone();
         if !a.quiet {
             eprintln!();
@@ -143,12 +153,13 @@ async fn main() {
                     report_verification(&t);
                 }
                 let el = start.elapsed().as_secs_f64();
+                let total = t.total.unwrap_or_else(|| t.downloaded());
                 println!(
                     "{}  {} in {:.2}s ({}/s)",
                     t.final_path().display(),
-                    util::human_size(t.total.unwrap_or(0)),
+                    util::human_size(total),
                     el,
-                    util::human_size(((t.total.unwrap_or(0) - resumed) as f64 / el.max(0.001)) as u64)
+                    util::human_size((total.saturating_sub(resumed) as f64 / el.max(0.001)) as u64)
                 );
             }
             Ok(Outcome::Cancelled) => {
