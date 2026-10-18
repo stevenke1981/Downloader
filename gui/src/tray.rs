@@ -1,4 +1,6 @@
 //! The tray is owned by the UI thread and uses its existing native event loop.
+// Only the Windows tray produces actions; elsewhere `actions()` is always empty.
+#[cfg_attr(not(windows), allow(dead_code))]
 #[derive(Clone, Copy)]
 pub enum Action {
     Restore,
