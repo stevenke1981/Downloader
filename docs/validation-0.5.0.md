@@ -21,3 +21,10 @@
 - Unix 下 `ipc.json` 0600 權限的程式碼於 Linux／macOS CI 編譯；未另行在實機檢查檔案權限。
 - 防毒軟體鎖檔情境未實際重現，只測試重試決策邏輯。
 - 仍沿用 0.4.1 的限制：系統匣選單、Explorer 重啟、150%／200% DPI 未完成原生互動驗收；Windows 安裝包未簽章，macOS 僅 ad-hoc 簽章、未公證。
+
+## 0.5.1 修正版
+
+- 損壞的 `downloads.json` 若無法移至 `downloads.json.corrupt`，不再被自動儲存覆寫，改存 `downloads.json.recovered`。新增測試以「`.corrupt` 位置有非空資料夾」使搬移失敗，確認原檔不變、`.recovered` 有本次清單；將修正改回舊行為時該測試失敗（mutation 檢查）。
+- 「下載所有連結」改以 origin + path 查 Cookie，限定路徑（如 `Path=/members`）的登入 Cookie 會一併送出。以 Node `vm` 載入 `background.js` 並模擬 `chrome.cookies.getAll`（RFC 6265 路徑比對）驗證：新版 3/3 正確，舊版在 `/members/*` 漏帶 Cookie。
+- 通過的測試由 60 項增至 61 項。
+- 未驗證：擴充功能仍未在真實 Chrome／Edge 實測。

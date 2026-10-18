@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.1 — 2026-10-18
 
 ### Fixed
 - A corrupt `downloads.json` that can't be moved aside to `downloads.json.corrupt` is no longer overwritten by the next autosave; the session is saved to `downloads.json.recovered` instead, as for an unreadable file.
