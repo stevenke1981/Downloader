@@ -51,18 +51,19 @@ async function cookieFor(url) {
   }
 }
 
-const originOf = (u) => {
-  try { return new URL(u).origin; } catch (_) { return u; }
+// Which cookies apply depends on scheme, host, port and path (a login cookie may be scoped to Path=/members),
+// never on the query or fragment, so lookups are keyed by origin + path.
+const cookieKey = (u) => {
+  try { const x = new URL(u); return x.origin + x.pathname; } catch (_) { return u; }
 };
 
 // Attach each download's cookies (when enabled) so the app can fetch logged-in URLs.
-// A single download uses its exact URL; a batch looks cookies up once per origin.
+// A batch looks cookies up once per distinct origin + path.
 async function withCookies(list) {
-  const single = list.length === 1;
   const cache = new Map(); // key -> Promise<cookie string | undefined>
   const attached = await Promise.all(list.map(async (d) => {
-    const key = single ? d.url : originOf(d.url);
-    if (!cache.has(key)) cache.set(key, cookieFor(single ? d.url : `${key}/`));
+    const key = cookieKey(d.url);
+    if (!cache.has(key)) cache.set(key, cookieFor(key));
     const cookie = await cache.get(key);
     return cookie ? { ...d, cookie } : d;
   }));

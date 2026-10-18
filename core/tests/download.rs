@@ -268,6 +268,22 @@ fn manager_moves_corrupt_downloads_json_aside() {
 }
 
 #[test]
+fn manager_keeps_corrupt_downloads_json_when_it_cannot_be_moved() {
+    let state = tempfile::tempdir().unwrap();
+    std::fs::write(state.path().join("downloads.json"), b"{not json").unwrap();
+    // A non-empty directory in the way makes the rename to .corrupt fail on every platform.
+    let blocker = state.path().join("downloads.json.corrupt");
+    std::fs::create_dir(&blocker).unwrap();
+    std::fs::write(blocker.join("keep"), b"x").unwrap();
+    let m = dlcore::Manager::new(state.path());
+    m.add(dlcore::NewDownload { url: "http://127.0.0.1:9/a.bin".into(), start: false, ..Default::default() });
+    m.shutdown();
+    assert_eq!(std::fs::read(state.path().join("downloads.json")).unwrap(), b"{not json", "original was overwritten");
+    let recovered = std::fs::read_to_string(state.path().join("downloads.json.recovered")).unwrap();
+    assert!(recovered.contains("a.bin"), "{recovered}");
+}
+
+#[test]
 fn manager_queue_and_persistence() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let s = rt.block_on(server::start(server::test_data(2 << 20), true, 256 << 10));
