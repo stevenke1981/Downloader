@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "Wenn Downloader nicht erreichbar ist, im Browser herunterladen"
  },
+ "optSendCookies": {
+  "message": "Cookies der Website mit Downloads senden (nötig für Downloads, die eine Anmeldung erfordern)"
+ },
  "optSave": {
   "message": "Speichern"
  },

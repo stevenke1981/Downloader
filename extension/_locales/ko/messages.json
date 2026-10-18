@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "Downloader에 연결할 수 없으면 브라우저로 다운로드"
  },
+ "optSendCookies": {
+  "message": "다운로드 시 사이트의 쿠키 보내기 (로그인이 필요한 다운로드에 필요)"
+ },
  "optSave": {
   "message": "저장"
  },

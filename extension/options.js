@@ -1,4 +1,4 @@
-const DEFAULTS = { intercept: true, minSizeKB: 0, include: "", exclude: "html,htm,php,json,xml,txt,crx", altBypass: true, fallback: true };
+const DEFAULTS = { intercept: true, minSizeKB: 0, include: "", exclude: "html,htm,php,json,xml,txt,crx", altBypass: true, fallback: true, sendCookies: true };
 const t = (k, a) => chrome.i18n.getMessage(k, a) || k;
 document.querySelectorAll("[data-i18n]").forEach((e) => (e.textContent = t(e.dataset.i18n)));
 const status = (s) => (document.getElementById("status").textContent = s);

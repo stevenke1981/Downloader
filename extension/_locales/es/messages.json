@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "Si no se puede contactar con Downloader, que descargue el navegador"
  },
+ "optSendCookies": {
+  "message": "Enviar las cookies del sitio con las descargas (necesario para descargas que requieren inicio de sesión)"
+ },
  "optSave": {
   "message": "Guardar"
  },

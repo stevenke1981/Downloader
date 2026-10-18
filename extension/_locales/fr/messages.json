@@ -44,6 +44,9 @@
  "optFallback": {
   "message": "Si Downloader est injoignable, laisser le navigateur télécharger"
  },
+ "optSendCookies": {
+  "message": "Envoyer les cookies du site avec les téléchargements (nécessaire pour les téléchargements nécessitant une connexion)"
+ },
  "optSave": {
   "message": "Enregistrer"
  },
