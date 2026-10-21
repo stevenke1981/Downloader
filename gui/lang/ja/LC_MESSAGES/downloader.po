@@ -3,6 +3,15 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: ja\n"
 
+msgid "1. Register the native host"
+msgstr "1. ネイティブホストを登録"
+
+msgid "2. Open extensions, enable Developer mode, then choose Load unpacked."
+msgstr "2. 拡張機能を開き、デベロッパーモードを有効にして「パッケージ化されていない拡張機能を読み込む」を選びます。"
+
+msgid "3. Select this folder. In the extension options, choose Check connection."
+msgstr "3. 下のフォルダーを選び、拡張機能のオプションで「接続を確認」を選びます。"
+
 msgid "Active"
 msgstr "アクティブ"
 
@@ -11,6 +20,9 @@ msgstr "実際"
 
 msgid "Add"
 msgstr "追加"
+
+msgid "Add a link, or connect your browser to send downloads here."
+msgstr "リンクを追加するか、ブラウザーを連携してダウンロードを送信できます。"
 
 msgid "Add download"
 msgstr "ダウンロードを追加"
@@ -30,6 +42,18 @@ msgstr "適用"
 msgid "Archives"
 msgstr "圧縮ファイル"
 
+msgid "Browser"
+msgstr "ブラウザー"
+
+msgid "Browser extension"
+msgstr "ブラウザー拡張機能"
+
+msgid "Browser not found. Install it, then refresh."
+msgstr "ブラウザーが見つかりません。インストール後に更新してください。"
+
+msgid "Browser setup actions apply immediately. Save only applies to app preferences."
+msgstr "ブラウザー設定の操作はすぐに反映されます。保存はアプリの設定にのみ適用されます。"
+
 msgid "Browse…"
 msgstr "参照…"
 
@@ -45,6 +69,12 @@ msgstr "チェックサム（MD5 / SHA-1 / SHA-256 / SHA-512、任意）"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "チェックサムは 32・40・64・128 文字の16進数で入力してください（BLAKE2b は b2: を付ける）。"
 
+msgid "Choose another category or return to all downloads."
+msgstr "別のカテゴリを選ぶか、すべてのダウンロードに戻ってください。"
+
+msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
+msgstr "Chrome ウェブストアではまだ公開されていません。同梱の拡張機能を手動でインストールしてください。"
+
 msgid "Closing this window restores the main window."
 msgstr "このウィンドウを閉じるとメインウィンドウが復元されます。ダウンロードは続行されます。"
 
@@ -54,14 +84,38 @@ msgstr "コンパクトウィンドウ"
 msgid "Completed"
 msgstr "完了"
 
+msgid "Connect browser"
+msgstr "ブラウザーを連携"
+
+msgid "Connect your browser"
+msgstr "ブラウザーを連携する"
+
 msgid "Connections"
 msgstr "接続数"
 
 msgid "Connections per download"
 msgstr "ダウンロードごとの接続数"
 
+msgid "Copy path"
+msgstr "パスをコピー"
+
+msgid "Could not check browser setup:"
+msgstr "ブラウザー設定を確認できませんでした:"
+
+msgid "Could not copy the extension path:"
+msgstr "拡張機能のパスをコピーできませんでした:"
+
 msgid "Could not open the file location:"
 msgstr "ファイルの場所を開けませんでした:"
+
+msgid "Could not open:"
+msgstr "開けませんでした:"
+
+msgid "Could not register the native host:"
+msgstr "ネイティブホストを登録できませんでした:"
+
+msgid "Ctrl+Tab switches sections · Esc cancels"
+msgstr "Ctrl+Tab でタブ切替 · Esc でキャンセル"
 
 msgid "Default folder for the file type"
 msgstr "ファイル種類ごとの既定フォルダー"
@@ -93,6 +147,9 @@ msgstr "Downloader — コンパクト"
 msgid "Downloading"
 msgstr "ダウンロード中"
 
+msgid "Downloads"
+msgstr "ダウンロード"
+
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "待機中、ダウンロード中、または検証中の項目があります。終了して一時停止しますか？次回 Downloader を開いたときに再開できます。"
 
@@ -107,6 +164,18 @@ msgstr "Downloader を終了しますか？"
 
 msgid "Expected"
 msgstr "期待値"
+
+msgid "Extension folder"
+msgstr "拡張機能フォルダー"
+
+msgid "Extension folder unavailable"
+msgstr "拡張機能フォルダーがありません"
+
+msgid "Extension path copied."
+msgstr "拡張機能のパスをコピーしました。"
+
+msgid "General"
+msgstr "一般"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "全体の速度制限（KB/s、0 = 無制限）"
@@ -123,8 +192,14 @@ msgstr "整合性"
 msgid "Language"
 msgstr "言語"
 
+msgid "Language and behavior"
+msgstr "言語と動作"
+
 msgid "Low"
 msgstr "低"
+
+msgid "Make Downloader work the way you do."
+msgstr "ダウンロードの設定やブラウザー連携を調整できます。"
 
 msgid "Max simultaneous downloads"
 msgstr "同時ダウンロード数"
@@ -138,17 +213,35 @@ msgstr "音楽"
 msgid "Name"
 msgstr "名前"
 
+msgid "Native host"
+msgstr "ネイティブホスト"
+
+msgid "Native host is ready. Finish installing the extension in your browser profile."
+msgstr "ネイティブホストは準備済みです。ブラウザープロファイルで拡張機能のインストールを完了してください。"
+
+msgid "Native host needs registration or repair."
+msgstr "ネイティブホストの登録または修復が必要です。"
+
+msgid "Native host registered. Continue with the extension steps below."
+msgstr "ネイティブホストを登録しました。下の手順で拡張機能を設定してください。"
+
+msgid "Network and schedule"
+msgstr "ネットワークとスケジュール"
+
 msgid "No"
 msgstr "いいえ"
 
 msgid "No checksum"
 msgstr "チェックサムなし"
 
-msgid "No downloads yet. Click \"Add\" or copy a link."
-msgstr "ダウンロードはまだありません。「追加」を押すかリンクをコピーしてください。"
+msgid "No downloads in this view"
+msgstr "この表示にダウンロードはありません"
 
 msgid "Normal"
 msgstr "標準"
+
+msgid "Not checked yet."
+msgstr "未確認です。"
 
 msgid "Not verified"
 msgstr "未検証"
@@ -159,8 +252,20 @@ msgstr "OK"
 msgid "Only download between"
 msgstr "次の時間帯のみダウンロード"
 
+msgid "Open extension folder"
+msgstr "拡張機能フォルダーを開く"
+
+msgid "Open extensions"
+msgstr "拡張機能を開く"
+
 msgid "Open folder"
 msgstr "フォルダーを開く"
+
+msgid "Opened the browser extension manager."
+msgstr "ブラウザーの拡張機能管理を開きました。"
+
+msgid "Opened the extension folder."
+msgstr "拡張機能フォルダーを開きました。"
 
 msgid "Other"
 msgstr "その他"
@@ -198,6 +303,15 @@ msgstr "プロキシ"
 msgid "Queued"
 msgstr "待機中"
 
+msgid "Refresh"
+msgstr "更新"
+
+msgid "Register / repair"
+msgstr "登録／修復"
+
+msgid "Registering the native host…"
+msgstr "ネイティブホストを登録中…"
+
 msgid "Remove the selected download from the list?"
 msgstr "選択したダウンロードを一覧から削除しますか？"
 
@@ -210,6 +324,9 @@ msgstr "レジューム対応"
 msgid "Retries"
 msgstr "再試行回数"
 
+msgid "Save"
+msgstr "保存"
+
 msgid "Save to"
 msgstr "保存先"
 
@@ -218,6 +335,9 @@ msgstr "保存先"
 
 msgid "Segments"
 msgstr "セグメント"
+
+msgid "Set up each browser profile once. Native host registration does not install the extension."
+msgstr "ブラウザープロファイルごとに設定が必要です。ネイティブホストの登録後も、拡張機能は別途インストールしてください。"
 
 msgid "Settings"
 msgstr "設定"
@@ -249,11 +369,23 @@ msgstr "すべて開始"
 msgid "Start immediately"
 msgstr "すぐに開始"
 
+msgid "Start time"
+msgstr "開始時刻"
+
 msgid "Status"
 msgstr "状態"
 
+msgid "Stop time"
+msgstr "終了時刻"
+
+msgid "Storage"
+msgstr "保存先"
+
 msgid "System default"
 msgstr "システムに従う"
+
+msgid "The bundled extension folder is missing. Repair or reinstall Downloader."
+msgstr "同梱の拡張機能フォルダーが見つかりません。Downloader を修復または再インストールしてください。"
 
 msgid "The file was moved or deleted. Its saved location is no longer available."
 msgstr "ファイルが移動または削除されました。保存先は利用できなくなっています。"
@@ -266,6 +398,12 @@ msgstr "このダウンロードはまだ完了していません。完了して
 
 msgid "Time left"
 msgstr "残り時間"
+
+msgid "Time range (HH:MM)"
+msgstr "時間帯（HH:MM）"
+
+msgid "Transfers"
+msgstr "転送設定"
 
 msgid "URL"
 msgstr "URL"
@@ -293,6 +431,9 @@ msgstr "クリップボードのダウンロードリンクを監視"
 
 msgid "Yes"
 msgstr "はい"
+
+msgid "Your downloads start here"
+msgstr "ここからダウンロードを開始"
 
 msgid "{0} downloads, {1} active"
 msgstr "ダウンロード {0} 件、実行中 {1} 件"

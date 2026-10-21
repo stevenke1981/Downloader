@@ -3,6 +3,15 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: ko\n"
 
+msgid "1. Register the native host"
+msgstr "1. 네이티브 호스트 등록"
+
+msgid "2. Open extensions, enable Developer mode, then choose Load unpacked."
+msgstr "2. 확장 프로그램을 열고 개발자 모드를 켠 다음 압축 해제된 확장 프로그램 로드를 선택하세요."
+
+msgid "3. Select this folder. In the extension options, choose Check connection."
+msgstr "3. 아래 폴더를 선택하고 확장 프로그램 옵션에서 연결 확인을 누르세요."
+
 msgid "Active"
 msgstr "진행 중"
 
@@ -11,6 +20,9 @@ msgstr "실제"
 
 msgid "Add"
 msgstr "추가"
+
+msgid "Add a link, or connect your browser to send downloads here."
+msgstr "링크를 추가하거나 브라우저를 연결해 다운로드를 보내세요."
 
 msgid "Add download"
 msgstr "다운로드 추가"
@@ -30,6 +42,18 @@ msgstr "적용"
 msgid "Archives"
 msgstr "압축 파일"
 
+msgid "Browser"
+msgstr "브라우저"
+
+msgid "Browser extension"
+msgstr "브라우저 확장"
+
+msgid "Browser not found. Install it, then refresh."
+msgstr "브라우저를 찾을 수 없습니다. 설치 후 새로고침하세요."
+
+msgid "Browser setup actions apply immediately. Save only applies to app preferences."
+msgstr "브라우저 설정 작업은 즉시 적용됩니다. 저장은 앱 환경설정에만 적용됩니다."
+
 msgid "Browse…"
 msgstr "찾아보기…"
 
@@ -45,6 +69,12 @@ msgstr "체크섬 (MD5 / SHA-1 / SHA-256 / SHA-512, 선택)"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "체크섬은 32, 40, 64, 128자 16진수여야 합니다 (BLAKE2b는 b2: 접두사)."
 
+msgid "Choose another category or return to all downloads."
+msgstr "다른 분류를 선택하거나 모든 다운로드로 돌아가세요."
+
+msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
+msgstr "아직 Chrome 웹 스토어에 등록되지 않았습니다. 함께 제공된 확장 프로그램을 수동으로 설치하세요."
+
 msgid "Closing this window restores the main window."
 msgstr "이 창을 닫으면 기본 창이 복원됩니다. 다운로드는 계속됩니다."
 
@@ -54,14 +84,38 @@ msgstr "간략 창"
 msgid "Completed"
 msgstr "완료"
 
+msgid "Connect browser"
+msgstr "브라우저 연결"
+
+msgid "Connect your browser"
+msgstr "브라우저 연결하기"
+
 msgid "Connections"
 msgstr "연결 수"
 
 msgid "Connections per download"
 msgstr "다운로드당 연결 수"
 
+msgid "Copy path"
+msgstr "경로 복사"
+
+msgid "Could not check browser setup:"
+msgstr "브라우저 설정을 확인할 수 없습니다:"
+
+msgid "Could not copy the extension path:"
+msgstr "확장 프로그램 경로를 복사할 수 없습니다:"
+
 msgid "Could not open the file location:"
 msgstr "파일 위치를 열 수 없습니다:"
+
+msgid "Could not open:"
+msgstr "열 수 없습니다:"
+
+msgid "Could not register the native host:"
+msgstr "네이티브 호스트를 등록할 수 없습니다:"
+
+msgid "Ctrl+Tab switches sections · Esc cancels"
+msgstr "Ctrl+Tab으로 탭 전환 · Esc로 취소"
 
 msgid "Default folder for the file type"
 msgstr "파일 형식별 기본 폴더"
@@ -93,6 +147,9 @@ msgstr "Downloader — 간략 창"
 msgid "Downloading"
 msgstr "다운로드 중"
 
+msgid "Downloads"
+msgstr "다운로드"
+
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "대기, 다운로드 또는 확인 중인 항목이 있습니다. 종료하고 일시 중지할까요? Downloader를 다시 열면 재개할 수 있습니다."
 
@@ -107,6 +164,18 @@ msgstr "Downloader를 종료할까요?"
 
 msgid "Expected"
 msgstr "예상"
+
+msgid "Extension folder"
+msgstr "확장 프로그램 폴더"
+
+msgid "Extension folder unavailable"
+msgstr "확장 프로그램 폴더 없음"
+
+msgid "Extension path copied."
+msgstr "확장 프로그램 경로를 복사했습니다."
+
+msgid "General"
+msgstr "일반"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "전체 속도 제한 (KB/s, 0 = 무제한)"
@@ -123,8 +192,14 @@ msgstr "무결성"
 msgid "Language"
 msgstr "언어"
 
+msgid "Language and behavior"
+msgstr "언어 및 동작"
+
 msgid "Low"
 msgstr "낮음"
+
+msgid "Make Downloader work the way you do."
+msgstr "다운로드 환경설정과 브라우저 연결을 조정하세요."
 
 msgid "Max simultaneous downloads"
 msgstr "최대 동시 다운로드"
@@ -138,17 +213,35 @@ msgstr "음악"
 msgid "Name"
 msgstr "이름"
 
+msgid "Native host"
+msgstr "네이티브 호스트"
+
+msgid "Native host is ready. Finish installing the extension in your browser profile."
+msgstr "네이티브 호스트가 준비되었습니다. 브라우저 프로필에서 확장 프로그램 설치를 완료하세요."
+
+msgid "Native host needs registration or repair."
+msgstr "네이티브 호스트를 등록하거나 복구해야 합니다."
+
+msgid "Native host registered. Continue with the extension steps below."
+msgstr "네이티브 호스트를 등록했습니다. 아래 확장 프로그램 설치 단계를 계속하세요."
+
+msgid "Network and schedule"
+msgstr "네트워크 및 일정"
+
 msgid "No"
 msgstr "아니요"
 
 msgid "No checksum"
 msgstr "체크섬 없음"
 
-msgid "No downloads yet. Click \"Add\" or copy a link."
-msgstr "아직 다운로드가 없습니다. \"추가\"를 누르거나 링크를 복사하세요."
+msgid "No downloads in this view"
+msgstr "이 보기에는 다운로드가 없습니다"
 
 msgid "Normal"
 msgstr "보통"
+
+msgid "Not checked yet."
+msgstr "아직 확인하지 않았습니다."
 
 msgid "Not verified"
 msgstr "검증 안 됨"
@@ -159,8 +252,20 @@ msgstr "확인"
 msgid "Only download between"
 msgstr "다음 시간에만 다운로드"
 
+msgid "Open extension folder"
+msgstr "확장 프로그램 폴더 열기"
+
+msgid "Open extensions"
+msgstr "확장 프로그램 열기"
+
 msgid "Open folder"
 msgstr "폴더 열기"
+
+msgid "Opened the browser extension manager."
+msgstr "브라우저 확장 프로그램 관리자를 열었습니다."
+
+msgid "Opened the extension folder."
+msgstr "확장 프로그램 폴더를 열었습니다."
 
 msgid "Other"
 msgstr "기타"
@@ -198,6 +303,15 @@ msgstr "프록시"
 msgid "Queued"
 msgstr "대기 중"
 
+msgid "Refresh"
+msgstr "새로고침"
+
+msgid "Register / repair"
+msgstr "등록 / 복구"
+
+msgid "Registering the native host…"
+msgstr "네이티브 호스트 등록 중…"
+
 msgid "Remove the selected download from the list?"
 msgstr "선택한 다운로드를 목록에서 제거할까요?"
 
@@ -210,6 +324,9 @@ msgstr "이어받기 지원"
 msgid "Retries"
 msgstr "재시도 횟수"
 
+msgid "Save"
+msgstr "저장"
+
 msgid "Save to"
 msgstr "저장 위치"
 
@@ -218,6 +335,9 @@ msgstr "저장 위치"
 
 msgid "Segments"
 msgstr "세그먼트"
+
+msgid "Set up each browser profile once. Native host registration does not install the extension."
+msgstr "브라우저 프로필마다 한 번씩 설정하세요. 네이티브 호스트 등록 후에도 확장 프로그램은 별도로 설치해야 합니다."
 
 msgid "Settings"
 msgstr "설정"
@@ -249,11 +369,23 @@ msgstr "모두 시작"
 msgid "Start immediately"
 msgstr "바로 시작"
 
+msgid "Start time"
+msgstr "시작 시간"
+
 msgid "Status"
 msgstr "상태"
 
+msgid "Stop time"
+msgstr "종료 시간"
+
+msgid "Storage"
+msgstr "저장 위치"
+
 msgid "System default"
 msgstr "시스템 기본값"
+
+msgid "The bundled extension folder is missing. Repair or reinstall Downloader."
+msgstr "제공된 확장 프로그램 폴더가 없습니다. Downloader를 복구하거나 다시 설치하세요."
 
 msgid "The file was moved or deleted. Its saved location is no longer available."
 msgstr "파일이 이동되었거나 삭제되었습니다. 저장된 위치를 더 이상 사용할 수 없습니다."
@@ -266,6 +398,12 @@ msgstr "이 다운로드는 아직 완료되지 않았습니다. 완료된 후 �
 
 msgid "Time left"
 msgstr "남은 시간"
+
+msgid "Time range (HH:MM)"
+msgstr "시간 범위 (HH:MM)"
+
+msgid "Transfers"
+msgstr "전송 설정"
 
 msgid "URL"
 msgstr "URL"
@@ -293,6 +431,9 @@ msgstr "클립보드의 다운로드 링크 감시"
 
 msgid "Yes"
 msgstr "예"
+
+msgid "Your downloads start here"
+msgstr "여기에서 다운로드를 시작하세요"
 
 msgid "{0} downloads, {1} active"
 msgstr "다운로드 {0}개, 진행 중 {1}개"

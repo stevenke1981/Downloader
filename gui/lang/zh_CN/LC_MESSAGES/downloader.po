@@ -3,6 +3,15 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: zh_CN\n"
 
+msgid "1. Register the native host"
+msgstr "1. 注册本机桥接程序"
+
+msgid "2. Open extensions, enable Developer mode, then choose Load unpacked."
+msgstr "2. 打开扩展程序，启用“开发者模式”，再选择“加载已解压的扩展程序”。"
+
+msgid "3. Select this folder. In the extension options, choose Check connection."
+msgstr "3. 选择下方文件夹，然后在扩展选项中点击“检查连接”。"
+
 msgid "Active"
 msgstr "进行中"
 
@@ -11,6 +20,9 @@ msgstr "实际"
 
 msgid "Add"
 msgstr "新建"
+
+msgid "Add a link, or connect your browser to send downloads here."
+msgstr "添加链接，或连接浏览器，将下载发送到这里。"
 
 msgid "Add download"
 msgstr "新建下载"
@@ -30,6 +42,18 @@ msgstr "应用"
 msgid "Archives"
 msgstr "压缩文件"
 
+msgid "Browser"
+msgstr "浏览器"
+
+msgid "Browser extension"
+msgstr "浏览器扩展"
+
+msgid "Browser not found. Install it, then refresh."
+msgstr "找不到浏览器。安装后请刷新。"
+
+msgid "Browser setup actions apply immediately. Save only applies to app preferences."
+msgstr "浏览器设置操作立即生效。“保存”仅应用 App 偏好设置。"
+
 msgid "Browse…"
 msgstr "浏览…"
 
@@ -45,6 +69,12 @@ msgstr "校验码（MD5 / SHA-1 / SHA-256 / SHA-512，可选）"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "校验码必须是 32、40、64 或 128 个十六进制字符（BLAKE2b 请加 b2:）。"
 
+msgid "Choose another category or return to all downloads."
+msgstr "选择其他分类，或返回全部下载。"
+
+msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
+msgstr "目前尚未上架 Chrome 应用商店，请手动安装附带的扩展。"
+
 msgid "Closing this window restores the main window."
 msgstr "关闭精简窗口会还原主窗口，下载继续进行。"
 
@@ -54,14 +84,38 @@ msgstr "精简窗口"
 msgid "Completed"
 msgstr "已完成"
 
+msgid "Connect browser"
+msgstr "连接浏览器"
+
+msgid "Connect your browser"
+msgstr "连接你的浏览器"
+
 msgid "Connections"
 msgstr "连接数"
 
 msgid "Connections per download"
 msgstr "每个下载的连接数"
 
+msgid "Copy path"
+msgstr "复制路径"
+
+msgid "Could not check browser setup:"
+msgstr "无法检查浏览器设置："
+
+msgid "Could not copy the extension path:"
+msgstr "无法复制扩展路径："
+
 msgid "Could not open the file location:"
 msgstr "无法打开文件位置："
+
+msgid "Could not open:"
+msgstr "无法打开："
+
+msgid "Could not register the native host:"
+msgstr "无法注册本机桥接程序："
+
+msgid "Ctrl+Tab switches sections · Esc cancels"
+msgstr "Ctrl+Tab 切换分页 · Esc 取消"
 
 msgid "Default folder for the file type"
 msgstr "按文件类型的默认文件夹"
@@ -93,6 +147,9 @@ msgstr "Downloader — 精简窗口"
 msgid "Downloading"
 msgstr "下载中"
 
+msgid "Downloads"
+msgstr "下载"
+
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "仍有排队、下载或校验中的项目。要退出并暂停它们吗？下次打开 Downloader 时可以继续。"
 
@@ -107,6 +164,18 @@ msgstr "要退出 Downloader 吗？"
 
 msgid "Expected"
 msgstr "预期"
+
+msgid "Extension folder"
+msgstr "扩展文件夹"
+
+msgid "Extension folder unavailable"
+msgstr "找不到扩展文件夹"
+
+msgid "Extension path copied."
+msgstr "已复制扩展路径。"
+
+msgid "General"
+msgstr "常规"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "全局限速（KB/s，0 = 不限）"
@@ -123,8 +192,14 @@ msgstr "完整性"
 msgid "Language"
 msgstr "语言"
 
+msgid "Language and behavior"
+msgstr "语言与使用偏好"
+
 msgid "Low"
 msgstr "低"
+
+msgid "Make Downloader work the way you do."
+msgstr "调整下载偏好，并连接你的浏览器。"
 
 msgid "Max simultaneous downloads"
 msgstr "同时下载数上限"
@@ -138,17 +213,35 @@ msgstr "音乐"
 msgid "Name"
 msgstr "名称"
 
+msgid "Native host"
+msgstr "本机桥接程序"
+
+msgid "Native host is ready. Finish installing the extension in your browser profile."
+msgstr "本机桥接程序已就绪。请继续在浏览器个人资料中完成扩展安装。"
+
+msgid "Native host needs registration or repair."
+msgstr "本机桥接程序需要注册或修复。"
+
+msgid "Native host registered. Continue with the extension steps below."
+msgstr "已注册本机桥接程序。请继续按下方步骤安装扩展。"
+
+msgid "Network and schedule"
+msgstr "网络与计划"
+
 msgid "No"
 msgstr "否"
 
 msgid "No checksum"
 msgstr "无校验文件"
 
-msgid "No downloads yet. Click \"Add\" or copy a link."
-msgstr "还没有下载。点击“新建”或复制一个链接。"
+msgid "No downloads in this view"
+msgstr "此分类目前没有下载"
 
 msgid "Normal"
 msgstr "普通"
+
+msgid "Not checked yet."
+msgstr "尚未检查。"
 
 msgid "Not verified"
 msgstr "未校验"
@@ -159,8 +252,20 @@ msgstr "确定"
 msgid "Only download between"
 msgstr "仅在此时段下载"
 
+msgid "Open extension folder"
+msgstr "打开扩展文件夹"
+
+msgid "Open extensions"
+msgstr "打开扩展管理页"
+
 msgid "Open folder"
 msgstr "打开文件夹"
+
+msgid "Opened the browser extension manager."
+msgstr "已打开浏览器扩展管理页。"
+
+msgid "Opened the extension folder."
+msgstr "已打开扩展文件夹。"
 
 msgid "Other"
 msgstr "其他"
@@ -198,6 +303,15 @@ msgstr "代理服务器"
 msgid "Queued"
 msgstr "排队中"
 
+msgid "Refresh"
+msgstr "刷新"
+
+msgid "Register / repair"
+msgstr "注册／修复"
+
+msgid "Registering the native host…"
+msgstr "正在注册本机桥接程序…"
+
 msgid "Remove the selected download from the list?"
 msgstr "要从列表中移除选中的下载吗？"
 
@@ -210,6 +324,9 @@ msgstr "支持续传"
 msgid "Retries"
 msgstr "重试次数"
 
+msgid "Save"
+msgstr "保存"
+
 msgid "Save to"
 msgstr "保存到"
 
@@ -218,6 +335,9 @@ msgstr "保存位置"
 
 msgid "Segments"
 msgstr "分段"
+
+msgid "Set up each browser profile once. Native host registration does not install the extension."
+msgstr "每个浏览器个人资料需单独设置一次。注册本机桥接程序后，仍需手动安装扩展。"
 
 msgid "Settings"
 msgstr "设置"
@@ -249,11 +369,23 @@ msgstr "全部开始"
 msgid "Start immediately"
 msgstr "立即开始"
 
+msgid "Start time"
+msgstr "开始时间"
+
 msgid "Status"
 msgstr "状态"
 
+msgid "Stop time"
+msgstr "停止时间"
+
+msgid "Storage"
+msgstr "保存位置"
+
 msgid "System default"
 msgstr "跟随系统"
+
+msgid "The bundled extension folder is missing. Repair or reinstall Downloader."
+msgstr "找不到附带的扩展文件夹。请修复或重新安装 Downloader。"
 
 msgid "The file was moved or deleted. Its saved location is no longer available."
 msgstr "文件已被移动或删除，原保存位置已无法找到文件。"
@@ -266,6 +398,12 @@ msgstr "此下载尚未完成，请等待完成后再定位文件。"
 
 msgid "Time left"
 msgstr "剩余时间"
+
+msgid "Time range (HH:MM)"
+msgstr "时段（HH:MM）"
+
+msgid "Transfers"
+msgstr "传输设置"
 
 msgid "URL"
 msgstr "网址"
@@ -293,6 +431,9 @@ msgstr "监视剪贴板中的下载链接"
 
 msgid "Yes"
 msgstr "是"
+
+msgid "Your downloads start here"
+msgstr "从这里开始下载"
 
 msgid "{0} downloads, {1} active"
 msgstr "共 {0} 个下载，{1} 个进行中"

@@ -24,6 +24,20 @@ export struct SegBar {
 }
 
 export global Tr {
+    pure public function browser-unchecked() -> string { return @tr("Not checked yet."); }
+    pure public function browser-host-ready() -> string { return @tr("Native host is ready. Finish installing the extension in your browser profile."); }
+    pure public function browser-host-missing() -> string { return @tr("Native host needs registration or repair."); }
+    pure public function browser-unavailable() -> string { return @tr("Browser not found. Install it, then refresh."); }
+    pure public function browser-check-failed() -> string { return @tr("Could not check browser setup:"); }
+    pure public function browser-registering() -> string { return @tr("Registering the native host…"); }
+    pure public function browser-registered() -> string { return @tr("Native host registered. Continue with the extension steps below."); }
+    pure public function browser-register-failed() -> string { return @tr("Could not register the native host:"); }
+    pure public function browser-opened() -> string { return @tr("Opened the browser extension manager."); }
+    pure public function browser-open-failed() -> string { return @tr("Could not open:"); }
+    pure public function browser-folder-opened() -> string { return @tr("Opened the extension folder."); }
+    pure public function browser-path-copied() -> string { return @tr("Extension path copied."); }
+    pure public function browser-path-missing() -> string { return @tr("The bundled extension folder is missing. Repair or reinstall Downloader."); }
+    pure public function browser-copy-failed() -> string { return @tr("Could not copy the extension path:"); }
     pure public function tray-unavailable() -> string { return @tr("The system tray is unavailable. The main window has been restored."); }
     pure public function unfinished() -> string { return @tr("This download is not complete. Wait for completion before locating the file."); }
     pure public function missing-file() -> string { return @tr("The file was moved or deleted. Its saved location is no longer available."); }
@@ -65,6 +79,16 @@ export global Tr {
     pure public function unknown() -> string { return @tr("Unknown"); }
 }
 
+global Palette {
+    out property <color> surface: white;
+    out property <color> subtle: #f6f8fb;
+    out property <color> text: #202d3b;
+    out property <color> muted: #556575;
+    out property <color> accent: #1565c0;
+    out property <color> border: #dce3eb;
+    out property <color> error: #b3261e;
+}
+
 component ToolButton inherits Rectangle {
     in property <image> icon;
     in property <string> label;
@@ -73,6 +97,13 @@ component ToolButton inherits Rectangle {
     min-width: 64px;
     height: 58px;
     border-radius: 6px;
+    border-width: focus-scope.has-focus ? 2px : 0px;
+    border-color: Palette.accent;
+    forward-focus: focus-scope;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
     background: ta.has-hover && root.enabled ? (ta.pressed ? #d6e9fb : #eaf4fd) : transparent;
     VerticalLayout {
         padding: 4px;
@@ -98,7 +129,18 @@ component ToolButton inherits Rectangle {
     }
     ta := TouchArea {
         enabled: root.enabled;
-        clicked => { root.clicked(); }
+        clicked => { focus-scope.focus(); root.clicked(); }
+    }
+    focus-scope := FocusScope {
+        width: 0px;
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == Key.Space {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
     }
 }
 
@@ -106,10 +148,20 @@ component SideItem inherits Rectangle {
     in property <string> label;
     in property <string> count;
     in property <bool> active;
+    in property <bool> enabled: true;
     in property <color> dot: #1e88e5;
     callback clicked;
     height: 32px;
     border-radius: 6px;
+    border-width: focus-scope.has-focus ? 2px : 0px;
+    border-color: Palette.accent;
+    forward-focus: focus-scope;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-checkable: true;
+    accessible-checked: root.active;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
     background: active ? #dcebfb : (ta.has-hover ? #edf3fa : transparent);
     HorizontalLayout {
         padding-left: 10px;
@@ -125,7 +177,18 @@ component SideItem inherits Rectangle {
         Text { text: root.label; vertical-alignment: center; font-size: 13px; color: active ? #0b5cad : #333; font-weight: active ? 600 : 400; }
         Text { text: root.count; vertical-alignment: center; horizontal-alignment: right; font-size: 12px; color: #888; }
     }
-    ta := TouchArea { clicked => { root.clicked(); } }
+    ta := TouchArea { enabled: root.enabled; clicked => { focus-scope.focus(); root.clicked(); } }
+    focus-scope := FocusScope {
+        width: 0px;
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == Key.Space {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
 }
 
 component HeaderCell inherits Text {
@@ -251,6 +314,29 @@ export component AppWindow inherits Window {
 
     // settings dialog
     in-out property <bool> set-open;
+    in-out property <int> s-tab: 0;
+    in-out property <int> s-browser: 0;
+    in property <string> browser-status;
+    in property <string> browser-folder;
+    in property <string> browser-message;
+    in property <bool> browser-busy;
+    callback browser-refresh();
+    callback browser-register();
+    callback browser-open-page();
+    callback browser-open-folder();
+    callback browser-copy-path();
+    changed s-browser => { root.browser-refresh(); }
+    changed s-tab => { if root.s-tab == 2 && root.set-open { root.browser-refresh(); } }
+    changed set-open => {
+        if root.set-open { root.select-settings-tab(root.s-tab); }
+        else { settings-button.focus(); }
+    }
+    function select-settings-tab(index: int) {
+        root.s-tab = mod(index + 3, 3);
+        if root.s-tab == 0 { general-tab.focus(); }
+        if root.s-tab == 1 { downloads-tab.focus(); }
+        if root.s-tab == 2 { browser-tab.focus(); }
+    }
     in property <[string]> languages;
     in-out property <int> s-language;
     in-out property <string> s-folder;
@@ -296,6 +382,21 @@ export component AppWindow inherits Window {
             }
             return accept;
         }
+        if root.set-open {
+            if event.text == Key.Escape { root.set-open = false; return accept; }
+            if event.text == Key.Tab && event.modifiers.control {
+                root.select-settings-tab(root.s-tab + (event.modifiers.shift ? -1 : 1));
+                return accept;
+            }
+            if event.text == Key.Tab && !event.modifiers.shift && settings-save.has-focus {
+                general-tab.focus();
+                return accept;
+            }
+            if event.text == Key.Tab && event.modifiers.shift && general-tab.has-focus {
+                settings-save.focus();
+                return accept;
+            }
+        }
         return reject;
     }
     capture-key-released(event) => {
@@ -332,7 +433,7 @@ export component AppWindow inherits Window {
                 ToolButton { icon: @image-url("icons/startall.svg"); label: @tr("Start all"); clicked => { root.start-all(); } }
                 ToolButton { icon: @image-url("icons/pauseall.svg"); label: @tr("Pause all"); clicked => { root.pause-all(); } }
                 Rectangle { width: 1px; background: #e3e6ea; }
-                ToolButton { icon: @image-url("icons/settings.svg"); label: @tr("Settings"); clicked => { root.settings-clicked(); } }
+                settings-button := ToolButton { icon: @image-url("icons/settings.svg"); label: @tr("Settings"); clicked => { root.settings-clicked(); } }
                 Rectangle { horizontal-stretch: 1; }
                 VerticalLayout {
                     alignment: center;
@@ -378,13 +479,13 @@ export component AppWindow inherits Window {
                 // The ListView inside owns only vertical scrolling.
                 table-scroll := ScrollView {
                 vertical-stretch: 1;
-                content-width: max(850px, self.width);
+                content-width: root.rows.length == 0 ? self.width : max(850px, self.width);
                 content-height: self.height;
                 vertical-scrollbar-policy: always-off;
                 VerticalLayout {
-                padding-bottom: table-scroll.width < 850px ? 16px : 0px;
+                padding-bottom: root.rows.length > 0 && table-scroll.width < 850px ? 16px : 0px;
                 // ---------- list header ----------
-                Rectangle {
+                if root.rows.length > 0: Rectangle {
                     height: 30px;
                     background: #fbfcfd;
                     HorizontalLayout {
@@ -454,12 +555,34 @@ export component AppWindow inherits Window {
                             }
                         }
                     }
-                    if root.rows.length == 0: Text {
-                        text: @tr("No downloads yet. Click \"Add\" or copy a link.");
-                        color: #9aa5b1;
-                        font-size: 15px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                    if root.rows.length == 0: VerticalLayout {
+                        x: 24px;
+                        width: parent.width - 48px;
+                        height: min(self.preferred-height, parent.height);
+                        y: (parent.height - self.height) / 2;
+                        spacing: 12px;
+                        alignment: center;
+                        Text {
+                            text: root.counts[0] == 0 ? @tr("Your downloads start here") : @tr("No downloads in this view");
+                            color: Palette.text;
+                            font-size: 18px;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+                        Text {
+                            text: root.counts[0] == 0 ? @tr("Add a link, or connect your browser to send downloads here.") : @tr("Choose another category or return to all downloads.");
+                            color: Palette.muted;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
+                        }
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 8px;
+                            if root.counts[0] == 0: Button { text: @tr("Add download"); primary: true; clicked => { root.add-clicked(); } }
+                            if root.counts[0] == 0: Button { text: @tr("Connect browser"); clicked => { root.settings-clicked(); root.select-settings-tab(2); } }
+                            if root.counts[0] > 0: Button { text: @tr("All downloads"); clicked => { root.filter-clicked(0); } }
+                        }
                     }
                 }
                 }
@@ -590,38 +713,165 @@ export component AppWindow inherits Window {
     }
 
     // ---------- settings dialog ----------
-    if root.set-open: Dialog {
-        title: @tr("Settings");
-        dialog-width: 600px;
-        Field { label: @tr("Language"); ComboBox { model: root.languages; current-index <=> root.s-language; horizontal-stretch: 1; } }
-        Field {
-            label: @tr("Download folder");
-            LineEdit { text <=> root.s-folder; horizontal-stretch: 1; }
-            Button { text: @tr("Browse…"); clicked => { root.s-folder = root.browse(1); } }
-        }
-        CheckBox { text: @tr("Sort into category sub-folders (Video, Music, …)"); checked <=> root.s-catfolders; }
-        Field { label: @tr("Max simultaneous downloads"); SpinBox { value <=> root.s-concurrent; minimum: 1; maximum: 20; } Rectangle { horizontal-stretch: 1; } }
-        Field { label: @tr("Connections per download"); SpinBox { value <=> root.s-conns; minimum: 1; maximum: 32; } Rectangle { horizontal-stretch: 1; } }
-        Field { label: @tr("Global speed limit (KB/s, 0 = unlimited)"); LineEdit { text <=> root.s-global; horizontal-stretch: 1; } }
-        Field { label: @tr("Default limit per download (KB/s)"); LineEdit { text <=> root.s-perdl; horizontal-stretch: 1; } }
-        Field { label: @tr("Retries"); SpinBox { value <=> root.s-retries; minimum: 0; maximum: 50; } Rectangle { horizontal-stretch: 1; } }
-        Field { label: @tr("Proxy"); LineEdit { text <=> root.s-proxy; placeholder-text: "http://host:8080 / socks5://host:1080"; horizontal-stretch: 1; } }
-        HorizontalLayout {
-            spacing: 10px;
-            CheckBox { text: @tr("Only download between"); checked <=> root.s-sched; }
-            LineEdit { text <=> root.s-start; width: 70px; }
-            Text { text: "–"; vertical-alignment: center; }
-            LineEdit { text <=> root.s-stop; width: 70px; }
-            Text { text: "(HH:MM)"; vertical-alignment: center; color: #888; }
-        }
-        CheckBox { text: @tr("Watch the clipboard for download links"); checked <=> root.s-clip; }
-        CheckBox { text: @tr("Verify downloads automatically (look for checksum files)"); checked <=> root.s-verify; }
-        if root.s-error != "": Text { text: root.s-error; color: #d32f2f; wrap: word-wrap; }
-        HorizontalLayout {
-            alignment: end;
-            spacing: 8px;
-            Button { text: @tr("Cancel"); clicked => { root.set-open = false; } }
-            Button { text: @tr("OK"); primary: true; clicked => { root.settings-ok(); } }
+    // The shell stays outside the scroll owner so tabs and actions never scroll away.
+    settings-overlay := Rectangle {
+        visible: root.set-open;
+        background: #00000060;
+        TouchArea { }
+        settings-shell := Rectangle {
+            width: min(704px, parent.width - 32px);
+            height: min(560px, parent.height - 32px);
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: Palette.surface;
+            border-radius: 10px;
+            drop-shadow-blur: 18px;
+            drop-shadow-color: #00000050;
+            forward-focus: general-tab;
+            VerticalLayout {
+                spacing: 0px;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 4px;
+                    Text { text: @tr("Settings"); color: Palette.text; font-size: 20px; font-weight: 700; }
+                    Text { text: @tr("Make Downloader work the way you do."); color: Palette.muted; wrap: word-wrap; }
+                }
+                FocusScope {
+                    height: 40px;
+                    accessible-role: tab-list;
+                    accessible-item-count: 3;
+                    capture-key-pressed(event) => {
+                        if event.text == Key.LeftArrow { root.select-settings-tab(root.s-tab - 1); return accept; }
+                        if event.text == Key.RightArrow { root.select-settings-tab(root.s-tab + 1); return accept; }
+                        return reject;
+                    }
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 16px;
+                        padding-bottom: 8px;
+                        spacing: 8px;
+                        general-tab := Button {
+                            text: @tr("General");
+                            accessible-role: tab;
+                            accessible-item-selectable: true;
+                            accessible-item-index: 0;
+                            accessible-item-selected: root.s-tab == 0;
+                            primary: root.s-tab == 0;
+                            clicked => { root.select-settings-tab(0); }
+                        }
+                        downloads-tab := Button {
+                            text: @tr("Downloads");
+                            accessible-role: tab;
+                            accessible-item-selectable: true;
+                            accessible-item-index: 1;
+                            accessible-item-selected: root.s-tab == 1;
+                            primary: root.s-tab == 1;
+                            clicked => { root.select-settings-tab(1); }
+                        }
+                        browser-tab := Button {
+                            text: @tr("Browser extension");
+                            accessible-role: tab;
+                            accessible-item-selectable: true;
+                            accessible-item-index: 2;
+                            accessible-item-selected: root.s-tab == 2;
+                            primary: root.s-tab == 2;
+                            clicked => { root.select-settings-tab(2); }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                    }
+                }
+                Rectangle { height: 1px; background: Palette.border; }
+                settings-body := ScrollView {
+                    min-height: 0px;
+                    vertical-stretch: 1;
+                    content-width: self.width;
+                    horizontal-scrollbar-policy: always-off;
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 12px;
+                        if root.s-tab == 0: VerticalLayout {
+                            spacing: 12px;
+                            Text { text: @tr("Language and behavior"); color: Palette.text; font-size: 15px; font-weight: 600; }
+                            Field { label: @tr("Language"); ComboBox { model: root.languages; current-index <=> root.s-language; accessible-label: @tr("Language"); horizontal-stretch: 1; } }
+                            CheckBox { text: @tr("Watch the clipboard for download links"); checked <=> root.s-clip; }
+                            CheckBox { text: @tr("Verify downloads automatically (look for checksum files)"); checked <=> root.s-verify; }
+                            Rectangle { height: 1px; background: Palette.border; }
+                            Text { text: @tr("Storage"); color: Palette.text; font-size: 15px; font-weight: 600; }
+                            Field {
+                                label: @tr("Download folder");
+                                LineEdit { text <=> root.s-folder; accessible-label: @tr("Download folder"); horizontal-stretch: 1; }
+                                Button { text: @tr("Browse…"); clicked => { root.s-folder = root.browse(1); } }
+                            }
+                            CheckBox { text: @tr("Sort into category sub-folders (Video, Music, …)"); checked <=> root.s-catfolders; }
+                        }
+                        if root.s-tab == 1: VerticalLayout {
+                            spacing: 12px;
+                            Text { text: @tr("Transfers"); color: Palette.text; font-size: 15px; font-weight: 600; }
+                            Field { label: @tr("Max simultaneous downloads"); SpinBox { value <=> root.s-concurrent; accessible-label: @tr("Max simultaneous downloads"); minimum: 1; maximum: 20; } Rectangle { horizontal-stretch: 1; } }
+                            Field { label: @tr("Connections per download"); SpinBox { value <=> root.s-conns; accessible-label: @tr("Connections per download"); minimum: 1; maximum: 32; } Rectangle { horizontal-stretch: 1; } }
+                            Field { label: @tr("Global speed limit (KB/s, 0 = unlimited)"); LineEdit { text <=> root.s-global; accessible-label: @tr("Global speed limit (KB/s, 0 = unlimited)"); input-type: decimal; horizontal-stretch: 1; } }
+                            Field { label: @tr("Default limit per download (KB/s)"); LineEdit { text <=> root.s-perdl; accessible-label: @tr("Default limit per download (KB/s)"); input-type: decimal; horizontal-stretch: 1; } }
+                            Field { label: @tr("Retries"); SpinBox { value <=> root.s-retries; accessible-label: @tr("Retries"); minimum: 0; maximum: 50; } Rectangle { horizontal-stretch: 1; } }
+                            Rectangle { height: 1px; background: Palette.border; }
+                            Text { text: @tr("Network and schedule"); color: Palette.text; font-size: 15px; font-weight: 600; }
+                            Field { label: @tr("Proxy"); LineEdit { text <=> root.s-proxy; accessible-label: @tr("Proxy"); placeholder-text: "http://host:8080 / socks5://host:1080"; horizontal-stretch: 1; } }
+                            CheckBox { text: @tr("Only download between"); checked <=> root.s-sched; }
+                            Field {
+                                label: @tr("Time range (HH:MM)");
+                                LineEdit { text <=> root.s-start; accessible-label: @tr("Start time"); enabled: root.s-sched; placeholder-text: "09:00"; width: 90px; }
+                                Text { text: "–"; vertical-alignment: center; color: Palette.muted; }
+                                LineEdit { text <=> root.s-stop; accessible-label: @tr("Stop time"); enabled: root.s-sched; placeholder-text: "18:00"; width: 90px; }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                        }
+                        if root.s-tab == 2: VerticalLayout {
+                            spacing: 12px;
+                            Text { text: @tr("Connect your browser"); color: Palette.text; font-size: 15px; font-weight: 600; }
+                            Text { text: @tr("Set up each browser profile once. Native host registration does not install the extension."); color: Palette.muted; wrap: word-wrap; }
+                            Field {
+                                label: @tr("Browser");
+                                ComboBox { model: ["Google Chrome", "Brave", "Microsoft Edge"]; current-index <=> root.s-browser; accessible-label: @tr("Browser"); enabled: !root.browser-busy; horizontal-stretch: 1; }
+                                Button { text: @tr("Refresh"); enabled: !root.browser-busy; clicked => { root.browser-refresh(); } }
+                            }
+                            Text { text: @tr("Native host") + ": " + (root.browser-status == "" ? Tr.browser-unchecked() : root.browser-status); color: Palette.text; wrap: word-wrap; }
+                            Text { text: @tr("1. Register the native host"); color: Palette.text; font-weight: 600; wrap: word-wrap; }
+                            HorizontalLayout {
+                                Button { text: @tr("Register / repair"); enabled: !root.browser-busy; clicked => { root.browser-register(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            Text { text: @tr("2. Open extensions, enable Developer mode, then choose Load unpacked."); color: Palette.text; font-weight: 600; wrap: word-wrap; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Button { text: @tr("Open extensions"); enabled: !root.browser-busy; clicked => { root.browser-open-page(); } }
+                                Button { text: @tr("Open extension folder"); enabled: !root.browser-busy && root.browser-folder != ""; clicked => { root.browser-open-folder(); } }
+                                Rectangle { horizontal-stretch: 1; }
+                            }
+                            Text { text: @tr("3. Select this folder. In the extension options, choose Check connection."); color: Palette.text; font-weight: 600; wrap: word-wrap; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                LineEdit { text: root.browser-folder; accessible-label: @tr("Extension folder"); read-only: true; horizontal-stretch: 1; placeholder-text: @tr("Extension folder unavailable"); }
+                                Button { text: @tr("Copy path"); enabled: !root.browser-busy && root.browser-folder != ""; clicked => { root.browser-copy-path(); } }
+                            }
+                            Text { text: @tr("Chrome Web Store listing is not available yet. Install the bundled extension manually."); color: Palette.muted; wrap: word-wrap; }
+                            Text { text: @tr("Browser setup actions apply immediately. Save only applies to app preferences."); color: Palette.muted; wrap: word-wrap; }
+                        }
+                    }
+                }
+                Rectangle { height: 1px; background: Palette.border; }
+                // Feedback belongs with the pinned actions, including validation errors from another tab.
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 8px;
+                    if root.s-error != "": Text { text: root.s-error; color: Palette.error; wrap: word-wrap; max-height: 56px; overflow: elide; }
+                    if root.s-tab == 2 && root.browser-message != "": Text { text: root.browser-message; color: Palette.text; wrap: word-wrap; max-height: 56px; overflow: elide; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text { text: @tr("Ctrl+Tab switches sections · Esc cancels"); color: Palette.muted; font-size: 11px; vertical-alignment: center; wrap: word-wrap; horizontal-stretch: 1; }
+                        Button { text: @tr("Cancel"); clicked => { root.set-open = false; } }
+                        settings-save := Button { text: @tr("Save"); primary: true; clicked => { root.settings-ok(); } }
+                    }
+                }
+            }
         }
     }
     if root.exit-open: Dialog {

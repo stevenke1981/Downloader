@@ -953,24 +953,35 @@ mod model_sync_tests {
 #[cfg(test)]
 mod lifecycle_tests {
     use super::*;
-    // Runs only when explicitly selected by the isolated CI screenshot script.
+    // Runs only when explicitly selected for native screenshots.
     // It renders the real AppWindow with synthetic data, without a Manager,
     // clipboard, private history, download, or simulated native mouse input.
     #[test]
-    #[ignore = "native rendering fixture for isolated Windows CI screenshots"]
+    #[ignore = "native rendering fixture; set DOWNLOADER_UI_SNAPSHOT for a local PPM"]
     fn render_layout_fixture() {
-        assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
+        let snapshot_path = std::env::var_os("DOWNLOADER_UI_SNAPSHOT");
+        assert!(
+            snapshot_path.is_some() || std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true"),
+            "set DOWNLOADER_UI_SNAPSHOT for an explicit local native screenshot"
+        );
         let scene = std::env::var("DOWNLOADER_UI_FIXTURE").unwrap();
         assert!(matches!(
             scene.as_str(),
-            "details" | "settings" | "details-scrolled" | "settings-scrolled"
+            "details"
+                | "settings"
+                | "details-scrolled"
+                | "settings-scrolled"
+                | "settings-browser"
+                | "settings-downloads"
+                | "settings-general"
+                | "empty"
         ));
         select_renderer();
         let ui = AppWindow::new().unwrap();
         apply_lang("zh_TW");
         set_languages_model(&ui);
         ui.set_tray_available(true);
-        ui.set_has_selection(true);
+        ui.set_has_selection(scene != "empty");
         ui.set_d_name("自製測試資料 fixture with spaces.txt".into());
         ui.set_d_path("C:\\fixture\\自製測試資料 fixture with spaces.txt".into());
         ui.set_d_url("http://127.0.0.1/fixture.txt".into());
@@ -983,18 +994,37 @@ mod lifecycle_tests {
         ui.set_d_actual("0123456789abcdef".repeat(4).into());
         ui.set_d_limit("0".into());
         ui.set_total_speed("0 B/s".into());
-        ui.set_status_line("1 個下載，0 個進行中（自製測試資料）".into());
-        ui.set_rows(ModelRc::new(VecModel::from(vec![Row {
-            name: "自製測試資料 fixture with spaces.txt".into(),
-            size: "256 KiB".into(),
-            progress: 1.0,
-            progress_text: "100%".into(),
-            status: 4,
-            selected: true,
-            verify: 1,
-            ..Default::default()
-        }])));
+        ui.set_status_line(if scene == "empty" {
+            "0 個下載，0 個進行中（自製測試資料）".into()
+        } else {
+            "1 個下載，0 個進行中（自製測試資料）".into()
+        });
+        let rows = if scene == "empty" {
+            vec![]
+        } else {
+            vec![Row {
+                name: "自製測試資料 fixture with spaces.txt".into(),
+                size: "256 KiB".into(),
+                progress: 1.0,
+                progress_text: "100%".into(),
+                status: 4,
+                selected: true,
+                verify: 1,
+                ..Default::default()
+            }]
+        };
+        ui.set_counts(ModelRc::new(VecModel::from(vec![rows.len() as i32; 10])));
+        ui.set_rows(ModelRc::new(VecModel::from(rows)));
         ui.set_set_open(scene.starts_with("settings"));
+        ui.set_s_tab(match scene.as_str() {
+            "settings-browser" => 2,
+            "settings-downloads" | "settings-scrolled" => 1,
+            _ => 0,
+        });
+        ui.set_s_folder("C:\\fixture\\下載資料夾".into());
+        ui.set_browser_status(ui.global::<Tr>().invoke_browser_host_ready());
+        ui.set_browser_folder("C:\\fixture\\Downloader\\extension".into());
+        ui.set_browser_message(ui.global::<Tr>().invoke_browser_path_copied());
         ui.window().set_size(slint::LogicalSize::new(760.0, 480.0));
         ui.show().unwrap();
         schedule_initial_placement(&ui);
@@ -1015,6 +1045,27 @@ mod lifecycle_tests {
                             delta_y: -2000.0,
                         });
                 }
+            });
+        }
+        if let Some(path) = snapshot_path {
+            let weak = ui.as_weak();
+            slint::Timer::single_shot(Duration::from_millis(800), move || {
+                use std::io::Write;
+                let ui = weak.upgrade().expect("fixture window is alive");
+                let snapshot = ui.window().take_snapshot().expect("native window snapshot");
+                let mut file = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
+                write!(
+                    file,
+                    "P6\n{} {}\n255\n",
+                    snapshot.width(),
+                    snapshot.height()
+                )
+                .unwrap();
+                for pixel in snapshot.as_slice() {
+                    file.write_all(&[pixel.r, pixel.g, pixel.b]).unwrap();
+                }
+                file.flush().unwrap();
+                let _ = slint::quit_event_loop();
             });
         }
         // Bound the fixture lifetime even if the screenshot helper fails.
@@ -1072,7 +1123,7 @@ mod lifecycle_tests {
     }
 
     #[test]
-    fn small_window_scrolls_to_detail_and_settings_actions() {
+    fn small_window_scrolls_details_and_pins_settings_actions() {
         use i_slint_backend_testing::ElementHandle;
         use std::cell::Cell;
         i_slint_backend_testing::init_no_event_loop();
@@ -1109,25 +1160,171 @@ mod lifecycle_tests {
         );
 
         ui.set_set_open(true);
+        for tab in 0..3 {
+            ui.set_s_tab(tab);
+            let mut footer_y = None;
+            for scroll in [0.0, -2000.0] {
+                ui.window()
+                    .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+                        position: slint::LogicalPosition::new(673.0, 240.0),
+                        delta_x: 0.0,
+                        delta_y: scroll,
+                    });
+                for label in ["Cancel", "Save"] {
+                    let control = ElementHandle::find_by_accessible_label(&ui, label)
+                        .next()
+                        .unwrap();
+                    let p = control.absolute_position();
+                    let s = control.size();
+                    assert!(
+                        p.x >= 28.0
+                            && p.y >= 16.0
+                            && p.x + s.width <= 732.5
+                            && p.y + s.height <= 464.5,
+                        "{label} must stay visible in tab {tab}: {p:?}, {s:?}"
+                    );
+                    if label == "Save" {
+                        assert_eq!(
+                            *footer_y.get_or_insert(p.y),
+                            p.y,
+                            "footer moved while scrolling"
+                        );
+                    }
+                }
+            }
+        }
+        let cancel = ElementHandle::find_by_accessible_label(&ui, "Cancel")
+            .next()
+            .unwrap();
+        cancel.mock_single_click(slint::platform::PointerEventButton::Left);
+        assert!(
+            !ui.get_set_open(),
+            "settings Cancel must remain reachable on every tab"
+        );
+    }
+
+    fn press_key(ui: &AppWindow, key: slint::platform::Key) {
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyPressed { text: key.into() });
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyReleased { text: key.into() });
+    }
+
+    #[test]
+    fn settings_tabs_support_keyboard_and_report_real_browser_actions() {
+        use i_slint_backend_testing::ElementHandle;
+        use std::cell::Cell;
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = AppWindow::new().unwrap();
+        apply_lang("en");
+        let registered = Rc::new(Cell::new(0));
+        let calls = registered.clone();
+        ui.on_browser_register(move || calls.set(calls.get() + 1));
+        let refreshed = Rc::new(Cell::new(0));
+        let calls = refreshed.clone();
+        ui.on_browser_refresh(move || calls.set(calls.get() + 1));
+        let saved = Rc::new(Cell::new(0));
+        let calls = saved.clone();
+        ui.on_settings_ok(move || calls.set(calls.get() + 1));
+        ui.show().unwrap();
+        ui.window().set_size(slint::LogicalSize::new(760.0, 480.0));
+        ui.set_set_open(true);
+        assert_eq!(ui.get_s_tab(), 0);
+        // Shift+Tab from the first tab wraps to the pinned Save action, not the main window.
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyPressed {
+                text: slint::platform::Key::Shift.into(),
+            });
+        press_key(&ui, slint::platform::Key::Tab);
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::KeyReleased {
+                text: slint::platform::Key::Shift.into(),
+            });
+        press_key(&ui, slint::platform::Key::Return);
+        assert_eq!(
+            saved.get(),
+            1,
+            "keyboard must reach pinned Save without leaving Settings"
+        );
+        press_key(&ui, slint::platform::Key::Tab);
+        press_key(&ui, slint::platform::Key::RightArrow);
+        assert_eq!(ui.get_s_tab(), 1);
+        press_key(&ui, slint::platform::Key::RightArrow);
+        assert_eq!(ui.get_s_tab(), 2);
+        assert!(
+            refreshed.get() > 0,
+            "entering Browser must request fresh status"
+        );
+        let browser_tab = ElementHandle::find_by_accessible_label(&ui, "Browser extension")
+            .next()
+            .unwrap();
+        assert_eq!(browser_tab.accessible_item_selected(), Some(true));
+        let register = ElementHandle::find_by_accessible_label(&ui, "Register / repair")
+            .next()
+            .unwrap();
+        // Register is near the top and reachable without scrolling at minimum size.
+        register.mock_single_click(slint::platform::PointerEventButton::Left);
+        assert_eq!(registered.get(), 1);
+        ui.set_browser_busy(true);
+        assert_eq!(register.accessible_enabled(), Some(false));
+        register.mock_single_click(slint::platform::PointerEventButton::Left);
+        assert_eq!(
+            registered.get(),
+            1,
+            "busy state must reject duplicate actions"
+        );
+        // An unverified profile must never be described as having the extension installed.
+        assert!(ui.get_browser_status().is_empty());
         ui.window()
             .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
                 position: slint::LogicalPosition::new(673.0, 240.0),
                 delta_x: 0.0,
                 delta_y: -2000.0,
             });
-        let cancel = ElementHandle::find_by_accessible_label(&ui, "Cancel")
+        let copied = ElementHandle::find_by_accessible_label(&ui, "Copy path")
             .next()
             .unwrap();
-        let p = cancel.absolute_position();
-        let s = cancel.size();
+        assert_eq!(copied.accessible_enabled(), Some(false));
+        ui.set_browser_busy(false);
+        ui.set_browser_folder("C:\\fixture\\extension".into());
+        assert_eq!(copied.accessible_enabled(), Some(true));
+        press_key(&ui, slint::platform::Key::Escape);
+        assert!(!ui.get_set_open());
+    }
+
+    #[test]
+    fn empty_list_offers_browser_setup_and_filtered_list_offers_reset() {
+        use i_slint_backend_testing::ElementHandle;
+        use std::cell::Cell;
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = AppWindow::new().unwrap();
+        apply_lang("en");
+        let weak = ui.as_weak();
+        ui.on_settings_clicked(move || weak.upgrade().unwrap().set_set_open(true));
+        ui.show().unwrap();
+        ui.window().set_size(slint::LogicalSize::new(760.0, 480.0));
+        ElementHandle::find_by_accessible_label(&ui, "Connect browser")
+            .next()
+            .unwrap()
+            .mock_single_click(slint::platform::PointerEventButton::Left);
+        assert!(ui.get_set_open());
+        assert_eq!(ui.get_s_tab(), 2);
+        ui.set_set_open(false);
+        ui.set_counts(ModelRc::new(VecModel::from(vec![3; 10])));
+        ui.set_filter(2);
+        let filtered = Rc::new(Cell::new(-1));
+        let calls = filtered.clone();
+        ui.on_filter_clicked(move |f| calls.set(f));
+        // The sidebar and empty-state action share the label. The latter is in the list column.
+        let reset = ElementHandle::find_by_accessible_label(&ui, "All downloads")
+            .find(|e| e.absolute_position().x > 196.0)
+            .unwrap();
+        reset.mock_single_click(slint::platform::PointerEventButton::Left);
+        assert_eq!(filtered.get(), 0);
         assert!(
-            p.x >= 80.0 && p.y >= 12.0 && p.x + s.width <= 680.5 && p.y + s.height <= 468.5,
-            "Cancel must be fully visible in the dialog viewport: {p:?}, {s:?}"
-        );
-        cancel.mock_single_click(slint::platform::PointerEventButton::Left);
-        assert!(
-            !ui.get_set_open(),
-            "settings Cancel must be reachable after scrolling"
+            ElementHandle::find_by_accessible_label(&ui, "No downloads in this view")
+                .next()
+                .is_some()
         );
     }
 

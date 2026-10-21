@@ -3,6 +3,15 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: zh_TW\n"
 
+msgid "1. Register the native host"
+msgstr "1. 註冊本機橋接程式"
+
+msgid "2. Open extensions, enable Developer mode, then choose Load unpacked."
+msgstr "2. 開啟擴充功能，啟用「開發人員模式」，再選擇「載入未封裝項目」。"
+
+msgid "3. Select this folder. In the extension options, choose Check connection."
+msgstr "3. 選取下方資料夾，並在擴充功能選項中按「檢查連線」。"
+
 msgid "Active"
 msgstr "進行中"
 
@@ -11,6 +20,9 @@ msgstr "實際"
 
 msgid "Add"
 msgstr "新增"
+
+msgid "Add a link, or connect your browser to send downloads here."
+msgstr "新增連結，或連接瀏覽器，將下載傳送到這裡。"
 
 msgid "Add download"
 msgstr "新增下載"
@@ -30,6 +42,18 @@ msgstr "套用"
 msgid "Archives"
 msgstr "壓縮檔"
 
+msgid "Browser"
+msgstr "瀏覽器"
+
+msgid "Browser extension"
+msgstr "瀏覽器擴充功能"
+
+msgid "Browser not found. Install it, then refresh."
+msgstr "找不到瀏覽器。安裝後，請重新整理。"
+
+msgid "Browser setup actions apply immediately. Save only applies to app preferences."
+msgstr "瀏覽器設定操作會立即生效。「儲存」僅套用 App 偏好設定。"
+
 msgid "Browse…"
 msgstr "瀏覽…"
 
@@ -45,6 +69,12 @@ msgstr "校驗碼（MD5 / SHA-1 / SHA-256 / SHA-512，選填）"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "校驗碼必須是 32、40、64 或 128 個十六進位字元（BLAKE2b 請加上 b2:）。"
 
+msgid "Choose another category or return to all downloads."
+msgstr "選擇其他分類，或返回全部下載。"
+
+msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
+msgstr "目前尚未上架 Chrome 線上應用程式商店，請手動安裝隨附的擴充功能。"
+
 msgid "Closing this window restores the main window."
 msgstr "關閉精簡視窗會還原主視窗，下載繼續執行。"
 
@@ -54,14 +84,38 @@ msgstr "精簡視窗"
 msgid "Completed"
 msgstr "已完成"
 
+msgid "Connect browser"
+msgstr "連接瀏覽器"
+
+msgid "Connect your browser"
+msgstr "連接你的瀏覽器"
+
 msgid "Connections"
 msgstr "連線數"
 
 msgid "Connections per download"
 msgstr "每個下載的連線數"
 
+msgid "Copy path"
+msgstr "複製路徑"
+
+msgid "Could not check browser setup:"
+msgstr "無法檢查瀏覽器設定："
+
+msgid "Could not copy the extension path:"
+msgstr "無法複製擴充功能路徑："
+
 msgid "Could not open the file location:"
 msgstr "無法開啟檔案位置："
+
+msgid "Could not open:"
+msgstr "無法開啟："
+
+msgid "Could not register the native host:"
+msgstr "無法註冊本機橋接程式："
+
+msgid "Ctrl+Tab switches sections · Esc cancels"
+msgstr "Ctrl+Tab 切換分頁 · Esc 取消"
 
 msgid "Default folder for the file type"
 msgstr "依檔案類型的預設資料夾"
@@ -93,6 +147,9 @@ msgstr "Downloader — 精簡視窗"
 msgid "Downloading"
 msgstr "下載中"
 
+msgid "Downloads"
+msgstr "下載"
+
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "仍有排程中、下載中或驗證中的項目。確定要退出並暫停嗎？下次開啟 Downloader 可繼續下載。"
 
@@ -107,6 +164,18 @@ msgstr "要退出 Downloader 嗎？"
 
 msgid "Expected"
 msgstr "預期"
+
+msgid "Extension folder"
+msgstr "擴充功能資料夾"
+
+msgid "Extension folder unavailable"
+msgstr "找不到擴充功能資料夾"
+
+msgid "Extension path copied."
+msgstr "已複製擴充功能路徑。"
+
+msgid "General"
+msgstr "一般"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "全域限速（KB/s，0 = 不限）"
@@ -123,8 +192,14 @@ msgstr "完整性"
 msgid "Language"
 msgstr "語言"
 
+msgid "Language and behavior"
+msgstr "語言與使用偏好"
+
 msgid "Low"
 msgstr "低"
+
+msgid "Make Downloader work the way you do."
+msgstr "調整下載偏好，並連接你的瀏覽器。"
 
 msgid "Max simultaneous downloads"
 msgstr "同時下載數上限"
@@ -138,17 +213,35 @@ msgstr "音樂"
 msgid "Name"
 msgstr "名稱"
 
+msgid "Native host"
+msgstr "本機橋接程式"
+
+msgid "Native host is ready. Finish installing the extension in your browser profile."
+msgstr "本機橋接程式已就緒。請繼續在瀏覽器個人資料中完成擴充功能安裝。"
+
+msgid "Native host needs registration or repair."
+msgstr "本機橋接程式需要註冊或修復。"
+
+msgid "Native host registered. Continue with the extension steps below."
+msgstr "已註冊本機橋接程式。請繼續依下方步驟安裝擴充功能。"
+
+msgid "Network and schedule"
+msgstr "網路與排程"
+
 msgid "No"
 msgstr "否"
 
 msgid "No checksum"
 msgstr "無校驗檔"
 
-msgid "No downloads yet. Click \"Add\" or copy a link."
-msgstr "還沒有下載。按「新增」或複製一個連結。"
+msgid "No downloads in this view"
+msgstr "這個分類目前沒有下載"
 
 msgid "Normal"
 msgstr "一般"
+
+msgid "Not checked yet."
+msgstr "尚未檢查。"
 
 msgid "Not verified"
 msgstr "未驗證"
@@ -159,8 +252,20 @@ msgstr "確定"
 msgid "Only download between"
 msgstr "只在此時段下載"
 
+msgid "Open extension folder"
+msgstr "開啟擴充功能資料夾"
+
+msgid "Open extensions"
+msgstr "開啟擴充功能管理頁"
+
 msgid "Open folder"
 msgstr "開啟資料夾"
+
+msgid "Opened the browser extension manager."
+msgstr "已開啟瀏覽器擴充功能管理頁。"
+
+msgid "Opened the extension folder."
+msgstr "已開啟擴充功能資料夾。"
 
 msgid "Other"
 msgstr "其他"
@@ -198,6 +303,15 @@ msgstr "代理伺服器"
 msgid "Queued"
 msgstr "排隊中"
 
+msgid "Refresh"
+msgstr "重新整理"
+
+msgid "Register / repair"
+msgstr "註冊／修復"
+
+msgid "Registering the native host…"
+msgstr "正在註冊本機橋接程式…"
+
 msgid "Remove the selected download from the list?"
 msgstr "要從清單中移除選取的下載嗎？"
 
@@ -210,6 +324,9 @@ msgstr "支援續傳"
 msgid "Retries"
 msgstr "重試次數"
 
+msgid "Save"
+msgstr "儲存"
+
 msgid "Save to"
 msgstr "儲存到"
 
@@ -218,6 +335,9 @@ msgstr "儲存位置"
 
 msgid "Segments"
 msgstr "分段"
+
+msgid "Set up each browser profile once. Native host registration does not install the extension."
+msgstr "每個瀏覽器個人資料需各設定一次。註冊本機橋接程式後，仍需手動安裝擴充功能。"
 
 msgid "Settings"
 msgstr "設定"
@@ -249,11 +369,23 @@ msgstr "全部開始"
 msgid "Start immediately"
 msgstr "立即開始"
 
+msgid "Start time"
+msgstr "開始時間"
+
 msgid "Status"
 msgstr "狀態"
 
+msgid "Stop time"
+msgstr "停止時間"
+
+msgid "Storage"
+msgstr "儲存位置"
+
 msgid "System default"
 msgstr "跟隨系統"
+
+msgid "The bundled extension folder is missing. Repair or reinstall Downloader."
+msgstr "找不到隨附的擴充功能資料夾。請修復或重新安裝 Downloader。"
 
 msgid "The file was moved or deleted. Its saved location is no longer available."
 msgstr "檔案已被移動或刪除，原儲存位置已無法找到檔案。"
@@ -266,6 +398,12 @@ msgstr "這個項目尚未下載完成，完成後才能定位檔案。"
 
 msgid "Time left"
 msgstr "剩餘時間"
+
+msgid "Time range (HH:MM)"
+msgstr "時段（HH:MM）"
+
+msgid "Transfers"
+msgstr "傳輸設定"
 
 msgid "URL"
 msgstr "網址"
@@ -293,6 +431,9 @@ msgstr "監看剪貼簿中的下載連結"
 
 msgid "Yes"
 msgstr "是"
+
+msgid "Your downloads start here"
+msgstr "從這裡開始下載"
 
 msgid "{0} downloads, {1} active"
 msgstr "共 {0} 個下載，{1} 個進行中"

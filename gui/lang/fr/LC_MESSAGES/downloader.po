@@ -3,6 +3,15 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: fr\n"
 
+msgid "1. Register the native host"
+msgstr "1. Enregistrer l'hôte natif"
+
+msgid "2. Open extensions, enable Developer mode, then choose Load unpacked."
+msgstr "2. Ouvrez les extensions, activez le mode développeur et choisissez Charger l'extension non empaquetée."
+
+msgid "3. Select this folder. In the extension options, choose Check connection."
+msgstr "3. Sélectionnez ce dossier, puis Vérifier la connexion dans les options de l'extension."
+
 msgid "Active"
 msgstr "Actifs"
 
@@ -11,6 +20,9 @@ msgstr "Réel"
 
 msgid "Add"
 msgstr "Ajouter"
+
+msgid "Add a link, or connect your browser to send downloads here."
+msgstr "Ajoutez un lien ou connectez votre navigateur pour envoyer des téléchargements ici."
 
 msgid "Add download"
 msgstr "Ajouter un téléchargement"
@@ -30,6 +42,18 @@ msgstr "Appliquer"
 msgid "Archives"
 msgstr "Archives"
 
+msgid "Browser"
+msgstr "Navigateur"
+
+msgid "Browser extension"
+msgstr "Extension du navigateur"
+
+msgid "Browser not found. Install it, then refresh."
+msgstr "Navigateur introuvable. Installez-le, puis actualisez."
+
+msgid "Browser setup actions apply immediately. Save only applies to app preferences."
+msgstr "Les actions du navigateur s'appliquent immédiatement. Enregistrer concerne uniquement les préférences de l'application."
+
 msgid "Browse…"
 msgstr "Parcourir…"
 
@@ -45,6 +69,12 @@ msgstr "Somme de contrôle (MD5 / SHA-1 / SHA-256 / SHA-512, facultatif)"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "La somme doit comporter 32, 40, 64 ou 128 caractères hex (préfixe b2: pour BLAKE2b)."
 
+msgid "Choose another category or return to all downloads."
+msgstr "Choisissez une autre catégorie ou revenez à tous les téléchargements."
+
+msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
+msgstr "L'extension n'est pas encore disponible dans le Chrome Web Store. Installez manuellement l'extension fournie."
+
 msgid "Closing this window restores the main window."
 msgstr "Fermer cette fenêtre restaure la fenêtre principale. Les téléchargements continuent."
 
@@ -54,14 +84,38 @@ msgstr "Fenêtre compacte"
 msgid "Completed"
 msgstr "Terminés"
 
+msgid "Connect browser"
+msgstr "Connecter le navigateur"
+
+msgid "Connect your browser"
+msgstr "Connecter votre navigateur"
+
 msgid "Connections"
 msgstr "Connexions"
 
 msgid "Connections per download"
 msgstr "Connexions par téléchargement"
 
+msgid "Copy path"
+msgstr "Copier le chemin"
+
+msgid "Could not check browser setup:"
+msgstr "Impossible de vérifier la configuration du navigateur :"
+
+msgid "Could not copy the extension path:"
+msgstr "Impossible de copier le chemin de l'extension :"
+
 msgid "Could not open the file location:"
 msgstr "Impossible d'ouvrir l'emplacement du fichier :"
+
+msgid "Could not open:"
+msgstr "Impossible d'ouvrir :"
+
+msgid "Could not register the native host:"
+msgstr "Impossible d'enregistrer l'hôte natif :"
+
+msgid "Ctrl+Tab switches sections · Esc cancels"
+msgstr "Ctrl+Tab change de section · Échap annule"
 
 msgid "Default folder for the file type"
 msgstr "Dossier par défaut selon le type"
@@ -93,6 +147,9 @@ msgstr "Downloader — compact"
 msgid "Downloading"
 msgstr "En cours"
 
+msgid "Downloads"
+msgstr "Téléchargements"
+
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "Des téléchargements sont encore en attente, en cours ou en vérification. Quitter et les suspendre ? Vous pourrez les reprendre à la prochaine ouverture de Downloader."
 
@@ -107,6 +164,18 @@ msgstr "Quitter Downloader ?"
 
 msgid "Expected"
 msgstr "Attendu"
+
+msgid "Extension folder"
+msgstr "Dossier de l'extension"
+
+msgid "Extension folder unavailable"
+msgstr "Dossier de l'extension indisponible"
+
+msgid "Extension path copied."
+msgstr "Chemin de l'extension copié."
+
+msgid "General"
+msgstr "Général"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "Limite globale (Ko/s, 0 = illimité)"
@@ -123,8 +192,14 @@ msgstr "Intégrité"
 msgid "Language"
 msgstr "Langue"
 
+msgid "Language and behavior"
+msgstr "Langue et comportement"
+
 msgid "Low"
 msgstr "Basse"
+
+msgid "Make Downloader work the way you do."
+msgstr "Personnalisez les téléchargements et connectez votre navigateur."
 
 msgid "Max simultaneous downloads"
 msgstr "Téléchargements simultanés max."
@@ -138,17 +213,35 @@ msgstr "Musique"
 msgid "Name"
 msgstr "Nom"
 
+msgid "Native host"
+msgstr "Hôte natif"
+
+msgid "Native host is ready. Finish installing the extension in your browser profile."
+msgstr "L'hôte natif est prêt. Terminez l'installation de l'extension dans votre profil de navigateur."
+
+msgid "Native host needs registration or repair."
+msgstr "L'hôte natif doit être enregistré ou réparé."
+
+msgid "Native host registered. Continue with the extension steps below."
+msgstr "Hôte natif enregistré. Poursuivez les étapes d'installation de l'extension ci-dessous."
+
+msgid "Network and schedule"
+msgstr "Réseau et planification"
+
 msgid "No"
 msgstr "Non"
 
 msgid "No checksum"
 msgstr "Pas de somme"
 
-msgid "No downloads yet. Click \"Add\" or copy a link."
-msgstr "Aucun téléchargement. Cliquez sur « Ajouter » ou copiez un lien."
+msgid "No downloads in this view"
+msgstr "Aucun téléchargement dans cette vue"
 
 msgid "Normal"
 msgstr "Normale"
+
+msgid "Not checked yet."
+msgstr "Pas encore vérifié."
 
 msgid "Not verified"
 msgstr "Non vérifié"
@@ -159,8 +252,20 @@ msgstr "OK"
 msgid "Only download between"
 msgstr "Télécharger uniquement entre"
 
+msgid "Open extension folder"
+msgstr "Ouvrir le dossier de l'extension"
+
+msgid "Open extensions"
+msgstr "Ouvrir les extensions"
+
 msgid "Open folder"
 msgstr "Ouvrir le dossier"
+
+msgid "Opened the browser extension manager."
+msgstr "Gestionnaire d'extensions du navigateur ouvert."
+
+msgid "Opened the extension folder."
+msgstr "Dossier de l'extension ouvert."
 
 msgid "Other"
 msgstr "Autres"
@@ -198,6 +303,15 @@ msgstr "Proxy"
 msgid "Queued"
 msgstr "En file d'attente"
 
+msgid "Refresh"
+msgstr "Actualiser"
+
+msgid "Register / repair"
+msgstr "Enregistrer / réparer"
+
+msgid "Registering the native host…"
+msgstr "Enregistrement de l'hôte natif…"
+
 msgid "Remove the selected download from the list?"
 msgstr "Retirer le téléchargement sélectionné de la liste ?"
 
@@ -210,6 +324,9 @@ msgstr "Reprise possible"
 msgid "Retries"
 msgstr "Tentatives"
 
+msgid "Save"
+msgstr "Enregistrer"
+
 msgid "Save to"
 msgstr "Enregistrer dans"
 
@@ -218,6 +335,9 @@ msgstr "Enregistré dans"
 
 msgid "Segments"
 msgstr "Segments"
+
+msgid "Set up each browser profile once. Native host registration does not install the extension."
+msgstr "Configurez chaque profil de navigateur une fois. L'enregistrement de l'hôte natif n'installe pas l'extension."
 
 msgid "Settings"
 msgstr "Paramètres"
@@ -249,11 +369,23 @@ msgstr "Tout démarrer"
 msgid "Start immediately"
 msgstr "Démarrer immédiatement"
 
+msgid "Start time"
+msgstr "Heure de début"
+
 msgid "Status"
 msgstr "État"
 
+msgid "Stop time"
+msgstr "Heure de fin"
+
+msgid "Storage"
+msgstr "Stockage"
+
 msgid "System default"
 msgstr "Langue du système"
+
+msgid "The bundled extension folder is missing. Repair or reinstall Downloader."
+msgstr "Le dossier de l'extension fournie est introuvable. Réparez ou réinstallez Downloader."
 
 msgid "The file was moved or deleted. Its saved location is no longer available."
 msgstr "Le fichier a été déplacé ou supprimé. Son emplacement enregistré n'est plus disponible."
@@ -266,6 +398,12 @@ msgstr "Ce téléchargement n'est pas terminé. Attendez la fin avant de localis
 
 msgid "Time left"
 msgstr "Restant"
+
+msgid "Time range (HH:MM)"
+msgstr "Plage horaire (HH:MM)"
+
+msgid "Transfers"
+msgstr "Transferts"
 
 msgid "URL"
 msgstr "URL"
@@ -293,6 +431,9 @@ msgstr "Surveiller le presse-papiers pour les liens"
 
 msgid "Yes"
 msgstr "Oui"
+
+msgid "Your downloads start here"
+msgstr "Vos téléchargements commencent ici"
 
 msgid "{0} downloads, {1} active"
 msgstr "{0} téléchargements, {1} actifs"
