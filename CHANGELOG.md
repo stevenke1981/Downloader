@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.2 — 2026-10-22
+
+### Improved
+- Settings now separates General, Downloads and Browser, with a pinned Save/Cancel footer, keyboard navigation and localized guidance for small windows.
+- Chrome, Brave and Edge extension setup is available inside Settings: native-host health checks and repair, extension-folder discovery/copy, and opening the selected browser's extensions page. Loading the unpacked extension remains a browser-profile action.
+- Empty and filtered download lists offer relevant next actions, and toolbar/sidebar controls support keyboard focus.
+- Native-host checks validate the actual registry view, manifest identity/origin, executable and current installation. Windows installer registration runs as the original user; macOS app bundles include the extension.
+- `scripts/verify-local.ps1` provides local Windows checks without GitHub Actions.
+
+### Fixed
+- Reject invalid or misaligned HTTP partial responses before writing downloaded bytes, while allowing valid shorter prefixes and unknown complete lengths.
+- Browser download cancellation failures no longer erase history or start a duplicate transfer in Downloader.
+
 ## 0.5.1 — 2026-10-18
 
 ### Fixed

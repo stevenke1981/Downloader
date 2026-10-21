@@ -12,6 +12,8 @@ use std::time::Duration;
 mod window_placement;
 
 slint::include_modules!();
+mod browser_controller;
+mod browser_setup;
 mod reveal;
 mod tray;
 
@@ -164,9 +166,16 @@ fn state_dir() -> PathBuf {
 fn browser_flags() -> Option<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--unregister-browser") {
-        dlcore::browser::unregister();
-        println!("browser integration removed");
-        return Some(0);
+        return Some(match dlcore::browser::unregister() {
+            Ok(()) => {
+                println!("browser integration removed");
+                0
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                1
+            }
+        });
     }
     if args.iter().any(|a| a == "--register-browser") {
         let host = std::env::current_exe()
@@ -579,6 +588,7 @@ fn main() -> Result<(), slint::PlatformError> {
         models: Models::new(),
     }));
     bind_models(&ui, &compact, &app.borrow().models);
+    browser_controller::bind(&ui, &app);
 
     refresh_now(&ui, &mut app.borrow_mut());
 
@@ -870,6 +880,7 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.set_s_verify(s.auto_verify);
         ui.set_s_error("".into());
         ui.set_set_open(true);
+        ui.invoke_browser_refresh();
     });
     on!(ui, app, on_settings_ok, || {
         let mut s = app.mgr().settings();
@@ -1208,6 +1219,47 @@ mod lifecycle_tests {
             .dispatch_event(slint::platform::WindowEvent::KeyPressed { text: key.into() });
         ui.window()
             .dispatch_event(slint::platform::WindowEvent::KeyReleased { text: key.into() });
+    }
+
+    #[test]
+    fn cancelling_exit_restores_keyboard_navigation_to_open_settings() {
+        use i_slint_backend_testing::ElementHandle;
+        use std::cell::Cell;
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = AppWindow::new().unwrap();
+        apply_lang("en");
+        let background_calls = Rc::new(Cell::new(0));
+        let calls = background_calls.clone();
+        ui.on_compact_clicked(move || calls.set(calls.get() + 1));
+        ui.show().unwrap();
+        ui.set_set_open(true);
+        ElementHandle::find_by_accessible_label(&ui, "General")
+            .next()
+            .unwrap()
+            .mock_single_click(slint::platform::PointerEventButton::Left);
+        ui.set_exit_open(true);
+        for key in [
+            slint::platform::Key::Escape,
+            slint::platform::Key::Tab,
+            slint::platform::Key::Return,
+        ] {
+            ui.window()
+                .dispatch_event(slint::platform::WindowEvent::KeyPressed { text: key.into() });
+            ui.window()
+                .dispatch_event(slint::platform::WindowEvent::KeyReleased { text: key.into() });
+        }
+        assert!(!ui.get_exit_open());
+        assert!(ui.get_set_open());
+        assert_eq!(
+            background_calls.get(),
+            0,
+            "Settings must keep keyboard focus"
+        );
+        assert_eq!(
+            ui.get_s_tab(),
+            1,
+            "Tab/Enter must activate Downloads in Settings"
+        );
     }
 
     #[test]

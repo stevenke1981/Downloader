@@ -310,10 +310,11 @@ pub fn browser_app_path(browser: Browser) -> Result<Option<PathBuf>, String> {
     let key = format!(r"Software\Microsoft\Windows\CurrentVersion\App Paths\{name}");
     for hive in [0x80000001_u32, 0x80000002_u32] {
         for view in [32, 64] {
-            if let Some(path) = registry_default_at(hive as i32 as isize, &key, view)? {
-                if path.is_absolute() && path.is_file() {
-                    return absolute_file(&path).map(Some);
-                }
+            if let Some(path) = registry_default_at(hive as i32 as isize, &key, view)?
+                && path.is_absolute()
+                && path.is_file()
+            {
+                return absolute_file(&path).map(Some);
             }
         }
     }
@@ -515,12 +516,11 @@ pub fn unregister() -> Result<(), String> {
         }
         // Retain the manifest if any deletion failed so surviving keys do not
         // become dangling registrations.
-        if failures.is_empty() {
-            if let Err(error) =
+        if failures.is_empty()
+            && let Err(error) =
                 remove_manifest(&crate::ipc::default_state_dir().join(format!("{HOST_NAME}.json")))
-            {
-                failures.push(error);
-            }
+        {
+            failures.push(error);
         }
     }
     #[cfg(not(windows))]

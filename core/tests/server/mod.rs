@@ -31,6 +31,10 @@ pub struct Server {
     pub redirect: Mutex<Option<String>>,
     /// Answer the main file with 403 when the request has no Cookie header.
     pub require_cookie: AtomicBool,
+    /// Override Content-Range for data requests; an empty value omits it. Probe stays valid.
+    pub data_content_range: Mutex<Option<String>>,
+    /// Return valid shorter prefixes of requested ranges (0 = no cap).
+    pub max_range_bytes: AtomicU64,
 }
 
 fn is_meta(name: &str) -> bool {
@@ -83,6 +87,8 @@ pub async fn start(data: Vec<u8>, range: bool, per_conn_rate: u64) -> Arc<Server
         data_requests: AtomicUsize::new(0),
         redirect: Mutex::new(None),
         require_cookie: AtomicBool::new(false),
+        data_content_range: Mutex::new(None),
+        max_range_bytes: AtomicU64::new(0),
     });
     let srv = s.clone();
     tokio::spawn(async move {
@@ -147,7 +153,9 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
         let spec = r.trim_start_matches("bytes=");
         let (a, b) = spec.split_once('-').unwrap();
         let a: u64 = a.parse().unwrap();
-        let b: u64 = if b.is_empty() { total - 1 } else { b.parse::<u64>().unwrap().min(total - 1) };
+        let mut b: u64 = if b.is_empty() { total - 1 } else { b.parse::<u64>().unwrap().min(total - 1) };
+        let max = s.max_range_bytes.load(Ordering::SeqCst);
+        if max > 0 { b = b.min(a.saturating_add(max - 1)); }
         range = Some((a, b));
     }
     let (status, start, end) = match range {
@@ -162,7 +170,12 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
         head += &format!("Accept-Ranges: bytes\r\nETag: {etag}\r\n");
     }
     if range.is_some() {
-        head += &format!("Content-Range: bytes {start}-{}/{total}\r\n", end - 1);
+        let override_range = if end - start > 1 { s.data_content_range.lock().unwrap().clone() } else { None };
+        match override_range {
+            Some(value) if value.is_empty() => {},
+            Some(value) => head += &format!("Content-Range: {value}\r\n"),
+            None => head += &format!("Content-Range: bytes {start}-{}/{total}\r\n", end - 1),
+        }
     }
     for (k, v) in s.headers.lock().unwrap().iter() {
         head += &format!("{k}: {v}\r\n");

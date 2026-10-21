@@ -17,8 +17,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp dist/universal/downloader dist/universal/dlx dist/universal/downloader-host "$APP/Contents/MacOS/"
 cp scripts/Downloader.icns "$APP/Contents/Resources/"
+cp -r extension "$APP/Contents/Resources/extension"
 cp docs/desktop-controls.zh-TW.md "$APP/Contents/Resources/"
-cp docs/validation-0.5.1.md docs/small-window-validation.zh-TW.md "$APP/Contents/Resources/"
+cp docs/browser-setup.zh-TW.md "$APP/Contents/Resources/"
+cp docs/ui-0.5.2-settings-*.png docs/dispatch-plan.md "$APP/Contents/Resources/"
+cp docs/validation-0.5.2.md docs/small-window-validation.zh-TW.md "$APP/Contents/Resources/"
 sed "s/__VERSION__/$VERSION/g" scripts/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist"
 # ad-hoc signature so Gatekeeper reports "unidentified developer" rather than "damaged"
@@ -30,6 +33,8 @@ mkdir -p downloader-macos-universal
 cp -r ../extension downloader-macos-universal/
 cp universal/downloader universal/dlx universal/downloader-host ../README.md ../LICENSE downloader-macos-universal/
 cp ../docs/desktop-controls.zh-TW.md downloader-macos-universal/
-cp ../docs/validation-0.5.1.md ../docs/small-window-validation.zh-TW.md downloader-macos-universal/
+cp ../docs/browser-setup.zh-TW.md downloader-macos-universal/
+cp ../docs/ui-0.5.2-settings-*.png ../docs/dispatch-plan.md downloader-macos-universal/
+cp ../docs/validation-0.5.2.md ../docs/small-window-validation.zh-TW.md downloader-macos-universal/
 tar czf downloader-macos-universal.tar.gz downloader-macos-universal
 ls -la

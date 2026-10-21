@@ -35,6 +35,71 @@ async fn multi_connection_range_download() {
 }
 
 #[tokio::test]
+async fn invalid_partial_responses_never_publish_a_completed_file() {
+    for header in ["", "garbage", "bytes 1-1000/1001", "bytes 0-999/1001", "bytes 1-1000/*", "bytes 0-998/1000"] {
+        let s = server::start(server::test_data(1000), true, 0).await;
+        *s.data_content_range.lock().unwrap() = Some(header.into());
+        let dir = tempfile::tempdir().unwrap();
+        let t = task(s.url("bad-range.bin"), dir.path(), 1);
+        let error = engine::run(t.clone(), ctx(0)).await.unwrap_err();
+        assert!(error.contains("Content-Range"), "{header}: {error}");
+        assert_eq!(t.lock().unwrap().downloaded(), 0, "invalid data must not be written");
+        assert!(!dir.path().join("bad-range.bin").exists());
+    }
+}
+
+#[tokio::test]
+async fn partial_response_may_omit_known_total() {
+    let data = server::test_data(1000);
+    let s = server::start(data.clone(), true, 0).await;
+    *s.data_content_range.lock().unwrap() = Some("bytes 0-999/*".into());
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("unknown-total.bin"), dir.path(), 1);
+    assert_eq!(engine::run(t, ctx(0)).await.unwrap(), Outcome::Completed);
+    assert_eq!(std::fs::read(dir.path().join("unknown-total.bin")).unwrap(), data);
+}
+
+#[tokio::test]
+async fn shorter_valid_range_prefixes_continue_without_retry_backoff() {
+    let data = server::test_data(1000);
+    let s = server::start(data.clone(), true, 0).await;
+    s.max_range_bytes.store(256, Ordering::SeqCst);
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("prefix.bin"), dir.path(), 1);
+    let mut c = ctx(0);
+    c.retries = 0; // A valid prefix is progress, not a retry failure.
+    assert_eq!(engine::run(t, c).await.unwrap(), Outcome::Completed);
+    assert_eq!(std::fs::read(dir.path().join("prefix.bin")).unwrap(), data);
+    let ranges = s.range_requests.lock().unwrap();
+    assert!(ranges.iter().any(|r| r == "bytes=256-999"));
+    assert!(ranges.iter().any(|r| r == "bytes=768-999"));
+}
+
+#[tokio::test]
+async fn wrong_range_on_resume_preserves_existing_partial_bytes() {
+    let data = server::test_data(1000);
+    let s = server::start(data.clone(), true, 0).await;
+    // Correct response length but cached bytes from a different offset.
+    *s.data_content_range.lock().unwrap() = Some("bytes 0-899/1000".into());
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(s.url("resume-range.bin"), dir.path(), 1);
+    {
+        let mut g = t.lock().unwrap();
+        g.file_name = "resume-range.bin".into();
+        g.total = Some(1000);
+        g.resumable = true;
+        g.etag = Some("\"v1\"".into());
+        g.segments = vec![dlcore::Seg { start: 0, pos: 100, end: 1000, busy: false }];
+        std::fs::write(g.part_path(), &data[..100]).unwrap();
+    }
+    let error = engine::run(t.clone(), ctx(0)).await.unwrap_err();
+    assert!(error.contains("Content-Range"), "{error}");
+    assert_eq!(std::fs::read(t.lock().unwrap().part_path()).unwrap(), data[..100]);
+    assert_eq!(t.lock().unwrap().downloaded(), 100);
+    assert!(!dir.path().join("resume-range.bin").exists());
+}
+
+#[tokio::test]
 async fn work_stealing_splits_slow_segments() {
     // Throttled server: connections finishing early must split remaining segments.
     let data = server::test_data(3 << 20);

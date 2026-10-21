@@ -50,6 +50,29 @@ fn hdr(r: &reqwest::Response, h: reqwest::header::HeaderName) -> Option<String> 
     r.headers().get(h).and_then(|v| v.to_str().ok()).map(str::to_string)
 }
 
+/// A single satisfied byte range. Keep the inclusive end so u64::MAX cannot wrap.
+fn content_range(value: &str) -> Option<(u64, u64, Option<u64>)> {
+    fn number(s: &str) -> Option<u64> {
+        if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) { return None; }
+        s.parse().ok()
+    }
+    let (unit, value) = value.trim().split_once(' ')?;
+    if !unit.eq_ignore_ascii_case("bytes") { return None; }
+    let (range, total) = value.split_once('/')?;
+    let (start, end) = range.split_once('-')?;
+    let (start, end) = (number(start)?, number(end)?);
+    let total = if total == "*" { None } else { Some(number(total)?) };
+    if start > end || total.is_some_and(|n| end >= n) { return None; }
+    Some((start, end, total))
+}
+
+fn response_range(resp: &reqwest::Response) -> Result<(u64, u64, Option<u64>), String> {
+    let mut values = resp.headers().get_all(CONTENT_RANGE).iter();
+    let value = values.next().and_then(|v| v.to_str().ok());
+    if values.next().is_some() { return Err("invalid Content-Range: multiple fields".into()); }
+    value.and_then(content_range).ok_or_else(|| "invalid or missing Content-Range".into())
+}
+
 /// HTTP status code from an error string such as "HTTP 404 Not Found".
 fn http_code(e: &str) -> Option<u16> {
     e.strip_prefix("HTTP ")?.get(..3)?.parse().ok()
@@ -97,7 +120,11 @@ async fn probe(client: &reqwest::Client, url: &str, referer: Option<&str>, cooki
     };
     p.checksums = checksum::from_headers(resp.headers(), st.as_u16() == 200);
     if st.as_u16() == 206 {
-        p.total = hdr(&resp, CONTENT_RANGE).and_then(|c| c.rsplit('/').next().and_then(|t| t.trim().parse().ok()));
+        let (start, end, total) = response_range(&resp)?;
+        if start != 0 || end != 0 || resp.content_length().is_some_and(|n| n != 1) {
+            return Err("Content-Range does not match the probe (bytes=0-0)".into());
+        }
+        p.total = total;
         p.range = p.total.is_some();
     } else {
         p.total = resp.content_length();
@@ -188,7 +215,7 @@ struct Shared {
 }
 
 async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
-    let (pos, end) = {
+    let (pos, end, total) = {
         let mut t = sh.task.lock().unwrap();
         if !sh.range {
             // No range support: every attempt restarts the file from scratch.
@@ -196,7 +223,7 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
             s.pos = s.start;
         }
         let s = t.segments[idx];
-        (s.pos, s.end)
+        (s.pos, s.end, t.total)
     };
     if pos >= end {
         return Ok(());
@@ -236,6 +263,19 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
             FetchErr::Retry(format!("HTTP {st}"))
         });
     }
+    let mut response_remaining = if sh.range {
+        let (actual_start, actual_end, actual_total) = response_range(&resp).map_err(FetchErr::Fatal)?;
+        if actual_start != pos || actual_end >= end || actual_total.is_some_and(|n| Some(n) != total)
+            || resp.content_length().is_some_and(|n| n != actual_end - actual_start + 1)
+        {
+            return Err(FetchErr::Fatal("Content-Range does not match the requested segment or file size".into()));
+        }
+        // RFC 9110 permits a shorter prefix and an unknown complete length (*).
+        // A valid prefix advances this segment; the worker requests its remainder.
+        Some(actual_end - actual_start + 1)
+    } else if st.as_u16() == 206 {
+        return Err(FetchErr::Fatal("unexpected partial response to a full-file request".into()));
+    } else { None };
     let mut stream = resp.bytes_stream();
     loop {
         let next = tokio::select! {
@@ -258,6 +298,12 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
             Some(Ok(c)) => c,
         };
         let n = chunk.len() as u64;
+        if let Some(remaining) = &mut response_remaining {
+            if n > *remaining {
+                return Err(FetchErr::Fatal("response body exceeds Content-Range".into()));
+            }
+            *remaining -= n;
+        }
         let wait = sh.ctx.local.reserve(n).max(sh.ctx.global.reserve(n));
         if !wait.is_zero() {
             tokio::select! {
@@ -272,7 +318,7 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
             write_at(&sh.file, &chunk[..take], s.pos).map_err(|e| FetchErr::Fatal(format!("write failed: {e}")))?;
             s.pos += take as u64;
         }
-        if s.done() {
+        if s.done() || response_remaining == Some(0) {
             return Ok(());
         }
     }
@@ -505,6 +551,16 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn validates_content_range_syntax_and_bounds() {
+        assert_eq!(content_range("bytes 10-19/100"), Some((10, 19, Some(100))));
+        assert_eq!(content_range("BYTES 0-0/*"), Some((0, 0, None)));
+        for bad in ["", "bytes */100", "items 0-0/1", "bytes 1-0/2", "bytes 0-2/2",
+            "bytes 0-0/0", "bytes +0-0/1", "bytes 0-0/1/2", "bytes 0-18446744073709551616/*"] {
+            assert_eq!(content_range(bad), None, "{bad}");
+        }
+    }
+
     #[test]
     fn same_origin_rules() {
         assert!(same_origin("https://a.example/x.zip", "https://a.example/y/z.zip?q=1"));

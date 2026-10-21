@@ -269,6 +269,7 @@ export component AppWindow inherits Window {
     callback exit-confirmed();
     changed exit-open => {
         if root.exit-open { root.exit-choice = false; keyboard-guard.focus(); }
+        else if root.set-open { root.select-settings-tab(root.s-tab); }
     }
 
     in property <[Row]> rows;

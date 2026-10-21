@@ -28,7 +28,7 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 - **多國語言**：繁體中文、簡體中文、English、日本語、한국어、Español、Deutsch、Français，在設定裡切換立即生效。系統語言是中文時預設繁體中文（簡體中文系統預設簡體）。
 - **命令列工具 `dlx`**：不需要介面的下載，可續傳。
 
-### 瀏覽器擴充功能（Chrome / Edge）
+### 瀏覽器擴充功能（Chrome / Brave / Edge）
 `extension/` 是 Manifest V3 擴充功能，Chrome、Edge、Brave 都能用：
 - 右鍵選單：用 Downloader 下載連結、圖片、影音、此網頁，以及「下載全部連結」。
 - 自動攔截瀏覽器下載，交給 Downloader（會帶上網址、來源網頁和檔名）。
@@ -36,9 +36,13 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 - 選項：開關攔截、最小檔案大小、只攔截／不攔截的副檔名、按住 Alt 點擊改用瀏覽器下載、連不上 Downloader 時改用瀏覽器下載。
 - 介面支援和 App 相同的 8 種語言。
 
-**安裝方式**（還沒上架 Chrome 線上應用程式商店）：
+**從 App 安裝**：開啟 **設定 → 瀏覽器擴充功能**，選擇 Chrome、Brave 或 Edge。頁面提供本機連線元件的檢查／註冊、擴充功能資料夾位置、複製路徑，以及開啟所選瀏覽器擴充功能頁面的按鈕。依畫面引導開啟「開發人員模式」，再用「載入未封裝項目」選取該資料夾。詳見 [瀏覽器整合使用說明](docs/browser-setup.zh-TW.md)。
+
+狀態只表示本機連線元件是否正確指向目前的 App；擴充功能仍需在各瀏覽器使用的個人資料中載入。
+
+**手動安裝方式**（還沒上架 Chrome 線上應用程式商店）：
 1. 下載 Release 裡的 `downloader-browser-extension.zip` 並解壓縮（Windows 安裝版已放在安裝目錄的 `extension` 資料夾）。
-2. 打開 `chrome://extensions`（Edge 是 `edge://extensions`），開啟「開發人員模式」。
+2. 打開 `chrome://extensions`（Brave 是 `brave://extensions`、Edge 是 `edge://extensions`），開啟「開發人員模式」。
 3. 按「載入未封裝項目」，選擇解壓縮後的資料夾。擴充功能 ID 固定為 `dikofgcelgoincfekonbdlmodjehgaah`。
 4. 註冊連線元件：Windows 安裝程式會自動做（可在安裝時取消勾選）；免安裝版、macOS、Linux 請執行一次 `downloader --register-browser`。移除用 `downloader --unregister-browser`，解除安裝時會自動移除。
 
@@ -70,6 +74,8 @@ cargo test --release
 ```
 翻譯檔在 `gui/lang/`，由 `scripts/gen_po.py` 產生。
 
+Windows 本機完整檢查（不使用 GitHub Actions）：`powershell -File scripts/verify-local.ps1`。包含格式、Clippy、release 建置／測試、擴充功能 Node 回歸測試與 CLI 啟動；加 `-BuildInstaller` 可一併建置 Windows 安裝程式，需要已安裝 Inno Setup。
+
 ---
 
 ## English
@@ -90,10 +96,14 @@ Downloader is a multi-connection download accelerator and manager written in Rus
 - **8 languages** switchable at runtime: 繁體中文, 简体中文, English, 日本語, 한국어, Español, Deutsch, Français. Traditional Chinese is the default on Chinese systems (Simplified on zh-CN/zh-SG).
 - **`dlx` CLI** for headless, resumable downloads.
 
-### Browser extension (Chrome / Edge)
+### Browser extension (Chrome / Brave / Edge)
 `extension/` is a Manifest V3 extension for Chrome, Edge and Brave: context-menu items for links, images, video/audio, the page and "download all links"; automatic interception of browser downloads (the site's cookies are forwarded to the app by default so downloads that need a login work — sent only over the local connection, kept in memory, never written to disk; can be turned off); options for enabling interception, minimum size, include/exclude file types, Alt+click bypass and falling back to the browser when the app can't be reached. Localized in the same 8 languages.
 
-**Install** (not on the Chrome Web Store): unzip `downloader-browser-extension.zip` from the release (the Windows installer also puts it in `<install dir>\extension`), open `chrome://extensions` or `edge://extensions`, enable Developer mode, click "Load unpacked" and choose the folder. The extension ID is fixed: `dikofgcelgoincfekonbdlmodjehgaah`. The Windows installer registers the native messaging host; otherwise run `downloader --register-browser` once (`--unregister-browser` removes it).
+**Install from the app**: open **Settings → Browser extension**, select Chrome, Brave or Edge, register/repair the native connector, then use the folder/path and browser-page buttons. Enable Developer mode in that browser, click **Load unpacked**, and select the displayed extension folder. Connector readiness checks the current installation's native host; it does not claim the extension is loaded in a browser profile.
+
+**Manual install** (not on the Chrome Web Store): unzip `downloader-browser-extension.zip` from the release (the Windows installer also puts it in `<install dir>\extension`), open `chrome://extensions`, `brave://extensions` or `edge://extensions`, enable Developer mode, click "Load unpacked" and choose the folder. The extension ID is fixed: `dikofgcelgoincfekonbdlmodjehgaah`. The Windows installer registers the native messaging host; otherwise run `downloader --register-browser` once (`--unregister-browser` removes it).
+
+On Windows, run `powershell -File scripts/verify-local.ps1` for local format/lint/release build/tests, extension regressions and CLI checks without GitHub Actions. Add `-BuildInstaller` if Inno Setup is installed.
 
 How it works: the extension talks to `downloader-host` via native messaging; the host forwards to the running app over a token-protected 127.0.0.1 connection and starts the app if needed.
 

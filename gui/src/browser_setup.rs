@@ -14,20 +14,20 @@ fn extension_candidates(exe: &Path) -> Vec<PathBuf> {
     };
     let mut candidates = vec![dir.join("extension")];
     // Standard macOS .app: Contents/MacOS/downloader, Resources/extension.
-    if dir.file_name().is_some_and(|name| name == "MacOS") {
-        if let Some(contents) = dir.parent() {
-            candidates.push(contents.join("Resources/extension"));
-        }
+    if dir.file_name().is_some_and(|name| name == "MacOS")
+        && let Some(contents) = dir.parent()
+    {
+        candidates.push(contents.join("Resources/extension"));
     }
     // Only look in a repository for a binary in its target tree. Installed apps
     // must not accidentally load a developer's stale checkout instead.
     for ancestor in exe.ancestors().skip(2).take(4) {
-        if ancestor.file_name().is_some_and(|name| name == "target") {
-            if let Some(root) = ancestor.parent() {
-                if root.join("Cargo.toml").is_file() && root.join("gui/Cargo.toml").is_file() {
-                    candidates.push(root.join("extension"));
-                }
-            }
+        if ancestor.file_name().is_some_and(|name| name == "target")
+            && let Some(root) = ancestor.parent()
+            && root.join("Cargo.toml").is_file()
+            && root.join("gui/Cargo.toml").is_file()
+        {
+            candidates.push(root.join("extension"));
         }
     }
     candidates
@@ -165,11 +165,11 @@ pub fn open_extension_folder() -> Result<(), String> {
     #[cfg(windows)]
     {
         let system = std::env::var_os("SystemRoot").ok_or("Windows SystemRoot is unavailable")?;
-        return Command::new(PathBuf::from(system).join("explorer.exe"))
+        Command::new(PathBuf::from(system).join("explorer.exe"))
             .arg(path)
             .spawn()
             .map(|_| ())
-            .map_err(|e| format!("Cannot open the extension folder: {e}"));
+            .map_err(|e| format!("Cannot open the extension folder: {e}"))
     }
     #[cfg(not(windows))]
     {

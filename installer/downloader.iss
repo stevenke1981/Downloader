@@ -67,7 +67,11 @@ Source: "{#SrcDir}\downloader-host.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\extension\*"; DestDir: "{app}\extension"; Excludes: "EXTENSION_ID"; Flags: ignoreversion recursesubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\desktop-controls.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\docs\validation-0.5.1.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\browser-setup.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\ui-0.5.2-settings-general.png"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\ui-0.5.2-settings-browser.png"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\dispatch-plan.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\validation-0.5.2.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\small-window-validation.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 

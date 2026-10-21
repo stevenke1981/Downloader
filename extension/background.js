@@ -188,7 +188,9 @@ chrome.downloads.onCreated.addListener(async (item) => {
   if (ext && exc.includes(ext)) return;
 
   // Take the download away from the browser.
-  try { await chrome.downloads.cancel(item.id); } catch (_) {}
+  // Cancellation can lose a race to completion or be rejected by the browser.
+  // Keep its download/history intact and avoid starting a duplicate in the app.
+  try { await chrome.downloads.cancel(item.id); } catch (_) { return; }
   try { await chrome.downloads.erase({ id: item.id }); } catch (_) {}
   const filename = (item.filename || "").split(/[\\/]/).pop() || undefined;
   const tab = await tabForPage(item.referrer).catch(() => null);
