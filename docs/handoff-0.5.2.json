@@ -1,0 +1,110 @@
+﻿{
+    "task_id":  "DL-0.5.2",
+    "actor_instance":  "/root",
+    "receiver_instance":  "user",
+    "kind":  "handoff",
+    "simulation":  false,
+    "result":  "BLOCKED",
+    "base_sha":  "f3f83664ec1ebc80337c72ff5c4dba1de17062b8",
+    "head_sha":  "f82a28c9d5defe61e56543320533d99bfe121731",
+    "tested_sha":  "f82a28c9d5defe61e56543320533d99bfe121731",
+    "acceptance_ids":  [
+                           "UI-UX",
+                           "BROWSER-SETTINGS",
+                           "DOWNLOAD-CORRECTNESS",
+                           "LOCAL-CHECKS",
+                           "COMMIT-PUSH",
+                           "LOCAL-UPGRADE",
+                           "LIVE-EXTENSIONS"
+                       ],
+    "artifact":  {
+                     "sha256":  "97633f24cdc467f90e85c504dc22732d5c29bcb338572054a72d784aa826e662",
+                     "path":  "dist/downloader-setup-windows-x64.exe"
+                 },
+    "checks":  [
+                   {
+                       "exit_code":  0,
+                       "rust_tests":  77,
+                       "result":  "PASS",
+                       "name":  "local-windows-release",
+                       "cwd":  ".",
+                       "platform":  "windows",
+                       "node_tests":  6,
+                       "argv":  [
+                                    "powershell",
+                                    "-File",
+                                    "scripts/verify-local.ps1",
+                                    "-BuildInstaller"
+                                ]
+                   },
+                   {
+                       "exit_code":  0,
+                       "name":  "native-rendered-fixtures",
+                       "logical_size":  [
+                                            760,
+                                            480
+                                        ],
+                       "pixel_size":  [
+                                          950,
+                                          600
+                                      ],
+                       "result":  "PASS",
+                       "platform":  "windows",
+                       "scenes":  [
+                                      "settings-general",
+                                      "settings-browser",
+                                      "settings-downloads",
+                                      "empty"
+                                  ]
+                   },
+                   {
+                       "result":  "PASS",
+                       "name":  "independent-source-review",
+                       "reviewer":  "/root/independent_review",
+                       "reviewed_sha":  "f82a28c9d5defe61e56543320533d99bfe121731"
+                   },
+                   {
+                       "url":  "https://github.com/stevenke1981/Downloader/commit/f82a28c9d5defe61e56543320533d99bfe121731",
+                       "result":  "PASS",
+                       "name":  "remote-main",
+                       "head_sha":  "f82a28c9d5defe61e56543320533d99bfe121731"
+                   },
+                   {
+                       "result":  "NOT_RUN",
+                       "name":  "github-actions",
+                       "reason":  "User quota exhausted; all pushed commits have [skip ci]; zero runs returned for source head"
+                   },
+                   {
+                       "observed_version":  "0.4.1",
+                       "result":  "BLOCKED",
+                       "name":  "local-installed-version",
+                       "reason":  "Standard Windows UAC consent pending for existing all-user installation; no consent bypass attempted"
+                   },
+                   {
+                       "detected_browsers":  [
+                                                 "Chrome",
+                                                 "Edge"
+                                             ],
+                       "result":  "BLOCKED",
+                       "name":  "browser-profile-extensions",
+                       "reason":  "Browser tool refuses chrome://extensions and forbids alternate routes. Manual Load unpacked required",
+                       "brave_detected":  false
+                   },
+                   {
+                       "result":  "NOT_RUN",
+                       "name":  "linux-macos-runtime",
+                       "reason":  "Windows execution environment"
+                   }
+               ],
+    "unresolved":  [
+                       "Accept the standard Windows UAC prompt, then verify installed 0.5.2 binaries/native IPC",
+                       "Manually load C:\\Program Files\\Downloader\\extension in each browser profile; browser automation cannot open management pages",
+                       "Brave executable was not detected"
+                   ],
+    "next_action":  "User completes UAC and browser Load unpacked; root then runs target/review-evidence/check-installed.py and records actual installed/native runtime result.",
+    "external_side_effects":  {
+                                  "detail":  "Source commits pushed to origin/main. Local installer elevation requested, not yet accepted. Browser extension profile install not performed.",
+                                  "performed":  true,
+                                  "authorized":  true
+                              }
+}
