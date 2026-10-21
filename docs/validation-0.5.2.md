@@ -1,6 +1,6 @@
 # Downloader 0.5.2 validation — 2026-10-22
 
-Base: `f3f83664ec1ebc80337c72ff5c4dba1de17062b8`. Scope and author ownership: [dispatch plan](dispatch-plan.md).
+Base: `f3f83664ec1ebc80337c72ff5c4dba1de17062b8`. Independently reviewed and locally tested source: `f82a28c9d5defe61e56543320533d99bfe121731`. Scope and author ownership: [dispatch plan](dispatch-plan.md).
 
 ## Current evidence
 
@@ -14,12 +14,15 @@ Base: `f3f83664ec1ebc80337c72ff5c4dba1de17062b8`. Scope and author ownership: [d
 | Final release format/lint/build/test | PASS | `scripts/verify-local.ps1 -BuildInstaller`, exit 0 on final source: GUI 16, core 24, download 29, IPC 8; 77 Rust tests plus 6 Node tests; strict release Clippy and GUI formatting pass |
 | Native rendered UI snapshots | PASS | Four ignored fixtures run explicitly with process exit 0: General, Browser, Downloads, Empty; real Windows renderer snapshots at 760×480 logical / 950×600 pixels (125% scale) |
 | Windows installer build | PASS | Inno Setup 7 built `dist/downloader-setup-windows-x64.exe`; compile only, installation tracked separately |
-| Local app upgrade | NOT_RUN | Existing all-user installation is 0.4.1 at `C:\Program Files\Downloader`; not running at intake |
+| Local app upgrade | BLOCKED | Existing all-user installation remains 0.4.1 at `C:\Program Files\Downloader`. Standard installer elevation was attempted; Windows returned “The operation was canceled by the user”. Installer did not start; no privilege workaround attempted. The 0.5.2 installer is ready for manual execution |
 | Browser profile extension installation | BLOCKED | Browser-use policy refuses internal extension-management URLs and prohibits alternate routes; manual Load unpacked is required |
 | GitHub Actions | NOT_RUN | User reports exhausted quota; pushed commits use `[skip ci]`; release workflow not dispatched |
+| Commit / push | PASS | Source pushed to `origin/main`; remote HEAD verified; no Actions runs returned for the source or evidence commits |
 | Linux/macOS runtime | NOT_RUN | Windows host only; macOS packaging correction is source-reviewed |
 
 Transient raw logs, Odin results and snapshot fixtures are stored under ignored `target/review-evidence/`.
+
+The original 0.4.1 installation and existing download records were backed up before attempting the update. Actual installed-binary hashes and native/IPC version checks remain pending until the user completes Windows elevation. Browser extension profiles were not modified.
 
 Native-rendered examples use synthetic data: [General settings](ui-0.5.2-settings-general.png), [Browser setup](ui-0.5.2-settings-browser.png). Snapshot capture proves rendered pixels; keyboard behavior is tested with Slint's testing backend. Real OS mouse input, IME and screen-reader checks were not performed.
 
