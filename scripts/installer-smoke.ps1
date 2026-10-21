@@ -25,9 +25,23 @@ Check (Test-Path (Join-Path ([Environment]::GetFolderPath('Programs')) 'Download
 $hk = 'HKCU:\Software\Google\Chrome\NativeMessagingHosts\io.github.stevenke1981.downloader'
 Check (Test-Path $hk) "Chrome native host registered"
 Check (Test-Path 'HKCU:\Software\Microsoft\Edge\NativeMessagingHosts\io.github.stevenke1981.downloader') "Edge native host registered"
+Check (Test-Path 'HKCU:\Software\BraveSoftware\Brave-Browser\NativeMessagingHosts\io.github.stevenke1981.downloader') "Brave native host registered"
+Check (Test-Path 'HKCU:\Software\Chromium\NativeMessagingHosts\io.github.stevenke1981.downloader') "Chromium native host registered (Brave fallback)"
 $mf = (Get-ItemProperty $hk).'(default)'
 $m = Get-Content $mf -Raw | ConvertFrom-Json
 Check (Test-Path $m.path) "host manifest points to $($m.path)"
+Check ($m.name -eq 'io.github.stevenke1981.downloader' -and $m.type -eq 'stdio') 'native host manifest identity and protocol'
+Check ($m.allowed_origins.Count -eq 1 -and $m.allowed_origins[0] -eq 'chrome-extension://dikofgcelgoincfekonbdlmodjehgaah/') 'native host only permits Downloader extension'
+foreach ($view in [Microsoft.Win32.RegistryView]::Registry32, [Microsoft.Win32.RegistryView]::Registry64) {
+    $baseKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::CurrentUser, $view)
+    try {
+        foreach ($browserKey in 'Google\Chrome', 'BraveSoftware\Brave-Browser', 'Microsoft\Edge', 'Chromium') {
+            $key = $baseKey.OpenSubKey("Software\$browserKey\NativeMessagingHosts\io.github.stevenke1981.downloader")
+            try { Check ($null -ne $key -and $key.GetValue('') -eq $mf) "$browserKey manifest target ($view)" }
+            finally { if ($null -ne $key) { $key.Dispose() } }
+        }
+    } finally { $baseKey.Dispose() }
+}
 $ver = & (Join-Path $dir 'dlx.exe') --version
 Check ($LASTEXITCODE -eq 0) "dlx --version runs: $ver"
 Check ($ver.Trim() -eq "dlx $expectedVersion") 'installed CLI version matches manifest'
@@ -67,6 +81,9 @@ Check ($p.ExitCode -eq 0) "uninstaller exit code 0"
 Start-Sleep -Seconds 3
 Check (-not (Test-Path (Join-Path $dir 'downloader.exe'))) "downloader.exe removed"
 Check (-not (Test-Path $hk)) "native host unregistered"
+foreach ($browserKey in 'BraveSoftware\Brave-Browser', 'Microsoft\Edge', 'Chromium') {
+    Check (-not (Test-Path "HKCU:\Software\$browserKey\NativeMessagingHosts\io.github.stevenke1981.downloader")) "$browserKey native host unregistered"
+}
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
 Check (-not ($userPath -like "*$dir*")) "removed from user PATH"
 Write-Host "Installer smoke test passed"

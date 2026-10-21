@@ -50,8 +50,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 chinesetraditional.TaskPath=將 dlx 命令列下載工具加入 PATH
 chinesetraditional.GroupIntegration=整合：
-chinesetraditional.TaskBrowser=註冊 Chrome / Edge 瀏覽器擴充功能的連線元件（Native Messaging）
-english.TaskBrowser=Register the Chrome / Edge extension connector (native messaging host)
+chinesetraditional.TaskBrowser=註冊 Chrome / Brave / Edge 瀏覽器擴充功能的連線元件（也可在 App 設定中安裝）
+english.TaskBrowser=Register the Chrome / Brave / Edge connector (also available in app Settings)
 english.TaskPath=Add the dlx command-line downloader to PATH
 english.GroupIntegration=Integration:
 
@@ -76,7 +76,7 @@ Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#AppExe}"; Parameters: "--register-browser"; Flags: runhidden waituntilterminated; Tasks: browser; StatusMsg: "{cm:TaskBrowser}"
+Filename: "{app}\{#AppExe}"; Parameters: "--register-browser"; Flags: runhidden waituntilterminated runasoriginaluser; Tasks: browser; StatusMsg: "{cm:TaskBrowser}"
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
