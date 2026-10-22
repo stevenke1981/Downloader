@@ -62,6 +62,11 @@ dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha
 ```
 按 Ctrl+C 中斷後，再執行同一個指令就會續傳。
 
+### Google Drive
+公開的單一檔案分享連結可直接加入 Downloader，會解析下載確認頁並使用伺服器回傳的檔名。需要登入的檔案請先在瀏覽器登入，再從 Drive 按「下載」；擴充功能會保留已解析的檔案網址與該網址的 Cookie。Google 登入頁不會被當成檔案儲存。
+
+資料夾連結請在瀏覽器開啟後選取檔案下載；Downloader 不會遞迴列出資料夾。瀏覽器自行產生的 `blob:` ZIP 由瀏覽器下載。更新本機擴充功能檔案後，請在瀏覽器的擴充功能頁按「重新載入」。
+
 ### 尚未支援
 - **FTP**：還不支援（`ftp://` 連結會被拒絕）。
 - **BitTorrent / 磁力連結**：不支援。
@@ -106,6 +111,11 @@ Downloader is a multi-connection download accelerator and manager written in Rus
 On Windows, run `powershell -File scripts/verify-local.ps1` for local format/lint/release build/tests, extension regressions and CLI checks without GitHub Actions. Add `-BuildInstaller` if Inno Setup is installed.
 
 How it works: the extension talks to `downloader-host` via native messaging; the host forwards to the running app over a token-protected 127.0.0.1 connection and starts the app if needed.
+
+### Google Drive
+Public single-file share links resolve their download confirmation page and use the response filename. For files requiring sign-in, log in and start the download in the browser; the extension keeps a resolved media URL and the cookies matching that URL. Google sign-in pages are never saved as files.
+
+Open folder links in the browser and select files to download; recursive folder listing is not supported. Browser-generated `blob:` ZIPs stay with the browser. Reload the extension in the browser after updating its local files.
 
 ### Not yet supported
 FTP and BitTorrent/magnet links are not supported yet. The system tray icon is Windows-only for now.

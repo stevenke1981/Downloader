@@ -1,0 +1,392 @@
+{
+  "task_id": "GD-FIX-2026-10-23",
+  "revision": 1,
+  "base_sha": "77f4d7821ea6540bf6ab618005d12086cff674e7",
+  "head_sha": "77f4d7821ea6540bf6ab618005d12086cff674e7",
+  "tested_sha": "77f4d7821ea6540bf6ab618005d12086cff674e7",
+  "working_tree_modified": true,
+  "actor_instance": "/root",
+  "receiver_instance": "user",
+  "role": "chief_orchestrator/integrator",
+  "kind": "handoff",
+  "result": "PASS",
+  "simulation": false,
+  "observed_at": "2026-10-23T01:45:38.821050+08:00",
+  "acceptance_ids": [
+    "AC1",
+    "AC2",
+    "AC3",
+    "AC4",
+    "AC5"
+  ],
+  "artifact": {
+    "path": "docs/google-drive-fix.md",
+    "sha256": "a99ea9e4426dceb1572276cf30960e4d6551c84bc8522aa28bfeae8d16e8ede6"
+  },
+  "sources": [
+    {
+      "path": "core/src/engine.rs",
+      "sha256": "a6e5d02c4a8c4a1f56506a8963e02c96f5ebbe9c5545e642496162e56b2cf330"
+    },
+    {
+      "path": "core/src/lib.rs",
+      "sha256": "aa28f526998818e1aedb57520010f4e43265c859f35d387ba2cb2528e35390dd"
+    },
+    {
+      "path": "core/src/google_drive.rs",
+      "sha256": "a362584ff61ee2d9b9727e35873f3bcd164a00bf0bbc8908c61441b73f908f37"
+    },
+    {
+      "path": "core/tests/google_drive.rs",
+      "sha256": "8294e60a80b7df0e8ac9fe350955a2ec5a1880e1f03d8793044af2b4a9e52bd8"
+    },
+    {
+      "path": "extension/background.js",
+      "sha256": "9a05b62a835160fb9e830fbd09fae0618ea7dabfa754a8692a641031f5007218"
+    },
+    {
+      "path": "scripts/tests/extension-background.test.cjs",
+      "sha256": "f8498ea1f1cc06e2d5ac5e79a9acf9c0a7dc4579983233fe880f443646794dcd"
+    },
+    {
+      "path": "README.md",
+      "sha256": "5948049d60dde817ef888af7e5805ff7ab287f83568e65e12f1059316890270b"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "2433d6182fb809915966f716401d8d9cafc44ae8ab5feb3bd28e77a84ddab00c"
+    },
+    {
+      "path": "docs/google-drive-dispatch-plan.md",
+      "sha256": "069db27e9f259e832e6a8e9a26d9c793d0967b089ace998dd511022b25070469"
+    },
+    {
+      "path": "docs/google-drive-fix.md",
+      "sha256": "a99ea9e4426dceb1572276cf30960e4d6551c84bc8522aa28bfeae8d16e8ede6"
+    }
+  ],
+  "checks": [
+    {
+      "name": "baseline-core-drive-regressions",
+      "platform": "Windows x64",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "downloader-core",
+        "--locked",
+        "--test",
+        "google_drive",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 1,
+      "result": "FAIL",
+      "passed": 3,
+      "failed": 5,
+      "location": "target/worktrees/google-drive-tests"
+    },
+    {
+      "name": "baseline-extension-regressions",
+      "platform": "Windows x64",
+      "argv": [
+        "node",
+        "--test",
+        "scripts/tests/extension-background.test.cjs"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 1,
+      "result": "FAIL",
+      "passed": 11,
+      "failed": 5,
+      "location": "target/worktrees/google-drive-extension/target/baseline"
+    },
+    {
+      "name": "candidate-drive-regressions",
+      "platform": "Windows x64",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "downloader-core",
+        "--locked",
+        "--test",
+        "google_drive",
+        "--",
+        "--nocapture"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 0,
+      "result": "PASS",
+      "passed": 8
+    },
+    {
+      "name": "project-local-gate",
+      "platform": "Windows x64",
+      "argv": [
+        "powershell",
+        "-File",
+        "scripts/verify-local.ps1"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 0,
+      "result": "PASS",
+      "rust_passed": 87,
+      "rust_ignored": 1,
+      "extension_passed": 16,
+      "includes": [
+        "cargo fmt -p downloader --check",
+        "cargo clippy --release --workspace --all-targets --locked -- -D warnings",
+        "cargo build --release --locked",
+        "cargo test --release --workspace --locked",
+        "node --test scripts/tests/extension-background.test.cjs",
+        "node --check extension/options.js",
+        "node --check extension/alt.js",
+        "target/release/dlx.exe --version"
+      ]
+    },
+    {
+      "name": "release-cli-live-smoke",
+      "platform": "Windows x64",
+      "argv": [
+        "target/release/dlx.exe",
+        "<public-file/private-file/folder>",
+        "--retries",
+        "0",
+        "--verify",
+        "off",
+        "--quiet"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "target/google-drive-release-smoke.json",
+      "cases": 3
+    },
+    {
+      "name": "installer-compile",
+      "platform": "Windows x64",
+      "argv": [
+        "powershell",
+        "-File",
+        "scripts/build-installer.ps1"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "name": "extension-archive-integrity",
+      "platform": "Windows x64",
+      "argv": [
+        "python",
+        "zipfile.testzip"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 0,
+      "result": "PASS",
+      "evidence": "target/google-drive-artifact-hashes.json"
+    },
+    {
+      "name": "signed-in-chrome-download",
+      "platform": "Windows x64",
+      "argv": [],
+      "cwd": "E:\\Downloader",
+      "exit_code": null,
+      "result": "NOT_RUN"
+    },
+    {
+      "name": "installed-app-upgrade",
+      "platform": "Windows x64",
+      "argv": [],
+      "cwd": "E:\\Downloader",
+      "exit_code": null,
+      "result": "NOT_RUN"
+    },
+    {
+      "name": "native-gui-render-fixture",
+      "platform": "Windows x64",
+      "argv": [],
+      "cwd": "E:\\Downloader",
+      "exit_code": null,
+      "result": "NOT_RUN"
+    },
+    {
+      "name": "remote-ci",
+      "platform": "Windows x64",
+      "argv": [],
+      "cwd": "E:\\Downloader",
+      "exit_code": null,
+      "result": "NOT_RUN"
+    },
+    {
+      "name": "linux-macos-runtime",
+      "platform": "Windows x64",
+      "argv": [],
+      "cwd": "E:\\Downloader",
+      "exit_code": null,
+      "result": "NOT_RUN"
+    },
+    {
+      "name": "installer-install-uninstall",
+      "platform": "Windows x64",
+      "argv": [],
+      "cwd": "E:\\Downloader",
+      "exit_code": null,
+      "result": "NOT_RUN"
+    },
+    {
+      "name": "final-format-and-diff-check",
+      "platform": "Windows x64",
+      "argv": [
+        "rustfmt --check --edition 2024 --config max_width=160,use_small_heuristics=Max core/src/google_drive.rs core/tests/google_drive.rs",
+        "git diff --check"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "name": "handoff-jsonschema-library-validation",
+      "platform": "Windows x64",
+      "argv": [
+        "python",
+        "jsonschema.validate"
+      ],
+      "cwd": "E:\\Downloader",
+      "exit_code": null,
+      "result": "NOT_RUN",
+      "reason": "jsonschema module unavailable; no dependency installed for this optional evidence check"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "target/release/downloader.exe",
+      "bytes": 23569920,
+      "sha256": "5be4699df2223a9794081b6d15c090a9042abd3167f23378cc8944a66914149c"
+    },
+    {
+      "path": "target/release/dlx.exe",
+      "bytes": 2986496,
+      "sha256": "b4a580398856379a95d758c95f664979b66774454b16abece80c58b1a9081698"
+    },
+    {
+      "path": "target/release/downloader-host.exe",
+      "bytes": 345088,
+      "sha256": "a407c296477a33e20ca2c8002630740b32aeca90cfbe811aad444341a5b23388"
+    },
+    {
+      "path": "dist/downloader-setup-google-drive-fix-windows-x64.exe",
+      "bytes": 11365724,
+      "sha256": "7189239ae1e87f37b3736597e2dd93db74a95a508a10d092ed856015d18882d8"
+    },
+    {
+      "path": "dist/downloader-browser-extension-google-drive-fix.zip",
+      "bytes": 20221,
+      "sha256": "8a97aa4d418f19b77f17d2516a3dfe5f81efcfce046c8cab7920854e9ba25b7d"
+    }
+  ],
+  "live_smoke": {
+    "executable": "E:\\Downloader\\target\\release\\dlx.exe",
+    "exe_sha256": "b4a580398856379a95d758c95f664979b66774454b16abece80c58b1a9081698",
+    "cases": [
+      {
+        "name": "public",
+        "argv": [
+          "E:\\Downloader\\target\\release\\dlx.exe",
+          "https://drive.google.com/file/d/0B9P1L--7Wd2vU3VUVlFnbTgtS2c/view",
+          "-o",
+          "E:\\Downloader\\target\\google-drive-release-smoke\\public",
+          "--retries",
+          "0",
+          "--verify",
+          "off",
+          "--quiet"
+        ],
+        "exit_code": 0,
+        "expected_exit": 0,
+        "seconds": 2.2,
+        "files": [
+          {
+            "name": "spam.txt",
+            "bytes": 5,
+            "sha256": "284e3029cce3ae5ee0b05866100e300046359f53ae4c77fe6b34c05aa7a72cee"
+          }
+        ],
+        "stdout": "E:\\Downloader\\target\\google-drive-release-smoke\\public\\spam.txt  5 B in 2.10s (2 B/s)",
+        "stderr": "",
+        "result": "PASS"
+      },
+      {
+        "name": "private",
+        "argv": [
+          "E:\\Downloader\\target\\release\\dlx.exe",
+          "https://drive.google.com/file/d/17g-6zzKXXZ_K79pNgwsqzriFa0Owk3RO/view?usp=drivesdk",
+          "-o",
+          "E:\\Downloader\\target\\google-drive-release-smoke\\private",
+          "--retries",
+          "0",
+          "--verify",
+          "off",
+          "--quiet"
+        ],
+        "exit_code": 1,
+        "expected_exit": 1,
+        "seconds": 0.81,
+        "files": [],
+        "stdout": "",
+        "stderr": "error: https://drive.google.com/file/d/17g-6zzKXXZ_K79pNgwsqzriFa0Owk3RO/view?usp=drivesdk: Google Drive: Google sign-in page received instead of a file; sign in and download again from the browser",
+        "result": "PASS"
+      },
+      {
+        "name": "folder",
+        "argv": [
+          "E:\\Downloader\\target\\release\\dlx.exe",
+          "https://drive.google.com/drive/folders/1r3xuwthdrkmLaNhBuJpueAbqlLiSo7EH",
+          "-o",
+          "E:\\Downloader\\target\\google-drive-release-smoke\\folder",
+          "--retries",
+          "0",
+          "--verify",
+          "off",
+          "--quiet"
+        ],
+        "exit_code": 1,
+        "expected_exit": 1,
+        "seconds": 0.28,
+        "files": [],
+        "stdout": "",
+        "stderr": "error: https://drive.google.com/drive/folders/1r3xuwthdrkmLaNhBuJpueAbqlLiSo7EH: Google Drive: folder links are web pages; open the folder in the browser, select the files and choose Download",
+        "result": "PASS"
+      }
+    ],
+    "result": "PASS"
+  },
+  "independent_check": {
+    "actor": "drive-tests",
+    "result": "PASS",
+    "scope": "single focused correctness check of integrated Drive/engine/extension candidate",
+    "limitations": "not independent approval of the test author own test cases; signed-in Chrome NOT_RUN"
+  },
+  "odin": {
+    "project": "ws_be6d445980b6717b0e09d633291ddc8c25c589e4d6785fca",
+    "root": "E:\\Downloader",
+    "live_structure": "PASS",
+    "rust_lsp_symbols": "PASS",
+    "write_grant": false,
+    "shell_grant": false,
+    "grants_changed": false
+  },
+  "unresolved": [
+    "Private Google Drive members require an authenticated browser session. Real signed-in Chrome download success was not verified.",
+    "Folder URLs are not recursively downloaded; select the files and choose Download in the browser.",
+    "Local fix retains version 0.5.2. Existing installed binaries and loaded extension were not upgraded."
+  ],
+  "next_action": "Install the prepared local fix and reload the extension; start private Drive downloads from the signed-in browser.",
+  "external_side_effects": {
+    "authorized": false,
+    "performed": false,
+    "note": "No push, release, account/sharing change or installed-app upgrade. Read-only Drive access and live HTTP download smoke were performed within the requested diagnosis."
+  }
+}

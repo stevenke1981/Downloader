@@ -5,6 +5,7 @@
 //! remaining segment in half, so slow connections never hold up the download.
 use crate::category::Category;
 use crate::checksum;
+use crate::google_drive;
 use crate::limiter::RateLimiter;
 use crate::task::{Seg, Status, Task};
 use crate::util;
@@ -38,6 +39,7 @@ pub enum Outcome {
 #[derive(Debug, Default)]
 struct Probe {
     url: String,
+    drive_download: bool,
     range: bool,
     total: Option<u64>,
     etag: Option<String>,
@@ -99,20 +101,36 @@ fn with_cookie_hint(err: String, lost_cookie: bool) -> String {
 }
 
 async fn probe(client: &reqwest::Client, url: &str, referer: Option<&str>, cookie: Option<&str>) -> Result<Probe, String> {
-    let mut req = client.get(url).header(RANGE, "bytes=0-0");
-    if let Some(r) = referer {
-        req = req.header(reqwest::header::REFERER, r);
-    }
-    if let Some(c) = cookie {
-        req = req.header(reqwest::header::COOKIE, c);
-    }
-    let resp = req.send().await.map_err(err_str)?;
+    let mut target = google_drive::download_url(url)?;
+    let mut drive_download = google_drive::is_drive(&target);
+    let mut confirmations = 0;
+    let resp = loop {
+        let mut req = client.get(target.clone()).header(RANGE, "bytes=0-0");
+        if let Some(r) = referer { req = req.header(reqwest::header::REFERER, r); }
+        // The browser header applies only to its original origin, including when
+        // following a confirmation form. Never copy it to another Google host.
+        if let Some(c) = cookie.filter(|_| same_origin(url, target.as_str())) { req = req.header(reqwest::header::COOKIE, c); }
+        let resp = req.send().await.map_err(err_str)?;
+        if google_drive::is_sign_in(resp.url()) { return Err(google_drive::SIGN_IN.into()); }
+        if !resp.status().is_success() { return Err(format!("HTTP {}", resp.status())); }
+        drive_download |= google_drive::is_drive(resp.url());
+        if drive_download && google_drive::is_html_page(&resp) {
+            if !google_drive::is_drive(resp.url()) || confirmations >= 3 { return Err(google_drive::UNAVAILABLE.into()); }
+            let next = google_drive::confirmation_url(resp).await?;
+            if next == target { return Err(google_drive::UNAVAILABLE.into()); }
+            target = next;
+            confirmations += 1;
+            continue;
+        }
+        break resp;
+    };
     let st = resp.status();
     if !st.is_success() {
         return Err(format!("HTTP {st}"));
     }
     let mut p = Probe {
         url: resp.url().to_string(),
+        drive_download,
         etag: hdr(&resp, ETAG).filter(|e| !e.starts_with("W/")),
         last_modified: hdr(&resp, LAST_MODIFIED),
         name: hdr(&resp, CONTENT_DISPOSITION).and_then(|d| util::name_from_disposition(&d)),
@@ -207,6 +225,7 @@ struct Shared {
     task: Arc<Mutex<Task>>,
     file: File,
     url: String,
+    drive_download: bool,
     range: bool,
     etag: Option<String>,
     referer: Option<String>,
@@ -247,6 +266,7 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
         _ = sh.ctx.cancel.cancelled() => return Err(FetchErr::Cancelled),
     };
     let st = resp.status();
+    google_drive::validate_file_response(&resp, sh.drive_download).map_err(FetchErr::Fatal)?;
     if sh.range && st.as_u16() != 206 {
         return Err(if st.as_u16() == 200 {
             FetchErr::Fatal("the file changed on the server (range request answered with the whole file)".into())
@@ -380,7 +400,7 @@ async fn probe_retry(ctx: &Ctx, url: &str, referer: Option<&str>, cookie: Option
         };
         match r {
             Ok(p) => return Ok(p),
-            Err(e) if attempt >= ctx.retries || http_code(&e).is_some_and(permanent) => return Err(e),
+            Err(e) if attempt >= ctx.retries || http_code(&e).is_some_and(permanent) || e.starts_with("Google Drive:") => return Err(e),
             Err(_) => {
                 attempt += 1;
                 tokio::select! {
@@ -443,7 +463,9 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     let (part, conns) = {
         let mut t = task.lock().unwrap();
         if t.file_name.is_empty() {
-            let name = t.suggested_name.as_deref().map(util::sanitize).filter(|n| !n.is_empty()).or_else(|| p.name.clone()).unwrap_or_else(|| "download".into());
+            let suggested = t.suggested_name.as_deref().map(util::sanitize).filter(|n| !n.is_empty())
+                .filter(|n| !p.drive_download || !matches!(n.to_ascii_lowercase().as_str(), "identifier" | "uc" | "download" | "view" | "open"));
+            let name = suggested.or_else(|| p.name.clone()).unwrap_or_else(|| "download".into());
             t.file_name = util::unique_name(&t.dir, &name);
             t.category = Category::from_name(&t.file_name);
         }
@@ -488,7 +510,7 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         let _ = file.set_len(n);
     }
 
-    let sh = Arc::new(Shared { task: task.clone(), file, url: p.url.clone(), range: p.range, etag: p.etag.clone(), referer, cookie, ctx: ctx.clone() });
+    let sh = Arc::new(Shared { task: task.clone(), file, url: p.url.clone(), drive_download: p.drive_download, range: p.range, etag: p.etag.clone(), referer, cookie, ctx: ctx.clone() });
     let mut set = tokio::task::JoinSet::new();
     for _ in 0..conns {
         set.spawn(worker(sh.clone()));

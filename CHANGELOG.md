@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Google Drive downloads no longer save Google sign-in HTML as a completed file named `identifier`. Public file share links resolve download confirmation forms and preserve response filenames; folder links explain how to download from the browser.
+- Browser interception leaves Google sign-in/error pages in the browser, preserves resolved Drive media URLs with their matching cookie scope, and avoids intercepting a redirected browser fallback twice.
+
 ## 0.5.2 — 2026-10-22
 
 ### Improved

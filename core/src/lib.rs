@@ -3,6 +3,7 @@ pub mod category;
 pub mod checksum;
 pub mod browser;
 pub mod engine;
+mod google_drive;
 pub mod ipc;
 pub mod native;
 pub mod limiter;

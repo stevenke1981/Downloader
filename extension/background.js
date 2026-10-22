@@ -93,6 +93,18 @@ function extOf(name) {
   const i = base.lastIndexOf(".");
   return i > 0 ? base.slice(i + 1).toLowerCase() : "";
 }
+function hostOf(url) {
+  try { return new URL(url).hostname; } catch (_) { return ""; }
+}
+const isDriveUrl = (url) => ["drive.google.com", "drive.usercontent.google.com"].includes(hostOf(url));
+function isDriveMediaUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" &&
+      ((u.hostname === "drive.usercontent.google.com" && u.pathname === "/download") ||
+       u.hostname.endsWith(".googleusercontent.com"));
+  } catch (_) { return false; }
+}
 const list = (s) => s.split(/[,\s;]+/).map((x) => x.replace(/^\./, "").toLowerCase()).filter(Boolean);
 
 function badge(text, color) {
@@ -175,14 +187,25 @@ chrome.runtime.onMessage.addListener((m, _sender, reply) => {
 
 chrome.downloads.onCreated.addListener(async (item) => {
   const o = await options();
-  const url = item.finalUrl || item.url;
+  const finalUrl = item.finalUrl || item.url;
+  // Use resolved Drive media with its own cookies: restarting from the share URL
+  // can lose authentication on the cross-host redirect. Keep unresolved Drive
+  // links intact so the app can resolve their file ID/resource key.
+  const url = isDriveUrl(item.url) && !isDriveMediaUrl(finalUrl) ? item.url : finalUrl;
   if (!o.intercept || !/^https?:\/\//i.test(url) || item.state !== "in_progress") return;
-  if (passThrough.delete(url)) return;
+  if (passThrough.delete(item.url) || passThrough.delete(finalUrl)) return;
+  if ([item.url, finalUrl].some((u) => hostOf(u) === "accounts.google.com")) return;
   if (o.altBypass && altDownAt && Date.now() - altDownAt < 5000) return;
   const size = item.totalBytes > 0 ? item.totalBytes : item.fileSize;
   if (o.minSizeKB > 0 && size > 0 && size < o.minSizeKB * 1024) return;
   const name = item.filename || url;
   const ext = extOf(name) || extOf(url);
+  const mime = (item.mime || "").split(";")[0].trim().toLowerCase();
+  // An unnamed HTML response from Drive is a confirmation/error page. Explicit
+  // .html/.htm downloads still follow the user's normal file type options.
+  if ((isDriveUrl(item.url) || isDriveUrl(finalUrl)) &&
+      ["text/html", "application/xhtml+xml"].includes(mime) &&
+      !["html", "htm"].includes(extOf(item.filename))) return;
   const inc = list(o.include), exc = list(o.exclude);
   if (inc.length && !inc.includes(ext)) return;
   if (ext && exc.includes(ext)) return;
