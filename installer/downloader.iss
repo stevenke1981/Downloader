@@ -63,9 +63,12 @@ Name: "addtopath"; Description: "{cm:TaskPath}"; GroupDescription: "{cm:GroupInt
 [Files]
 Source: "{#SrcDir}\downloader.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\dlx.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SrcDir}\dlxctl.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SrcDir}\downloader-host.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\extension\*"; DestDir: "{app}\extension"; Excludes: "EXTENSION_ID"; Flags: ignoreversion recursesubdirs
 Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\fdm-tools.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\fdm-feature-matrix.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\desktop-controls.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\browser-setup.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\ui-0.5.2-settings-general.png"; DestDir: "{app}"; Flags: ignoreversion

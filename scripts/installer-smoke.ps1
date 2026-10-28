@@ -15,7 +15,7 @@ $p = Start-Process $setup -Wait -PassThru -ArgumentList @(
     '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/CURRENTUSER',
     '/TASKS=desktopicon,addtopath,browser', '/LOG=install.log')
 Check ($p.ExitCode -eq 0) "installer exit code 0 (got $($p.ExitCode))"
-foreach ($f in 'downloader.exe', 'dlx.exe', 'downloader-host.exe', 'extension\manifest.json', 'README.md', 'LICENSE.txt', 'unins000.exe') {
+foreach ($f in 'downloader.exe', 'dlx.exe', 'dlxctl.exe', 'downloader-host.exe', 'extension\manifest.json', 'README.md', 'LICENSE.txt', 'unins000.exe') {
     Check (Test-Path (Join-Path $dir $f)) "installed $f"
 }
 $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -45,6 +45,8 @@ foreach ($view in [Microsoft.Win32.RegistryView]::Registry32, [Microsoft.Win32.R
 $ver = & (Join-Path $dir 'dlx.exe') --version
 Check ($LASTEXITCODE -eq 0) "dlx --version runs: $ver"
 Check ($ver.Trim() -eq "dlx $expectedVersion") 'installed CLI version matches manifest'
+$controlVer = & (Join-Path $dir 'dlxctl.exe') --version
+Check ($LASTEXITCODE -eq 0 -and $controlVer.Trim() -eq "dlxctl $expectedVersion") 'installed control CLI version matches manifest'
 $hostVer = & (Join-Path $dir 'downloader-host.exe') --version
 Check ($LASTEXITCODE -eq 0 -and $hostVer.Trim() -eq "downloader-host $expectedVersion") 'installed host version matches manifest'
 Check ((Get-Item (Join-Path $dir 'downloader.exe')).VersionInfo.FileVersionRaw -eq [version]"$expectedVersion.0") 'installed GUI version matches manifest'

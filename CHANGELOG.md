@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- Align the FDM feature checklist with optional aria2c FTP/BitTorrent/magnet/Metalink downloads, FFmpeg RTSP/MMS capture, explicit yt-dlp website-video mode, and curl FTP listing. Optional engines are discovered through PATH or executable-path environment variables and do not run through a shell.
+- Batch URL paste/import, main and compact window descriptor drops, completed-file preview, copy-source sharing, task connection/status logs, and a separate desktop Tools window.
+- Configurable low/medium/high traffic presets, origin-specific site concurrency/connection/authentication profiles with session-only passwords, and custom extension-to-folder rules.
+- Bounded same-origin recursive HTML link discovery, persisted one-shot start/pause/program/shutdown actions, and an opt-in token-authenticated remote queue API with the `dlxctl` command-line tool.
+- Document the feature matrix and layered local/runtime/GUI acceptance. External aria2c/yt-dlp limits are per process at launch; FFmpeg has no byte-rate limiter. Legacy Google Video/Flash services are not recreated.
+
 ### Fixed
 - Google Drive downloads no longer save Google sign-in HTML as a completed file named `identifier`. Public file share links resolve download confirmation forms and preserve response filenames; folder links explain how to download from the browser.
 - Browser interception leaves Google sign-in/error pages in the browser, preserves resolved Drive media URLs with their matching cookie scope, and avoids intercepting a redirected browser fallback twice.

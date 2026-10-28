@@ -1,5 +1,5 @@
 # Builds dist\downloader-setup-windows-x64.exe with Inno Setup.
-# Expects all three target\release Downloader executables to exist already.
+# Expects all four target\release Downloader executables to exist already.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root

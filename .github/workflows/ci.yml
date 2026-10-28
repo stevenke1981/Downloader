@@ -41,6 +41,8 @@ jobs:
           B=target/release/dlx
           $B --version
           $B --help >/dev/null
+          target/release/dlxctl --version
+          target/release/dlxctl --help >/dev/null
       - name: GUI screenshot (Windows)
         if: runner.os == 'Windows'
         shell: pwsh

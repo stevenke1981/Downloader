@@ -14,6 +14,8 @@
 
 Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Slint，支援 Windows、Linux、macOS。
 
+新增的 **工具** 視窗提供低／中／高流量模式、站點與資料夾規則、網頁遞迴擷取／FTP 瀏覽、單次計劃任務，以及遠端 API。新增下載可一次貼上多個網址，也能匯入或拖入 Torrent／Metalink 檔；網站影片請明確選擇「影音」模式。完整用途對照與驗收範圍見 [FDM 功能對照](docs/fdm-feature-matrix.zh-TW.md) 及 [使用說明](docs/fdm-tools.zh-TW.md)。
+
 ### 功能
 - **多連線分段下載**：用 HTTP Range 把檔案切成多段同時下載（每個下載最多 32 條連線，可設定）。先下完的連線會自動把最慢那段切一半接手，不會被單一條慢連線拖住。
 - **續傳**：暫停或關掉程式後，進度會存起來，下次開啟會接著下載。會檢查 ETag / Last-Modified，伺服器上的檔案變了就從頭下載；伺服器不支援 Range 時自動改用單一連線。
@@ -67,9 +69,15 @@ dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha
 
 資料夾連結請在瀏覽器開啟後選取檔案下載；Downloader 不會遞迴列出資料夾。瀏覽器自行產生的 `blob:` ZIP 由瀏覽器下載。更新本機擴充功能檔案後，請在瀏覽器的擴充功能頁按「重新載入」。
 
-### 尚未支援
-- **FTP**：還不支援（`ftp://` 連結會被拒絕）。
-- **BitTorrent / 磁力連結**：不支援。
+### 選用的協定工具
+- **aria2c**：FTP、BitTorrent／磁力連結、Metalink 鏡像下載。
+- **FFmpeg**：RTSP／MMS 串流擷取。
+- **yt-dlp**：明確選擇影音模式後下載網站影片。
+- **curl**：FTP 目錄瀏覽。
+
+這些工具需另外提供可執行檔並放在 PATH，或指定 `DOWNLOADER_ARIA2`、`DOWNLOADER_FFMPEG`、`DOWNLOADER_YTDLP`、`DOWNLOADER_CURL` 絕對路徑；`dlx --tools` 與工具視窗顯示可用狀態。HTTP/HTTPS 沿用內建引擎。外部工具的續傳與限速依引擎能力：aria2c／yt-dlp 使用啟動時的單程序上限，沒有跨程序的總流量協調或即時變更限速；FFmpeg 串流擷取沒有位元組限速。外部引擎不接收瀏覽器 Cookie；FTP 可使用站點帳密。
+
+### 平台限制
 - **系統匣圖示**：目前只有 Windows；其他平台可用精簡視窗。
 
 ### 建置
@@ -86,6 +94,8 @@ Windows 本機完整檢查（不使用 GitHub Actions）：`powershell -File scr
 ## English
 
 Downloader is a multi-connection download accelerator and manager written in Rust with a Slint GUI, for Windows, Linux and macOS.
+
+The **Tools** window adds configurable traffic presets, site/folder rules, bounded web crawling and FTP listing, one-shot scheduled actions, and an opt-in authenticated remote API. Add multiple URLs in one batch or import/drop Torrent and Metalink descriptors; choose video mode explicitly for website videos. See the [FDM feature matrix](docs/fdm-feature-matrix.zh-TW.md) for the implementation and evidence boundaries.
 
 ### Features
 - **Segmented multi-connection downloads** over HTTP/HTTPS using Range requests (up to 32 connections per download). Connections that finish early split the largest remaining segment, so one slow connection never holds up the download.
@@ -117,8 +127,8 @@ Public single-file share links resolve their download confirmation page and use 
 
 Open folder links in the browser and select files to download; recursive folder listing is not supported. Browser-generated `blob:` ZIPs stay with the browser. Reload the extension in the browser after updating its local files.
 
-### Not yet supported
-FTP and BitTorrent/magnet links are not supported yet. The system tray icon is Windows-only for now.
+### Optional protocol tools
+Provide `aria2c` for FTP, BitTorrent/magnet and Metalink; FFmpeg for RTSP/MMS capture; yt-dlp for explicit website-video mode; and curl for FTP listing. Put them on PATH or set executable paths through `DOWNLOADER_ARIA2`, `DOWNLOADER_FFMPEG`, `DOWNLOADER_YTDLP`, and `DOWNLOADER_CURL`. `dlx --tools` reports availability. They are not bundled. Native HTTP/HTTPS behavior is retained. External aria2c/yt-dlp limits apply at process start, without aggregate or live rate coordination across processes; FFmpeg capture has no byte-rate limiter. Browser cookies are not passed to external engines; FTP site credentials are supported. The system tray icon remains Windows-only.
 
 ### License
 MIT. This is an independent project; it is not affiliated with Free Download Manager, and all icons are original.

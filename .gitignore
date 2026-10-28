@@ -2,3 +2,5 @@ target/
 dist/
 *.part
 installer/ChineseTraditional.isl
+__pycache__/
+*.pyc
