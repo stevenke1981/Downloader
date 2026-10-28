@@ -1,4 +1,4 @@
-//! Native HLS/direct media, RTSP H.264 Annex B, and MS-WMSP-over-HTTP.
+//! Native HLS/direct media, RTSP H.264 Annex B or G.711 WAV, and MS-WMSP-over-HTTP.
 //! Interrupted streams restart. Complete files enter payload; partial/control
 //! files stay in state. No subprocess, C media engine, or JS runtime is used.
 use crate::engine::{Ctx, Outcome};
@@ -58,7 +58,7 @@ impl Transfer {
             Credentials, PlayOptions, Session, SessionOptions, SetupOptions, TcpTransportOptions,
             TeardownPolicy, Transport,
         };
-        use retina::codec::{CodecItem, FrameFormat};
+        use retina::codec::{CodecItem, FrameFormat, ParametersRef};
         let credentials = self
             .snapshot
             .authorization
@@ -95,9 +95,32 @@ impl Transfer {
             .position(|stream| {
                 stream.media() == "video" && stream.encoding_name().eq_ignore_ascii_case("h264")
             })
+            .or_else(|| session.streams().iter().position(|stream| {
+                stream.media() == "audio" && matches!(stream.encoding_name().to_ascii_lowercase().as_str(), "pcmu" | "pcma")
+            }))
             .ok_or(
-                "native RTSP capture requires an H.264 video track; audio/H.265 are not recorded",
+                "native RTSP requires H.264 video or G.711 PCMU/PCMA audio; other codecs and simultaneous A/V muxing are unsupported",
             )?;
+        let audio = if session.streams()[stream].media() == "audio" {
+            let Some(ParametersRef::Audio(parameters)) = session.streams()[stream].parameters()
+            else {
+                return Err("RTSP G.711 has no audio parameters".into());
+            };
+            let sample_rate = parameters.clock_rate();
+            let channels = parameters.channels().get();
+            if sample_rate != 8000 || !(1..=2).contains(&channels) {
+                return Err("native G.711 capture supports 8000 Hz mono/stereo only".into());
+            }
+            Some((
+                session.streams()[stream]
+                    .encoding_name()
+                    .eq_ignore_ascii_case("pcma"),
+                sample_rate,
+                channels,
+            ))
+        } else {
+            None
+        };
         tokio::time::timeout(
             Duration::from_secs(30),
             session.setup(
@@ -124,15 +147,25 @@ impl Transfer {
             .await
             .map_err(|e| e.to_string())?;
         let mut written = 0u64;
+        if let Some((_, sample_rate, channels)) = audio {
+            file.write_all(&pcm_wav_header(0, sample_rate, channels))
+                .await
+                .map_err(|e| e.to_string())?;
+            written = 44;
+        }
         let mut ready = false;
         let mut ended = false;
-        self.task.lock().unwrap().append_log("Native RTSP/TCP H.264 Annex B capture; one video track, no audio; completion requires RTCP BYE");
+        self.task.lock().unwrap().append_log(if audio.is_some() {
+            "Native RTSP/TCP G.711 -> PCM16 WAV capture; one audio track; completion requires RTCP BYE"
+        } else {
+            "Native RTSP/TCP H.264 Annex B capture; one video track, no audio; completion requires RTCP BYE"
+        });
         while let Some(item) = tokio::time::timeout(Duration::from_secs(60), stream.next())
             .await
             .map_err(|_| "RTSP media timed out")?
         {
             match item.map_err(|e| format!("RTSP media: {e}"))? {
-                CodecItem::VideoFrame(frame) => {
+                CodecItem::VideoFrame(frame) if audio.is_none() => {
                     self.limit(frame.data().len().saturating_add(16)).await;
                     if frame.loss() != 0 {
                         return Err("RTSP RTP packet loss; refusing an incomplete capture".into());
@@ -152,6 +185,33 @@ impl Transfer {
                     written += frame.data().len() as u64;
                     self.progress(written);
                 }
+                CodecItem::AudioFrame(frame) => {
+                    let Some((alaw, _, channels)) = audio else {
+                        continue;
+                    };
+                    self.limit(frame.data().len().saturating_add(16)).await;
+                    if frame.loss() != 0 {
+                        return Err("RTSP G.711 RTP packet loss; refusing incomplete audio".into());
+                    }
+                    if !frame.data().len().is_multiple_of(channels as usize) {
+                        return Err(
+                            "RTSP G.711 payload does not contain whole audio sample frames".into(),
+                        );
+                    }
+                    let data_length = written - 44 + frame.data().len() as u64 * 2;
+                    if data_length > (u32::MAX - 36) as u64 {
+                        return Err("RTSP WAV recording exceeds RIFF's 4 GiB size limit".into());
+                    }
+                    let pcm: Vec<u8> = frame
+                        .data()
+                        .iter()
+                        .flat_map(|sample| g711_sample(*sample, alaw).to_le_bytes())
+                        .collect();
+                    file.write_all(&pcm).await.map_err(|e| e.to_string())?;
+                    written += pcm.len() as u64;
+                    ready = true;
+                    self.progress(written);
+                }
                 CodecItem::Rtcp(packet) => {
                     self.limit(packet.raw().len().saturating_add(4)).await;
                     if packet.pkts().any(|packet| packet.payload_type() == 203) {
@@ -169,9 +229,22 @@ impl Transfer {
             );
         }
         if !ready {
-            return Err("RTSP ended before an H.264 keyframe".into());
+            return Err("RTSP ended before a complete H.264 keyframe or G.711 audio frame".into());
         }
-        self.finish(file, "h264").await
+        if let Some((_, sample_rate, channels)) = audio {
+            file.seek(std::io::SeekFrom::Start(0))
+                .await
+                .map_err(|e| e.to_string())?;
+            file.write_all(&pcm_wav_header(
+                (written - 44) as u32,
+                sample_rate,
+                channels,
+            ))
+            .await
+            .map_err(|e| e.to_string())?;
+        }
+        self.finish(file, if audio.is_some() { "wav" } else { "h264" })
+            .await
     }
 
     async fn mmsh(&self, url: Url) -> Result<(), String> {
@@ -500,8 +573,7 @@ impl Transfer {
             if mms {
                 request = request.header(reqwest::header::USER_AGENT, "NSPlayer/9.0.0.2980")
                     .header(reqwest::header::ACCEPT, "*/*")
-                    .header(reqwest::header::PRAGMA, "no-cache,rate=1.000,stream-time=0,stream-offset=0:0,request-context=1,max-duration=0,xPlayStrm=1")
-                    .header("Supported", "com.microsoft.wm.srvppair, com.microsoft.wm.sswitch");
+                    .header(reqwest::header::PRAGMA, "no-cache,rate=1.000,stream-time=0,stream-offset=0:0,request-context=1,max-duration=0,xPlayStrm=1");
             }
             let response = request
                 .send()
@@ -891,14 +963,17 @@ fn asf_packet(bytes: &[u8], packet_size: usize) -> Result<Vec<u8>, String> {
     if payload_offset + 6 > bytes.len() {
         return Err("truncated ASF packet parsing information".into());
     }
-    if bytes.len() == packet_size {
-        return Ok(bytes.to_vec());
-    }
     let mut existing_padding = [0u8; 4];
     existing_padding[..padding_size].copy_from_slice(&bytes[padding_offset..payload_offset]);
     let existing_padding = u32::from_le_bytes(existing_padding) as usize;
+    if existing_padding > bytes.len() - payload_offset - 6 {
+        return Err("invalid ASF packet padding length".into());
+    }
+    if bytes.len() == packet_size {
+        return Ok(bytes.to_vec());
+    }
     let new_length = bytes.len() - length_size - padding_size + 4;
-    if new_length > packet_size || existing_padding > bytes.len() - payload_offset - 6 {
+    if new_length > packet_size {
         return Err("ASF padding cannot be restored within its fixed packet size".into());
     }
     let mut packet = Vec::with_capacity(packet_size);
@@ -912,7 +987,68 @@ fn asf_packet(bytes: &[u8], packet_size: usize) -> Result<Vec<u8>, String> {
     Ok(packet)
 }
 
+fn pcm_wav_header(data_length: u32, sample_rate: u32, channels: u16) -> [u8; 44] {
+    let mut header = [0u8; 44];
+    header[..4].copy_from_slice(b"RIFF");
+    header[4..8].copy_from_slice(&(data_length + 36).to_le_bytes());
+    header[8..16].copy_from_slice(b"WAVEfmt ");
+    header[16..20].copy_from_slice(&16u32.to_le_bytes());
+    header[20..22].copy_from_slice(&1u16.to_le_bytes());
+    header[22..24].copy_from_slice(&channels.to_le_bytes());
+    header[24..28].copy_from_slice(&sample_rate.to_le_bytes());
+    header[28..32].copy_from_slice(&(sample_rate * channels as u32 * 2).to_le_bytes());
+    header[32..34].copy_from_slice(&(channels * 2).to_le_bytes());
+    header[34..36].copy_from_slice(&16u16.to_le_bytes());
+    header[36..40].copy_from_slice(b"data");
+    header[40..44].copy_from_slice(&data_length.to_le_bytes());
+    header
+}
+
+fn g711_sample(code: u8, alaw: bool) -> i16 {
+    // ITU-T G.711 segment expansion, calculated in i32 before the signed PCM16
+    // conversion. A-law has a half-quantum offset; mu-law has a 132-unit bias.
+    let code = if alaw { code ^ 0x55 } else { !code };
+    let segment = (code >> 4) & 7;
+    let magnitude = if alaw {
+        let quantized = (code as i32 & 15) << 4;
+        if segment == 0 {
+            quantized + 8
+        } else {
+            (quantized + 264) << (segment - 1)
+        }
+    } else {
+        (((code as i32 & 15) << 3) + 132) << segment
+    };
+    if alaw {
+        if code & 0x80 != 0 {
+            magnitude as i16
+        } else {
+            -magnitude as i16
+        }
+    } else if code & 0x80 != 0 {
+        (132 - magnitude) as i16
+    } else {
+        (magnitude - 132) as i16
+    }
+}
+
 fn media_extension(bytes: &[u8]) -> Option<&'static str> {
+    // Packed-audio HLS carries an ID3 timestamp before its ADTS frames.
+    let audio = if bytes.starts_with(b"ID3")
+        && bytes.len() >= 10
+        && bytes[6..10].iter().all(|byte| byte & 0x80 == 0)
+    {
+        let size = bytes[6..10]
+            .iter()
+            .fold(0usize, |size, byte| (size << 7) | *byte as usize);
+        let end = 10 + size + if bytes[5] & 0x10 != 0 { 10 } else { 0 };
+        bytes
+            .get(end..)
+            .filter(|bytes| !bytes.is_empty())
+            .unwrap_or(bytes)
+    } else {
+        bytes
+    };
     if bytes.len() >= 12 && &bytes[4..8] == b"ftyp" {
         Some("mp4")
     } else if bytes.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) {
@@ -927,10 +1063,10 @@ fn media_extension(bytes: &[u8]) -> Option<&'static str> {
         Some("avi")
     } else if bytes.len() >= 188 && bytes[0] == 0x47 && (bytes.len() < 376 || bytes[188] == 0x47) {
         Some("ts")
-    } else if bytes.len() >= 7 && bytes[0] == 0xff && bytes[1] & 0xf6 == 0xf0 {
+    } else if audio.len() >= 7 && audio[0] == 0xff && audio[1] & 0xf6 == 0xf0 {
         Some("aac")
     } else if bytes.starts_with(b"ID3")
-        || (bytes.len() >= 4 && bytes[0] == 0xff && bytes[1] & 0xe0 == 0xe0 && bytes[1] & 6 != 0)
+        || (audio.len() >= 4 && audio[0] == 0xff && audio[1] & 0xe0 == 0xe0 && audio[1] & 6 != 0)
     {
         Some("mp3")
     } else if bytes.starts_with(&ASF_HEADER) {
@@ -1153,15 +1289,14 @@ fn discover(html: &str, page: &Url) -> Result<Url, String> {
             }
         } else if let Some(src) = attrs.attr("src") {
             candidates.push(src.to_owned());
-        } else if let Some(property) = attrs.attr("property").or_else(|| attrs.attr("name")) {
-            if matches!(
+        } else if let Some(property) = attrs.attr("property").or_else(|| attrs.attr("name"))
+            && matches!(
                 property.to_ascii_lowercase().as_str(),
                 "og:video" | "og:video:url" | "og:video:secure_url" | "twitter:player:stream"
-            ) {
-                if let Some(content) = attrs.attr("content") {
-                    candidates.push(content.to_owned());
-                }
-            }
+            )
+            && let Some(content) = attrs.attr("content")
+        {
+            candidates.push(content.to_owned());
         }
         if candidates.len() >= 64 {
             break;
@@ -1412,6 +1547,182 @@ mod tests {
         .repeat(20)
     }
 
+    fn transport_segment(sequence: u8) -> Vec<u8> {
+        // A real MPEG-TS program: PAT -> PMT -> AAC PES, including MPEG-2
+        // section CRCs, continuity counters, PCR and PTS (no external encoder).
+        let mut packets = Vec::new();
+        for (pid, mut section) in [
+            (0u16, vec![0, 0xb0, 13, 0, 1, 0xc1, 0, 0, 0, 1, 0xe1, 0]),
+            (
+                0x100,
+                vec![
+                    2, 0xb0, 18, 0, 1, 0xc1, 0, 0, 0xe1, 1, 0xf0, 0, 0x0f, 0xe1, 1, 0xf0, 0,
+                ],
+            ),
+        ] {
+            let mut crc = 0xffff_ffffu32;
+            for byte in &section {
+                crc ^= (*byte as u32) << 24;
+                for _ in 0..8 {
+                    crc = (crc << 1)
+                        ^ if crc & 0x8000_0000 != 0 {
+                            0x04c1_1db7
+                        } else {
+                            0
+                        };
+                }
+            }
+            section.extend_from_slice(&crc.to_be_bytes());
+            let mut packet = vec![0x47, 0x40 | (pid >> 8) as u8, pid as u8, 0x10 | sequence, 0];
+            packet.extend_from_slice(&section);
+            packet.resize(188, 0xff);
+            packets.extend_from_slice(&packet);
+        }
+        let pts = sequence as u64 * 4096 * 90_000 / 44_100;
+        let audio = &adts()[..52];
+        let mut pes = vec![0, 0, 1, 0xc0];
+        pes.extend_from_slice(&((audio.len() + 8) as u16).to_be_bytes());
+        pes.extend_from_slice(&[0x80, 0x80, 5]);
+        pes.extend_from_slice(&[
+            0x21 | (((pts >> 30) as u8 & 7) << 1),
+            (pts >> 22) as u8,
+            ((pts >> 14) as u8 & 0xfe) | 1,
+            (pts >> 7) as u8,
+            ((pts << 1) as u8) | 1,
+        ]);
+        pes.extend_from_slice(audio);
+        let adaptation = 183 - pes.len();
+        let mut packet = vec![0x47, 0x41, 1, 0x30 | sequence, adaptation as u8, 0x10];
+        packet.extend_from_slice(&[
+            (pts >> 25) as u8,
+            (pts >> 17) as u8,
+            (pts >> 9) as u8,
+            (pts >> 1) as u8,
+            ((pts & 1) << 7) as u8 | 0x7e,
+            0,
+        ]);
+        packet.resize(5 + adaptation, 0xff);
+        packet.extend_from_slice(&pes);
+        assert_eq!(packet.len(), 188);
+        packets.extend_from_slice(&packet);
+        packets
+    }
+
+    #[tokio::test]
+    async fn hls_transport_stream_live_cancel_and_safe_restart() {
+        let first = transport_segment(0);
+        let second = transport_segment(1);
+        let fixture = http_fixture(HashMap::from([
+            ("/live.m3u8".into(), reply("application/vnd.apple.mpegurl", b"#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:0.093,\nfirst.ts\n".to_vec())),
+            ("/vod.m3u8".into(), reply("application/vnd.apple.mpegurl", b"#EXTM3U\n#EXT-X-TARGETDURATION:1\n#EXTINF:0.093,\nfirst.ts\n#EXTINF:0.093,\nsecond.ts\n#EXT-X-ENDLIST\n".to_vec())),
+            ("/first.ts".into(), reply("video/mp2t", first.clone())),
+            ("/second.ts".into(), reply("video/mp2t", second.clone())),
+        ])).await;
+        let (stage, task, ctx) = environment(format!("{}/live.m3u8", fixture.base));
+        let cancel = ctx.cancel.clone();
+        let result = tokio::join!(download(task.clone(), ctx, stage.path()), async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            cancel.cancel();
+        });
+        assert_eq!(result.0.unwrap(), Outcome::Cancelled);
+        assert_eq!(task.lock().unwrap().downloaded(), first.len() as u64);
+        assert_eq!(
+            std::fs::read_dir(stage.path().join("payload"))
+                .unwrap()
+                .count(),
+            0
+        );
+        let (_, task, ctx) = environment(format!("{}/vod.m3u8", fixture.base));
+        assert_eq!(
+            download(task, ctx, stage.path()).await.unwrap(),
+            Outcome::Completed
+        );
+        let output = std::fs::read(stage.path().join("payload/media.ts")).unwrap();
+        assert_eq!(output, [first, second].concat());
+        assert!(output.chunks_exact(188).all(|packet| packet[0] == 0x47));
+        let digest = hex::encode(Sha256::digest(&output));
+        println!("native HLS MPEG-TS fixture SHA-256 {digest}");
+    }
+
+    #[tokio::test]
+    async fn hls_packed_id3_aac_is_not_mislabeled_mp3() {
+        let mut private = b"com.apple.streaming.transportStreamTimestamp\0".to_vec();
+        private.extend_from_slice(&0u64.to_be_bytes());
+        let mut tag = b"PRIV".to_vec();
+        tag.extend_from_slice(&[0, 0, 0, private.len() as u8, 0, 0]);
+        tag.extend_from_slice(&private);
+        let mut audio = b"ID3\x04\x00\x00".to_vec();
+        audio.extend_from_slice(&[0, 0, 0, tag.len() as u8]);
+        audio.extend_from_slice(&tag);
+        audio.extend_from_slice(&adts());
+        let fixture = http_fixture(HashMap::from([
+            (
+                "/packed.m3u8".into(),
+                reply(
+                    "application/vnd.apple.mpegurl",
+                    b"#EXTM3U\n#EXTINF:0.465,\naudio.aac\n#EXT-X-ENDLIST\n".to_vec(),
+                ),
+            ),
+            ("/audio.aac".into(), reply("audio/aac", audio.clone())),
+        ]))
+        .await;
+        let (stage, task, ctx) = environment(format!("{}/packed.m3u8", fixture.base));
+        assert_eq!(
+            download(task, ctx, stage.path()).await.unwrap(),
+            Outcome::Completed
+        );
+        assert_eq!(
+            std::fs::read(stage.path().join("payload/media.aac")).unwrap(),
+            audio
+        );
+    }
+
+    #[tokio::test]
+    async fn rtsp_handshake_and_mmsh_body_waits_cancel_promptly() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (stage, task, ctx) =
+            environment(format!("rtsp://{}/stall", listener.local_addr().unwrap()));
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            assert!(request_header(&mut socket).await.starts_with("DESCRIBE"));
+            std::future::pending::<()>().await;
+        });
+        let cancel = ctx.cancel.clone();
+        let started = std::time::Instant::now();
+        let result = tokio::join!(download(task, ctx, stage.path()), async {
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            cancel.cancel();
+        });
+        assert_eq!(result.0.unwrap(), Outcome::Cancelled);
+        assert!(started.elapsed() < Duration::from_millis(500));
+        server.abort();
+        let fixture = http_fixture(HashMap::from([(
+            "/stall".into(),
+            Reply {
+                status: "200 OK",
+                headers: "Content-Type: application/x-mms-framed\r\n".into(),
+                body: Vec::new(),
+                stall: true,
+            },
+        )]))
+        .await;
+        let (stage, task, ctx) = environment(fixture.base.replacen("http:", "mmsh:", 1) + "/stall");
+        let cancel = ctx.cancel.clone();
+        let started = std::time::Instant::now();
+        let result = tokio::join!(download(task, ctx, stage.path()), async {
+            tokio::time::sleep(Duration::from_millis(80)).await;
+            cancel.cancel();
+        });
+        assert_eq!(result.0.unwrap(), Outcome::Cancelled);
+        assert!(started.elapsed() < Duration::from_millis(500));
+        assert_eq!(
+            std::fs::read_dir(stage.path().join("payload"))
+                .unwrap()
+                .count(),
+            0
+        );
+    }
+
     async fn rtsp_fixture(lost: bool, end: bool) -> (String, Vec<u8>, tokio::task::JoinHandle<()>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("rtsp://{}/live/", listener.local_addr().unwrap());
@@ -1505,6 +1816,92 @@ mod tests {
             let _ = tokio::time::timeout(Duration::from_secs(5), socket.read(&mut buffer)).await;
         });
         (url, expected, handle)
+    }
+
+    #[tokio::test]
+    async fn rtsp_pcmu_and_pcma_rtp_decode_to_valid_pcm_wav() {
+        for (codec, payload_type, encoded, decoded) in [
+            (
+                "PCMU",
+                0u8,
+                [0xff, 0x7f, 0x00, 0x80, 0xfe, 0x7e, 0x55, 0xd5],
+                [0i16, 0, -32124, 32124, 8, -8, -716, 716],
+            ),
+            (
+                "PCMA",
+                8u8,
+                [0xd5, 0x55, 0xaa, 0x2a, 0x80, 0x00, 0xd4, 0x54],
+                [8i16, -8, 32256, -32256, 5504, -5504, 24, -24],
+            ),
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let url = format!("rtsp://{}/audio/", listener.local_addr().unwrap());
+            let base = url.clone();
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                for method in ["DESCRIBE", "SETUP", "PLAY"] {
+                    let request = request_header(&mut socket).await;
+                    assert!(request.starts_with(method));
+                    let cseq = request
+                        .lines()
+                        .find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("cseq: ")
+                                .map(str::to_owned)
+                        })
+                        .unwrap();
+                    let (extra,body)=match method {
+                        "DESCRIBE"=>(format!("Content-Type: application/sdp\r\nContent-Base: {base}\r\n"),format!("v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=G711 fixture\r\nt=0 0\r\na=control:*\r\nm=audio 0 RTP/AVP {payload_type}\r\na=rtpmap:{payload_type} {codec}/8000/1\r\na=control:track1\r\n")),
+                        "SETUP"=>("Session: audio;timeout=60\r\nTransport: RTP/AVP/TCP;unicast;interleaved=0-1;ssrc=12345678\r\n".into(),String::new()),
+                        _=>(format!("Session: audio\r\nRange: npt=0-\r\nRTP-Info: url={base}track1;seq=500;rtptime=0\r\n"),String::new()),
+                    };
+                    socket.write_all(format!("RTSP/1.0 200 OK\r\nCSeq: {cseq}\r\n{extra}Content-Length: {}\r\n\r\n{body}",body.len()).as_bytes()).await.unwrap();
+                }
+                for index in 0..2u16 {
+                    let mut packet = vec![0x80, payload_type];
+                    packet.extend_from_slice(&(500 + index).to_be_bytes());
+                    packet.extend_from_slice(&(index as u32 * 8).to_be_bytes());
+                    packet.extend_from_slice(&0x12345678u32.to_be_bytes());
+                    packet.extend_from_slice(&encoded);
+                    let mut frame = vec![b'$', 0];
+                    frame.extend_from_slice(&(packet.len() as u16).to_be_bytes());
+                    frame.extend_from_slice(&packet);
+                    socket.write_all(&frame).await.unwrap();
+                }
+                socket
+                    .write_all(&[b'$', 1, 0, 8, 0x81, 203, 0, 1, 0x12, 0x34, 0x56, 0x78])
+                    .await
+                    .unwrap();
+                let mut buffer = [0; 8];
+                let _ = socket.read(&mut buffer).await;
+            });
+            let (stage, task, ctx) = environment(url);
+            assert_eq!(
+                tokio::time::timeout(
+                    Duration::from_secs(5),
+                    download(task.clone(), ctx, stage.path())
+                )
+                .await
+                .unwrap()
+                .unwrap(),
+                Outcome::Completed
+            );
+            let output = std::fs::read(stage.path().join("payload/media.wav")).unwrap();
+            let mut expected = wav(16);
+            let samples: Vec<u8> = decoded
+                .repeat(2)
+                .into_iter()
+                .flat_map(i16::to_le_bytes)
+                .collect();
+            expected[44..].copy_from_slice(&samples);
+            assert_eq!(output, expected, "{codec}");
+            assert_eq!(task.lock().unwrap().total, Some(76));
+            println!(
+                "native RTSP {codec} WAV fixture SHA-256 {}",
+                hex::encode(Sha256::digest(&output))
+            );
+            server.await.unwrap();
+        }
     }
 
     #[tokio::test]
