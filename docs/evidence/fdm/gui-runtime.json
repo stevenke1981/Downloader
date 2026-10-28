@@ -1,0 +1,66 @@
+{
+    "binary_sha256":  "2903470E457F3C8DCC233EFB5F56EFD43FC1F19DCE8EA651686DF33CAE7DA22C",
+    "method":  "Native release GUI operated through Computer Use; isolated state and loopback HTTP/FTP fixtures",
+    "cases":  [
+                  {
+                      "id":  1,
+                      "url":  "http://127.0.0.1:60032/sample.bin",
+                      "output":  "sample.bin",
+                      "status":  "Completed",
+                      "sha256":  "7DACA2095D0438260FA849183DFC67FAA459FDF4936E1BC91EEC6B281B27E4C2",
+                      "hash_matches":  true,
+                      "log":  [
+                                  "Download started",
+                                  "HTTP probe started",
+                                  "HTTP transfer started (1 connection(s), ranges: false)",
+                                  "HTTP output published",
+                                  "Download completed"
+                              ]
+                  },
+                  {
+                      "id":  2,
+                      "url":  "http://127.0.0.1:60032/file%20%231%25.bin",
+                      "output":  "file #1%.bin",
+                      "status":  "Completed",
+                      "sha256":  "5C398B5262DAE9828F692F8290769193F9DAA2D5CADD45F12D70B4DFE68EB383",
+                      "hash_matches":  true,
+                      "log":  [
+                                  "Download started",
+                                  "HTTP probe started",
+                                  "HTTP transfer started (1 connection(s), ranges: false)",
+                                  "HTTP output published",
+                                  "Download completed"
+                              ]
+                  },
+                  {
+                      "id":  3,
+                      "url":  "ftp://127.0.0.1:60033/file%20%231%25.bin",
+                      "output":  "file #1% (1).bin",
+                      "status":  "Completed",
+                      "sha256":  "5C398B5262DAE9828F692F8290769193F9DAA2D5CADD45F12D70B4DFE68EB383",
+                      "hash_matches":  true,
+                      "log":  [
+                                  "Download started",
+                                  "aria2c protocol engine started",
+                                  "aria2c exited with exit code: 0",
+                                  "Published 1 output file(s)",
+                                  "Download completed"
+                              ]
+                  },
+                  {
+                      "id":  4,
+                      "url":  "ftp://127.0.0.1:60033/sample.bin",
+                      "output":  "sample (1).bin",
+                      "status":  "Completed",
+                      "sha256":  "7DACA2095D0438260FA849183DFC67FAA459FDF4936E1BC91EEC6B281B27E4C2",
+                      "hash_matches":  true,
+                      "log":  [
+                                  "Download started",
+                                  "aria2c protocol engine started",
+                                  "aria2c exited with exit code: 0",
+                                  "Published 1 output file(s)",
+                                  "Download completed"
+                              ]
+                  }
+              ]
+}

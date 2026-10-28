@@ -1,0 +1,169 @@
+{
+    "source_sha":  "76b31c1",
+    "platform":  "Windows x64",
+    "date":  "2026-10-28",
+    "workflow_job":  "757e52419ca54b53b2b224bb84be9981",
+    "verification_outcome":  "passed",
+    "verification_exit_code":  0,
+    "verification_check_id":  "7208ed7ca60ac5ea51645b83ea377d68734f6554bf52055ede17e51dda5791a8",
+    "verification_evidence_sha256":  "0509496058984283d3afe294381eb36c70db1e0fb5910d97ce16540c2c06bb7a",
+    "artifact_sha256":  {
+                            "dlx.exe":  "31A140E3CD8F8661402A8179B1F14398897A8B46E1D3E141A66914058826B49B",
+                            "downloader.exe":  "2903470E457F3C8DCC233EFB5F56EFD43FC1F19DCE8EA651686DF33CAE7DA22C",
+                            "downloader-host.exe":  "9A0B0ADEB74AFFB5A610320C56F72AD41F2CC5F1B566702E6D2002B7DF22BEE6",
+                            "downloader-setup-windows-x64.exe":  "50C4A8B520F294B638CCCCEB1B06F7421014E58E6102C7D12236192DFBD7904B",
+                            "dlxctl.exe":  "6BA5C9AE2B2C54AF6F51421EEF1366D138929BD66CB20B93BEB36F757A2F47AA"
+                        },
+    "runtime_cases":  [
+                          {
+                              "name":  "native-http",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  0.352,
+                              "matching_outputs":  [
+                                                       "native-http\\payload.bin"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "ftp",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  0.279,
+                              "matching_outputs":  [
+                                                       "ftp\\payload.bin"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "metalink-mirror",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  0.278,
+                              "matching_outputs":  [
+                                                       "metalink-mirror\\payload.bin"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "metalink-http-descriptor",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  0.279,
+                              "matching_outputs":  [
+                                                       "metalink-http-descriptor\\payload.bin"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "torrent-webseed",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  2.129,
+                              "matching_outputs":  [
+                                                       "torrent-webseed\\payload.bin"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "torrent-http-descriptor",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  2.118,
+                              "matching_outputs":  [
+                                                       "torrent-http-descriptor\\payload.bin"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "magnet-local-peer",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  6.858,
+                              "matching_outputs":  [
+                                                       "magnet-local-peer\\payload.bin"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "authenticated-ftp-list",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  null,
+                              "matching_outputs":  null,
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "authenticated-ftp-via-remote-manager",
+                              "status":  "PASS",
+                              "exit_code":  null,
+                              "elapsed_seconds":  null,
+                              "matching_outputs":  null,
+                              "download_status":  "Completed",
+                              "unauthenticated_request_rejected":  true,
+                              "password_excluded_from_persistence":  true,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "video",
+                              "status":  "PASS",
+                              "exit_code":  0,
+                              "elapsed_seconds":  1.852,
+                              "matching_outputs":  [
+                                                       "video\\sample [sample].mp4"
+                                                   ],
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  null
+                          },
+                          {
+                              "name":  "rtsp-live",
+                              "status":  "NOT_RUN",
+                              "exit_code":  null,
+                              "elapsed_seconds":  null,
+                              "matching_outputs":  null,
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  "No live RTSP source fixture"
+                          },
+                          {
+                              "name":  "mms-live",
+                              "status":  "NOT_RUN",
+                              "exit_code":  null,
+                              "elapsed_seconds":  null,
+                              "matching_outputs":  null,
+                              "download_status":  null,
+                              "unauthenticated_request_rejected":  null,
+                              "password_excluded_from_persistence":  null,
+                              "reason":  "No live legacy MMS source fixture"
+                          }
+                      ],
+    "rtsp_test_scope":  "Two explicit real FFmpeg RTSP/RTP finite-capture and cancellation tests passed separately; runtime_cases rtsp-live NOT_RUN refers to public/live source",
+    "installer_build":  "PASS; installation NOT_RUN"
+}
