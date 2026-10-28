@@ -11,6 +11,7 @@ rfd = { version = "0.17.2", default-features = false, features = ["gtk3"] }
 arboard = { version = "3", default-features = false }
 sys-locale = "0.3"
 dirs = "6"
+url = "2"
 
 # Windows: the software renderer's partial (damage-region) presentation via softbuffer
 # leaves parts of the window unpainted/transparent on some systems, so use Skia there.

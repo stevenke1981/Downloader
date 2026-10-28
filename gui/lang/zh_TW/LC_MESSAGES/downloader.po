@@ -716,3 +716,6 @@ msgstr "已複製存取權杖。"
 
 msgid "Clipboard is unavailable."
 msgstr "無法使用剪貼簿。"
+
+msgid "Connections (0 = automatic / site default)"
+msgstr "連線數（0 = 自動／網站預設）"

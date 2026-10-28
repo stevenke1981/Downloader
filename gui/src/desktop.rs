@@ -20,6 +20,10 @@ impl Drop for Controller {
     }
 }
 
+fn connection_override(value: i32) -> Option<u32> {
+    (value > 0).then_some(value.clamp(1, 32) as u32)
+}
+
 pub fn bind(
     ui: &AppWindow,
     compact: &CompactWindow,
@@ -96,7 +100,7 @@ pub fn bind(
             let folder = ui.get_add_folder().trim().to_owned();
             let template = NewDownload {
                 dir: (!folder.is_empty()).then(|| PathBuf::from(folder)),
-                connections: Some(ui.get_add_conns().clamp(1, 32) as u32),
+                connections: connection_override(ui.get_add_conns()),
                 kind: if ui.get_add_kind() == 1 {
                     DownloadKind::Video
                 } else {
@@ -129,7 +133,7 @@ pub fn bind(
         });
     }
     for window in [ui.window(), compact.window()] {
-        let (weak, compact, app) = (ui.as_weak(), compact.as_weak(), app.clone());
+        let (weak, compact) = (ui.as_weak(), compact.as_weak());
         window.on_winit_window_event(move |_, event| {
             if let winit::event::WindowEvent::DroppedFile(path) = event {
                 if let (Some(ui), Some(compact)) = (weak.upgrade(), compact.upgrade()) {
@@ -138,7 +142,7 @@ pub fn bind(
                         return EventResult::PreventDefault;
                     }
                     if !ui.get_add_open() {
-                        open_add(&ui, &app.borrow(), "");
+                        open_add(&ui, "");
                     }
                     let mut input = ui.get_add_url().to_string();
                     if !input.is_empty() {
@@ -233,4 +237,75 @@ pub fn bind(
         },
     );
     Ok(Controller { logs, timer })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dlcore::{Manager, site::SiteRule};
+
+    #[test]
+    fn add_form_automatic_uses_each_site_default_and_preserves_override() {
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = AppWindow::new().unwrap();
+        ui.set_add_conns(8);
+        open_add(&ui, "");
+        assert_eq!(ui.get_add_conns(), 0);
+        let state = tempfile::tempdir().unwrap();
+        let manager = Manager::new(state.path());
+        let mut settings = manager.settings();
+        settings.max_connections = 8;
+        settings.site_rules.push(SiteRule {
+            host: "https://site.example".into(),
+            connections: 2,
+            ..Default::default()
+        });
+        manager.set_settings(settings).unwrap();
+        let ids = batch::enqueue(
+            &manager,
+            "https://site.example/a.bin\nhttps://global.example/b.bin",
+            NewDownload {
+                connections: connection_override(ui.get_add_conns()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let snapshots = manager.snapshots();
+        assert_eq!(
+            snapshots
+                .iter()
+                .find(|s| s.id == ids[0])
+                .unwrap()
+                .connections,
+            2
+        );
+        assert_eq!(
+            snapshots
+                .iter()
+                .find(|s| s.id == ids[1])
+                .unwrap()
+                .connections,
+            8
+        );
+        ui.set_add_conns(5);
+        let ids = batch::enqueue(
+            &manager,
+            "https://site.example/c.bin",
+            NewDownload {
+                connections: connection_override(ui.get_add_conns()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            manager
+                .snapshots()
+                .iter()
+                .find(|s| s.id == ids[0])
+                .unwrap()
+                .connections,
+            5
+        );
+        manager.shutdown();
+    }
 }

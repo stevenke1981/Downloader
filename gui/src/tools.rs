@@ -40,6 +40,42 @@ fn mode(index: i32) -> TrafficMode {
     }
 }
 
+fn ftp_directory(directory: &str) -> Result<url::Url, String> {
+    let mut base = url::Url::parse(directory.trim()).map_err(|error| error.to_string())?;
+    if base.scheme() != "ftp"
+        || base.host_str().is_none()
+        || !base.username().is_empty()
+        || base.password().is_some()
+    {
+        return Err("FTP directory must be an ftp:// URL without embedded credentials".into());
+    }
+    base.set_query(None);
+    base.set_fragment(None);
+    if !base.path().ends_with('/') {
+        base.path_segments_mut()
+            .map_err(|()| "FTP URL has no directory path")?
+            .push("");
+    }
+    Ok(base)
+}
+
+/// NLST returns raw names, so append them as path segments rather than treating
+/// their punctuation as URL syntax or replacing the FTP directory's last part.
+fn ftp_sources(directory: &url::Url, names: Vec<String>) -> Vec<String> {
+    names
+        .into_iter()
+        .map(|name| {
+            let mut source = directory.clone();
+            source
+                .path_segments_mut()
+                .expect("validated FTP directory has path segments")
+                .pop_if_empty()
+                .push(&name);
+            source.into()
+        })
+        .collect()
+}
+
 fn populate(ui: &ToolsWindow, context: &Context) {
     let settings = context.manager.settings();
     ui.set_traffic(match settings.traffic_mode {
@@ -386,17 +422,20 @@ pub fn bind(main: &AppWindow, app: &Rc<RefCell<App>>) -> Result<Controller, slin
         ui.set_message(ui.global::<ToolTr>().invoke_working());
         let (weak, manager) = (ui.as_weak(), context.manager.clone());
         std::thread::spawn(move || {
-            let result = if username.is_empty() && password.is_empty() {
-                Ok(())
-            } else {
-                dlcore::site::url_origin(&url)
-                    .ok_or_else(|| "Enter a valid FTP URL.".to_owned())
-                    .and_then(|origin| manager.set_site_credentials(&origin, &username, &password))
-            }
-            .and_then(|()| {
-                manager
-                    .runtime()
-                    .block_on(dlcore::external::list_ftp(&url, &username, &password))
+            let result = ftp_directory(&url).and_then(|directory| {
+                if !username.is_empty() || !password.is_empty() {
+                    manager.set_site_credentials(
+                        &directory.origin().ascii_serialization(),
+                        &username,
+                        &password,
+                    )?;
+                }
+                let names = manager.runtime().block_on(dlcore::external::list_ftp(
+                    directory.as_str(),
+                    &username,
+                    &password,
+                ))?;
+                Ok(ftp_sources(&directory, names))
             });
             let _ = weak.upgrade_in_event_loop(move |ui| {
                 ui.set_busy(false);
@@ -572,6 +611,52 @@ pub fn bind(main: &AppWindow, app: &Rc<RefCell<App>>) -> Result<Controller, slin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ftp_listing_names_become_encoded_downloadable_sources() {
+        let directory = ftp_directory(" ftp://example.org/releases ").unwrap();
+        assert_eq!(directory.as_str(), "ftp://example.org/releases/");
+        let sources = ftp_sources(
+            &directory,
+            vec![
+                "payload.bin".into(),
+                "space #?%.bin".into(),
+                "中文.bin".into(),
+                "ftp://other.invalid/filename".into(),
+            ],
+        );
+        assert_eq!(sources[0], "ftp://example.org/releases/payload.bin");
+        assert_eq!(
+            sources[1],
+            "ftp://example.org/releases/space%20%23%3F%25.bin"
+        );
+        assert_eq!(
+            sources[2],
+            "ftp://example.org/releases/%E4%B8%AD%E6%96%87.bin"
+        );
+        assert!(sources[3].starts_with("ftp://example.org/releases/ftp:"));
+        assert_eq!(
+            ftp_sources(
+                &ftp_directory("ftp://example.org/releases/").unwrap(),
+                vec!["payload.bin".into()]
+            )[0],
+            sources[0]
+        );
+        assert!(ftp_directory("ftp://user:secret@example.org/releases").is_err());
+        let state = tempfile::tempdir().unwrap();
+        let manager = Manager::new(state.path());
+        let ids = batch::enqueue(&manager, &sources.join("\n"), NewDownload::default()).unwrap();
+        assert_eq!(ids.len(), sources.len());
+        assert_eq!(
+            manager
+                .snapshots()
+                .iter()
+                .map(|s| &s.url)
+                .collect::<Vec<_>>(),
+            sources.iter().collect::<Vec<_>>()
+        );
+        manager.shutdown();
+    }
 
     #[test]
     fn traffic_indices_keep_custom_and_three_presets_distinct() {

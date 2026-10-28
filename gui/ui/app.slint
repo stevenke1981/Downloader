@@ -325,7 +325,7 @@ export component AppWindow inherits Window {
     in-out property <int> add-kind;
     in-out property <string> add-url;
     in-out property <string> add-folder;
-    in-out property <int> add-conns: 8;
+    in-out property <int> add-conns: 0;
     in-out property <string> add-checksum;
     in-out property <bool> add-start: true;
     in-out property <string> add-error;
@@ -725,7 +725,7 @@ export component AppWindow inherits Window {
             LineEdit { text <=> root.add-folder; placeholder-text: @tr("Default folder for the file type"); horizontal-stretch: 1; }
             Button { text: @tr("Browse…"); clicked => { root.add-folder = root.browse(0); } }
         }
-        Field { label: @tr("Connections"); SpinBox { value <=> root.add-conns; minimum: 1; maximum: 32; } Rectangle { horizontal-stretch: 1; } }
+        Field { label: @tr("Connections (0 = automatic / site default)"); SpinBox { value <=> root.add-conns; minimum: 0; maximum: 32; } Rectangle { horizontal-stretch: 1; } }
         Field { label: @tr("Checksum (MD5 / SHA-1 / SHA-256 / SHA-512, optional)"); LineEdit { text <=> root.add-checksum; horizontal-stretch: 1; } }
         CheckBox { text: @tr("Start immediately"); checked <=> root.add-start; }
         if root.add-error != "": Text { text: root.add-error; color: #d32f2f; wrap: word-wrap; }

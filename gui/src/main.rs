@@ -487,10 +487,10 @@ fn set_languages_model(ui: &AppWindow) {
     ui.set_languages(ModelRc::new(VecModel::from(v)));
 }
 
-fn open_add(ui: &AppWindow, app: &App, url: &str) {
+fn open_add(ui: &AppWindow, url: &str) {
     ui.set_add_url(url.into());
     ui.set_add_folder("".into());
-    ui.set_add_conns(app.mgr().settings().max_connections as i32);
+    ui.set_add_conns(0);
     ui.set_add_checksum("".into());
     ui.set_add_start(true);
     ui.set_add_kind(0);
@@ -725,7 +725,7 @@ fn main() -> Result<(), slint::PlatformError> {
                                 && !snaps.iter().any(|s| s.url == line)
                         });
                         if fresh {
-                            open_add(&ui, &a, text.trim());
+                            open_add(&ui, text.trim());
                         }
                     }
                 }
@@ -758,9 +758,14 @@ fn main() -> Result<(), slint::PlatformError> {
         }};
     }
 
-    on!(ui, app, on_add_clicked, || {
-        open_add(&ui, &app, "");
-    });
+    {
+        let weak = ui.as_weak();
+        ui.on_add_clicked(move || {
+            if let Some(ui) = weak.upgrade() {
+                open_add(&ui, "");
+            }
+        });
+    }
     on!(ui, app, on_start_clicked, || {
         if let Some(id) = app.selected {
             app.mgr().start(id);
