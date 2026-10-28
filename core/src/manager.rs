@@ -1,10 +1,12 @@
 //! Download queue: concurrency limit, priorities, scheduler, persistence.
+use crate::automation::Action;
 use crate::category::Category;
 use crate::checksum::Checksum;
 use crate::engine::{self, Ctx, Outcome};
 use crate::limiter::RateLimiter;
 use crate::settings::Settings;
-use crate::task::{Status, Task};
+use crate::task::{DownloadKind, Status, Task};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -40,10 +42,12 @@ struct Inner {
     /// Set when downloads.json existed but could not be read: saves go to downloads.json.recovered so the
     /// user's list is never replaced with this session's.
     save_disabled: AtomicBool,
+    credentials: Mutex<HashMap<String, String>>,
+    automation_log: Mutex<Vec<String>>,
 }
 
 /// A point-in-time view of one download for the UI.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Snapshot {
     pub id: u64,
     pub url: String,
@@ -66,11 +70,14 @@ pub struct Snapshot {
     pub verification: Option<crate::task::Verification>,
     /// 0..1 while hashing.
     pub verify_progress: f32,
+    pub kind: DownloadKind,
+    pub log: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct NewDownload {
     pub url: String,
+    pub kind: DownloadKind,
     /// None = folder from settings (per category).
     pub dir: Option<PathBuf>,
     /// None = from settings.
@@ -89,15 +96,38 @@ pub struct NewDownload {
     pub cookie: Option<String>,
 }
 
+struct RuntimeOwner(Option<tokio::runtime::Runtime>);
+
+impl std::ops::Deref for RuntimeOwner {
+    type Target = tokio::runtime::Runtime;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().expect("manager runtime")
+    }
+}
+
+impl Drop for RuntimeOwner {
+    fn drop(&mut self) {
+        // A remote-control clone can be the last owner to leave an async task.
+        if let Some(runtime) = self.0.take() {
+            runtime.shutdown_background();
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Manager {
     inner: Arc<Inner>,
-    rt: tokio::runtime::Runtime,
+    rt: Arc<RuntimeOwner>,
 }
 
 impl Manager {
     /// `dir` holds settings.json and downloads.json.
     pub fn new(dir: &Path) -> Manager {
-        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(4).build().expect("tokio runtime");
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .worker_threads(4)
+            .build()
+            .expect("tokio runtime");
         let (settings, _) = load_json::<Settings>(&dir.join("settings.json"));
         let (mut tasks, tasks_readable) = load_json::<Vec<Task>>(&dir.join("downloads.json"));
         for t in &mut tasks {
@@ -106,8 +136,11 @@ impl Manager {
             }
         }
         let next = tasks.iter().map(|t| t.id).max().unwrap_or(0) + 1;
-        let client = settings.build_client().or_else(|_| Settings::default().build_client()).expect("http client");
-        let global = Arc::new(RateLimiter::new(settings.global_limit));
+        let client = settings
+            .build_client()
+            .or_else(|_| Settings::default().build_client())
+            .expect("http client");
+        let global = Arc::new(RateLimiter::new(settings.effective_global_limit()));
         let entries = tasks
             .into_iter()
             .map(|t| Entry {
@@ -130,6 +163,8 @@ impl Manager {
             rt: rt.handle().clone(),
             last_saved: Mutex::new(Vec::new()),
             save_disabled: AtomicBool::new(!tasks_readable),
+            credentials: Mutex::new(HashMap::new()),
+            automation_log: Mutex::new(Vec::new()),
         });
         let tick = inner.clone();
         rt.spawn(async move {
@@ -147,54 +182,110 @@ impl Manager {
                 }
             }
         });
-        Manager { inner, rt }
+        Manager {
+            inner,
+            rt: Arc::new(RuntimeOwner(Some(rt))),
+        }
     }
 
     pub fn settings(&self) -> Settings {
         self.inner.settings.lock().unwrap().clone()
     }
 
-    pub fn set_settings(&self, s: Settings) -> Result<(), String> {
+    pub fn set_settings(&self, mut s: Settings) -> Result<(), String> {
+        s.validate()?;
+        for rule in &mut s.site_rules {
+            rule.host = crate::site::origin(&rule.host)?;
+        }
         let client = s.build_client()?;
-        let _ = std::fs::create_dir_all(&self.inner.dir);
-        let json = serde_json::to_vec_pretty(&s).unwrap();
+        std::fs::create_dir_all(&self.inner.dir).map_err(|e| e.to_string())?;
         {
             // Serialize settings changes with dispatch. A timer tick must not
             // start queued jobs using a limit captured before this update.
             let _dispatch = self.inner.entries.lock().unwrap();
+            let mut current = self.inner.settings.lock().unwrap();
+            // Applying an old open settings form must not re-arm a consumed one-shot.
+            for action in &mut s.scheduled_actions {
+                if current
+                    .scheduled_actions
+                    .iter()
+                    .any(|old| old.id == action.id && old.consumed)
+                {
+                    action.consumed = true;
+                }
+            }
+            let json = serde_json::to_vec_pretty(&s).map_err(|e| e.to_string())?;
+            write_atomic(&self.inner.dir.join("settings.json"), &json)
+                .map_err(|e| e.to_string())?;
             *self.inner.client.lock().unwrap() = client;
-            self.inner.global.set_rate(s.global_limit);
-            *self.inner.settings.lock().unwrap() = s;
+            self.inner.global.set_rate(s.effective_global_limit());
+            *current = s;
         }
-        write_atomic(&self.inner.dir.join("settings.json"), &json).map_err(|e| e.to_string())
+        self.inner.dispatch();
+        Ok(())
     }
 
     pub fn add(&self, d: NewDownload) -> u64 {
+        self.try_add(d).unwrap_or_else(|error| {
+            eprintln!("download was not added: {error}");
+            0
+        })
+    }
+
+    pub fn try_add(&self, d: NewDownload) -> Result<u64, String> {
+        crate::util::validate_source(d.url.trim())?;
+        if d.connections
+            .is_some_and(|count| !(1..=32).contains(&count))
+        {
+            return Err("connections must be 1–32".into());
+        }
         let s = self.settings();
         let id = self.inner.next_id.fetch_add(1, Ordering::Relaxed);
-        let name = d.file_name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| crate::util::name_from_url(&d.url));
+        let name = d
+            .file_name
+            .clone()
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or_else(|| crate::util::name_from_url(&d.url));
         let cat = Category::from_name(&name);
         let limit = d.speed_limit.unwrap_or(s.per_download_limit);
         let cookie = match d.cookie.filter(|c| !c.trim().is_empty()) {
             Some(c) if usable_cookie(&c) => Some(c),
             Some(_) => {
                 // Never print the value: it is a session secret.
-                eprintln!("a cookie was dropped: it is not a valid HTTP header value or is longer than 8 KiB");
+                eprintln!(
+                    "a cookie was dropped: it is not a valid HTTP header value or is longer than 8 KiB"
+                );
                 None
             }
             None => None,
         };
         let had_cookie = cookie.is_some();
+        let origin = crate::site::url_origin(d.url.trim());
+        let rule = origin
+            .as_ref()
+            .and_then(|origin| s.site_rules.iter().find(|r| &r.host == origin));
+        let authorization = origin
+            .as_ref()
+            .and_then(|origin| self.inner.credentials.lock().unwrap().get(origin).cloned());
         let t = Task {
             id,
             url: d.url.trim().to_string(),
-            dir: d.dir.unwrap_or_else(|| s.folder_for(cat)),
-            connections: d.connections.unwrap_or(s.max_connections).clamp(1, 32),
+            kind: d.kind,
+            dir: d.dir.unwrap_or_else(|| s.folder_for_name(&name, cat)),
+            connections: d
+                .connections
+                .unwrap_or_else(|| rule.map_or(s.max_connections, |r| r.connections))
+                .clamp(1, 32),
+            authorization,
             speed_limit: limit,
             checksum: d.checksum,
             priority: d.priority,
             category: cat,
-            status: if d.start { Status::Queued } else { Status::Paused },
+            status: if d.start {
+                Status::Queued
+            } else {
+                Status::Paused
+            },
             added: chrono::Utc::now().timestamp(),
             referer: d.referer.filter(|r| r.starts_with("http")),
             suggested_name: d.file_name,
@@ -214,7 +305,88 @@ impl Manager {
         });
         self.save_async();
         self.inner.dispatch();
-        id
+        Ok(id)
+    }
+
+    pub fn set_traffic_mode(&self, mode: crate::settings::TrafficMode) -> Result<(), String> {
+        let mut settings = self.settings();
+        settings.traffic_mode = mode;
+        self.set_settings(settings)
+    }
+
+    pub fn global_limit(&self) -> u64 {
+        self.inner.global.rate()
+    }
+
+    /// Bare host names mean HTTPS; use a complete origin for HTTP or non-default ports.
+    pub fn set_site_credentials(
+        &self,
+        host: &str,
+        username: &str,
+        password: &str,
+    ) -> Result<(), String> {
+        use base64::Engine;
+        let origin = crate::site::origin(host)?;
+        if username.contains(':')
+            || username
+                .chars()
+                .chain(password.chars())
+                .any(char::is_control)
+        {
+            return Err("invalid Basic-auth username or password".into());
+        }
+        let authorization = if username.is_empty() && password.is_empty() {
+            None
+        } else {
+            Some(format!(
+                "Basic {}",
+                base64::engine::general_purpose::STANDARD.encode(format!("{username}:{password}"))
+            ))
+        };
+        {
+            let mut credentials = self.inner.credentials.lock().unwrap();
+            if let Some(value) = &authorization {
+                credentials.insert(origin.clone(), value.clone());
+            } else {
+                credentials.remove(&origin);
+            }
+        }
+        for entry in self.inner.entries.lock().unwrap().iter_mut() {
+            let mut task = entry.task.lock().unwrap();
+            if crate::site::url_origin(&task.url).as_ref() == Some(&origin) {
+                task.authorization = authorization.clone();
+            }
+        }
+        if !username.is_empty() {
+            let mut settings = self.settings();
+            if let Some(rule) = settings
+                .site_rules
+                .iter_mut()
+                .find(|rule| rule.host == origin)
+            {
+                rule.username = username.into();
+            } else {
+                settings.site_rules.push(crate::site::SiteRule {
+                    host: origin,
+                    username: username.into(),
+                    ..Default::default()
+                });
+            }
+            self.set_settings(settings)?;
+        }
+        Ok(())
+    }
+
+    pub fn automation_log(&self) -> Vec<String> {
+        self.inner.automation_log.lock().unwrap().clone()
+    }
+
+    pub fn client(&self) -> reqwest::Client {
+        self.inner.client.lock().unwrap().clone()
+    }
+
+    pub fn crawl_client(&self) -> Result<crate::grabber::CrawlClient, String> {
+        self.settings().build_crawl_client()
     }
 
     /// Persist on the runtime, not the caller's thread: saving fsyncs, which can stall the GUI on a slow disk.
@@ -226,7 +398,9 @@ impl Manager {
 
     fn with<R>(&self, id: u64, f: impl FnOnce(&mut Entry) -> R) -> Option<R> {
         let mut es = self.inner.entries.lock().unwrap();
-        es.iter_mut().find(|e| e.task.lock().unwrap().id == id).map(f)
+        es.iter_mut()
+            .find(|e| e.task.lock().unwrap().id == id)
+            .map(f)
     }
 
     /// Queue a paused/failed download (it starts when a slot is free).
@@ -237,6 +411,7 @@ impl Manager {
                 t.status = Status::Queued;
                 t.error = None;
                 t.verify_retried = false;
+                t.append_log("Queued by user");
             }
         });
         self.inner.dispatch();
@@ -247,6 +422,7 @@ impl Manager {
             let mut t = e.task.lock().unwrap();
             if matches!(t.status, Status::Queued | Status::Downloading) {
                 t.status = Status::Paused;
+                t.append_log("Paused by user");
                 if let Some(c) = &e.cancel {
                     c.cancel();
                 }
@@ -268,7 +444,9 @@ impl Manager {
     pub fn remove(&self, id: u64, delete_file: bool) {
         let entry = {
             let mut es = self.inner.entries.lock().unwrap();
-            let Some(i) = es.iter().position(|e| e.task.lock().unwrap().id == id) else { return };
+            let Some(i) = es.iter().position(|e| e.task.lock().unwrap().id == id) else {
+                return;
+            };
             es.remove(i)
         };
         if let Some(c) = &entry.cancel {
@@ -319,7 +497,11 @@ impl Manager {
                     id: t.id,
                     url: t.url.clone(),
                     name: t.display_name(),
-                    path: if t.file_name.is_empty() { t.dir.clone() } else { t.final_path() },
+                    path: if t.file_name.is_empty() {
+                        t.dir.clone()
+                    } else {
+                        t.final_path()
+                    },
                     total: t.total,
                     downloaded,
                     speed,
@@ -329,12 +511,23 @@ impl Manager {
                     error: t.error.clone(),
                     segments: t.segments.iter().map(|s| (s.start, s.pos, s.end)).collect(),
                     connections: t.connections,
-                    active_connections: if running { t.segments.iter().filter(|s| s.busy).count() as u32 } else { 0 },
+                    active_connections: if running {
+                        t.segments.iter().filter(|s| s.busy).count() as u32
+                    } else {
+                        0
+                    },
                     speed_limit: t.speed_limit,
                     priority: t.priority,
                     resumable: t.resumable,
                     verification: t.verification.clone(),
-                    verify_progress: match t.total { Some(n) if n > 0 => (t.verify_done.load(Ordering::Relaxed) as f64 / n as f64).min(1.0) as f32, _ => 0.0 },
+                    verify_progress: match t.total {
+                        Some(n) if n > 0 => (t.verify_done.load(Ordering::Relaxed) as f64
+                            / n as f64)
+                            .min(1.0) as f32,
+                        _ => 0.0,
+                    },
+                    kind: t.kind,
+                    log: t.log.clone(),
                 }
             })
             .collect()
@@ -359,19 +552,115 @@ impl Manager {
                 }
             }
         }
-        let handles: Vec<_> = self.inner.entries.lock().unwrap().iter_mut().filter_map(|e| e.handle.take()).collect();
+        let handles: Vec<_> = self
+            .inner
+            .entries
+            .lock()
+            .unwrap()
+            .iter_mut()
+            .filter_map(|e| e.handle.take())
+            .collect();
         self.rt.block_on(async {
             for h in handles {
                 let _ = tokio::time::timeout(Duration::from_secs(3), h).await;
             }
         });
         // Tasks that were cancelled by shutdown should resume next launch.
-        self.inner.save_with(|t| if t.status == Status::Downloading { t.status = Status::Queued });
-        self.rt.shutdown_timeout(Duration::from_secs(1));
+        self.inner.save_with(|t| {
+            if t.status == Status::Downloading {
+                t.status = Status::Queued
+            }
+        });
+        if let Ok(mut owner) = Arc::try_unwrap(self.rt)
+            && let Some(runtime) = owner.0.take()
+        {
+            runtime.shutdown_timeout(Duration::from_secs(1));
+        }
     }
 }
 
 impl Inner {
+    fn log_automation(&self, message: String) {
+        let mut log = self.automation_log.lock().unwrap();
+        if log.last() == Some(&message) {
+            return;
+        }
+        log.push(message);
+        if log.len() > 100 {
+            log.remove(0);
+        }
+    }
+
+    fn run_due_actions(self: &Arc<Self>) {
+        let due = {
+            let mut settings = self.settings.lock().unwrap();
+            let now = chrono::Utc::now().timestamp();
+            let mut updated = settings.clone();
+            let due: Vec<_> = updated
+                .scheduled_actions
+                .iter_mut()
+                .filter(|action| !action.consumed && action.at <= now)
+                .map(|action| {
+                    action.consumed = true;
+                    (action.id, action.action.clone())
+                })
+                .collect();
+            if due.is_empty() {
+                return;
+            }
+            let saved = serde_json::to_vec_pretty(&updated)
+                .map_err(|e| e.to_string())
+                .and_then(|json| {
+                    write_atomic(&self.dir.join("settings.json"), &json).map_err(|e| e.to_string())
+                });
+            if let Err(error) = saved {
+                self.log_automation(format!(
+                    "Actions not executed: consumption could not be saved ({error})"
+                ));
+                return;
+            }
+            *settings = updated;
+            due
+        };
+        for (id, action) in due {
+            match action {
+                Action::StartAll | Action::PauseAll => {
+                    let start = action == Action::StartAll;
+                    for entry in self.entries.lock().unwrap().iter_mut() {
+                        let mut task = entry.task.lock().unwrap();
+                        if start && matches!(task.status, Status::Paused | Status::Error) {
+                            task.status = Status::Queued;
+                            task.error = None;
+                            task.verify_retried = false;
+                            task.append_log("Queued by scheduled action");
+                        } else if !start
+                            && matches!(task.status, Status::Queued | Status::Downloading)
+                        {
+                            task.status = Status::Paused;
+                            task.append_log("Paused by scheduled action");
+                            if let Some(cancel) = &entry.cancel {
+                                cancel.cancel();
+                            }
+                        }
+                    }
+                    self.save();
+                    self.log_automation(format!("Action {id}: completed"));
+                }
+                _ => {
+                    self.log_automation(format!("Action {id}: started"));
+                    let me = self.clone();
+                    self.rt.spawn_blocking(move || {
+                        let result = crate::automation::run(action);
+                        me.log_automation(match result {
+                            Ok(()) => format!("Action {id}: completed"),
+                            Err(error) => format!("Action {id}: {error}"),
+                        });
+                    });
+                }
+            }
+        }
+    }
+
     fn save(&self) {
         self.save_with(|_| {});
     }
@@ -396,7 +685,11 @@ impl Inner {
             let _ = std::fs::create_dir_all(&self.dir);
             // downloads.json couldn't be read at startup: never overwrite it, but keep this session's list
             // in a side file so it can be recovered by hand.
-            let name = if self.save_disabled.load(Ordering::Relaxed) { "downloads.json.recovered" } else { "downloads.json" };
+            let name = if self.save_disabled.load(Ordering::Relaxed) {
+                "downloads.json.recovered"
+            } else {
+                "downloads.json"
+            };
             if write_atomic(&self.dir.join(name), &json).is_ok() {
                 *last = json;
             }
@@ -405,12 +698,17 @@ impl Inner {
 
     /// Timer loop only: update speeds from the bytes moved over the real elapsed `dt`, then dispatch.
     fn tick(self: &Arc<Self>, dt: f64) {
+        self.run_due_actions();
         {
             let mut es = self.entries.lock().unwrap();
             for e in es.iter_mut() {
                 let b = e.task.lock().unwrap().downloaded();
                 let inst = b.saturating_sub(e.last_bytes) as f64 / dt;
-                e.speed = if e.speed == 0.0 { inst } else { e.speed * 0.6 + inst * 0.4 };
+                e.speed = if e.speed == 0.0 {
+                    inst
+                } else {
+                    e.speed * 0.6 + inst * 0.4
+                };
                 e.last_bytes = b;
             }
         }
@@ -457,12 +755,39 @@ impl Inner {
             .collect();
         queued.sort();
         let client = self.client.lock().unwrap().clone();
-        for (_, _, i) in queued.into_iter().take(slots) {
+        let mut per_site: HashMap<String, u32> = HashMap::new();
+        for entry in es.iter().filter(|entry| entry.running()) {
+            if let Some(origin) = crate::site::url_origin(&entry.task.lock().unwrap().url) {
+                *per_site.entry(origin).or_default() += 1;
+            }
+        }
+        let mut started = 0;
+        for (_, _, i) in queued {
+            if started == slots {
+                break;
+            }
+            let origin = crate::site::url_origin(&es[i].task.lock().unwrap().url);
+            if let Some(origin) = &origin
+                && settings
+                    .site_rules
+                    .iter()
+                    .find(|rule| &rule.host == origin)
+                    .is_some_and(|rule| {
+                        per_site.get(origin).copied().unwrap_or(0) >= rule.max_concurrent
+                    })
+            {
+                continue;
+            }
+            if let Some(origin) = origin {
+                *per_site.entry(origin).or_default() += 1;
+            }
+            started += 1;
             let e = &mut es[i];
             let cancel = CancellationToken::new();
             let (downloaded, speed_limit) = {
                 let mut t = e.task.lock().unwrap();
                 t.status = Status::Downloading;
+                t.append_log("Download started");
                 (t.downloaded(), t.speed_limit)
             };
             e.limiter.set_rate(speed_limit);
@@ -488,15 +813,18 @@ impl Inner {
                         Ok(Outcome::Completed) => {
                             t.status = Status::Completed;
                             t.error = None;
+                            t.append_log("Download completed");
                         }
                         Ok(Outcome::Cancelled) => {
                             if t.status == Status::Downloading {
                                 t.status = Status::Paused;
+                                t.append_log("Download paused");
                             }
                         }
                         Err(err) => {
                             t.status = Status::Error;
                             t.error = Some(err);
+                            t.append_log("Download failed; see error status");
                         }
                     }
                 }
@@ -519,7 +847,11 @@ fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {
 
 /// Read a state file. `Ok(None)` when it doesn't exist. Other errors (a sharing violation or an antivirus lock on
 /// Windows is usually brief) are retried `retries` times, `pause` apart, before the error is returned.
-fn read_retrying(mut read: impl FnMut() -> std::io::Result<Vec<u8>>, retries: u32, pause: Duration) -> std::io::Result<Option<Vec<u8>>> {
+fn read_retrying(
+    mut read: impl FnMut() -> std::io::Result<Vec<u8>>,
+    retries: u32,
+    pause: Duration,
+) -> std::io::Result<Option<Vec<u8>>> {
     let mut left = retries;
     loop {
         match read() {
@@ -543,7 +875,10 @@ fn load_json<T: serde::de::DeserializeOwned + Default>(path: &Path) -> (T, bool)
         Ok(Some(bytes)) => bytes,
         Ok(None) => return (T::default(), true),
         Err(e) => {
-            eprintln!("{} cannot be read ({e}); starting empty and not overwriting it this session", path.display());
+            eprintln!(
+                "{} cannot be read ({e}); starting empty and not overwriting it this session",
+                path.display()
+            );
             return (T::default(), false);
         }
     };
@@ -554,11 +889,18 @@ fn load_json<T: serde::de::DeserializeOwned + Default>(path: &Path) -> (T, bool)
             let bad = path.with_file_name(format!("{name}.corrupt"));
             match std::fs::rename(path, &bad) {
                 Ok(()) => {
-                    eprintln!("{} is unreadable ({e}); moved it to {}", path.display(), bad.display());
+                    eprintln!(
+                        "{} is unreadable ({e}); moved it to {}",
+                        path.display(),
+                        bad.display()
+                    );
                     (T::default(), true)
                 }
                 Err(re) => {
-                    eprintln!("{} is unreadable ({e}) and could not be moved aside ({re}); not overwriting it this session", path.display());
+                    eprintln!(
+                        "{} is unreadable ({e}) and could not be moved aside ({re}); not overwriting it this session",
+                        path.display()
+                    );
                     (T::default(), false)
                 }
             }
@@ -581,9 +923,18 @@ mod tests {
         assert!(usable_cookie("sid=abc; uid=42"));
         // http 1.x accepts UTF-8 bytes in header values, so such a cookie is kept.
         assert!(usable_cookie("name=中文"));
-        assert!(!usable_cookie("sid=a\nSet-Cookie: x=y"), "CR/LF must never reach a header");
-        assert!(!usable_cookie("sid=a\u{1}b"), "control characters are not header bytes");
-        assert!(usable_cookie(&format!("k={}", "a".repeat(8190))), "8192 bytes is the limit");
+        assert!(
+            !usable_cookie("sid=a\nSet-Cookie: x=y"),
+            "CR/LF must never reach a header"
+        );
+        assert!(
+            !usable_cookie("sid=a\u{1}b"),
+            "control characters are not header bytes"
+        );
+        assert!(
+            usable_cookie(&format!("k={}", "a".repeat(8190))),
+            "8192 bytes is the limit"
+        );
         assert!(!usable_cookie(&format!("k={}", "a".repeat(8191))));
     }
 
@@ -605,7 +956,11 @@ mod tests {
         let r = read_retrying(
             || {
                 calls += 1;
-                if calls < 3 { Err(Error::new(ErrorKind::PermissionDenied, "locked")) } else { Ok(b"[]".to_vec()) }
+                if calls < 3 {
+                    Err(Error::new(ErrorKind::PermissionDenied, "locked"))
+                } else {
+                    Ok(b"[]".to_vec())
+                }
             },
             5,
             Duration::ZERO,
