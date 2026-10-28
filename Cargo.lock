@@ -1058,6 +1058,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tray-icon",
+ "url",
  "windows",
  "winresource",
 ]
