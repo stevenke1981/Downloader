@@ -1,0 +1,239 @@
+import { Button, ComboBox, LineEdit, TextEdit, CheckBox, SpinBox, ScrollView } from "std-widgets.slint";
+
+export global ToolTr {
+    pure public function token-copied() -> string { return @tr("Access token copied."); }
+    pure public function clipboard-unavailable() -> string { return @tr("Clipboard is unavailable."); }
+
+    pure public function saved() -> string { return @tr("Saved."); }
+    pure public function working() -> string { return @tr("Working…"); }
+    pure public function invalid-number() -> string { return @tr("Enter a valid non-negative number."); }
+    pure public function missing-tool() -> string { return @tr("Not installed"); }
+    pure public function ready-tool() -> string { return @tr("Available"); }
+    pure public function remote-off() -> string { return @tr("Remote API is stopped."); }
+    pure public function remote-on(address: string) -> string { return @tr("Remote API is listening on {}.", address); }
+    pure public function links-added(count: int) -> string { return @tr("Added {} downloads.", count); }
+    pure public function action-name(index: int) -> string {
+        if index == 1 { return @tr("Pause all"); }
+        if index == 2 { return @tr("Run a program"); }
+        if index == 3 { return @tr("Shut down computer"); }
+        return @tr("Start all");
+    }
+    pure public function scheduled(id: int, action: string, minutes: int) -> string { return @tr("#{} {} — in {} min", id, action, minutes); }
+    pure public function consumed(id: int, action: string) -> string { return @tr("#{} {} — finished", id, action); }
+}
+
+export component LogWindow inherits Window {
+    title: @tr("Connection / status log");
+    preferred-width: 720px;
+    preferred-height: 460px;
+    min-width: 400px;
+    min-height: 260px;
+    in property <string> download-name;
+    in property <string> log;
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+        Text { text: root.download-name; overflow: elide; font-weight: 600; }
+        TextEdit { text: root.log; read-only: true; }
+    }
+}
+
+component Field inherits HorizontalLayout {
+    in property <string> label;
+    spacing: 10px;
+    Text { text: root.label; width: 165px; vertical-alignment: center; wrap: word-wrap; }
+    @children
+}
+
+export component ToolsWindow inherits Window {
+    title: @tr("Downloader tools");
+    icon: @image-url("icons/app.svg");
+    preferred-width: 780px;
+    preferred-height: 640px;
+    min-width: 660px;
+    min-height: 480px;
+    background: #f6f8fb;
+    in-out property <int> tab;
+    in property <bool> busy;
+    in property <string> message: ToolTr.saved();
+    in property <string> capabilities;
+    in-out property <int> traffic;
+    in-out property <string> low;
+    in-out property <string> medium;
+    in-out property <string> high;
+    in-out property <string> custom;
+    in property <[string]> sites;
+    in-out property <int> site-index: -1;
+    in-out property <string> host;
+    in-out property <string> username;
+    in-out property <string> password;
+    in-out property <int> concurrent: 3;
+    in-out property <int> connections: 8;
+    in property <[string]> folders;
+    in-out property <int> folder-index: -1;
+    in-out property <string> extensions;
+    in-out property <string> folder;
+    in-out property <string> web-url;
+    in-out property <int> depth: 1;
+    in-out property <int> pages: 20;
+    in-out property <string> links;
+    in-out property <string> ftp-url;
+    in-out property <string> ftp-user;
+    in-out property <string> ftp-password;
+    in property <[string]> actions;
+    in-out property <int> action-index: -1;
+    in-out property <int> delay: 10;
+    in-out property <int> action;
+    in-out property <string> program;
+    in-out property <string> args;
+    in property <string> automation-log;
+    in-out property <bool> remote-enabled;
+    in-out property <string> bind-address;
+    in-out property <string> token;
+    in property <string> remote-status;
+    callback traffic-save();
+    callback site-load();
+    callback site-save();
+    callback site-remove();
+    callback folder-load();
+    callback folder-save();
+    callback folder-remove();
+    callback folder-browse();
+    callback crawl();
+    callback ftp-list();
+    callback enqueue();
+    callback schedule-add();
+    callback schedule-remove();
+    callback remote-save();
+    callback token-generate();
+    callback token-copy();
+    callback refresh();
+    callback dismiss();
+
+    FocusScope {
+    key-pressed(event) => {
+        if event.text == Key.Escape { root.dismiss(); return accept; }
+        return reject;
+    }
+    VerticalLayout {
+        padding: 16px;
+        spacing: 10px;
+        HorizontalLayout {
+            spacing: 5px;
+            Button { text: @tr("Traffic"); primary: root.tab == 0; clicked => { root.tab = 0; } }
+            Button { text: @tr("Sites / folders"); primary: root.tab == 1; clicked => { root.tab = 1; } }
+            Button { text: @tr("Web / FTP"); primary: root.tab == 2; clicked => { root.tab = 2; } }
+            Button { text: @tr("Actions"); primary: root.tab == 3; clicked => { root.tab = 3; } }
+            Button { text: @tr("Remote API"); primary: root.tab == 4; clicked => { root.tab = 4; } }
+        }
+        ScrollView {
+            content-width: self.width;
+            horizontal-scrollbar-policy: always-off;
+            VerticalLayout {
+                spacing: 10px;
+                padding: 4px;
+                if root.tab == 0: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: @tr("Choose a traffic mode. Limits are KB/s; 0 means unlimited."); wrap: word-wrap; }
+                    Field { label: @tr("Traffic mode"); ComboBox { model: [@tr("Custom"), @tr("Low"), @tr("Medium"), @tr("High")]; current-index <=> root.traffic; horizontal-stretch: 1; } }
+                    Field { label: @tr("Low limit"); LineEdit { text <=> root.low; horizontal-stretch: 1; } }
+                    Field { label: @tr("Medium limit"); LineEdit { text <=> root.medium; horizontal-stretch: 1; } }
+                    Field { label: @tr("High limit"); LineEdit { text <=> root.high; horizontal-stretch: 1; } }
+                    Field { label: @tr("Custom limit"); LineEdit { text <=> root.custom; horizontal-stretch: 1; } }
+                    Button { text: @tr("Apply traffic limits"); enabled: !root.busy; clicked => { root.traffic-save(); } }
+                    Text { text: @tr("Protocol tools"); font-weight: 600; }
+                    Text { text: root.capabilities; wrap: word-wrap; }
+                    Text { text: @tr("Install the missing tools on PATH to enable the corresponding protocols."); wrap: word-wrap; }
+                }
+                if root.tab == 1: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: @tr("Site profiles"); font-weight: 600; }
+                    ComboBox { model: root.sites; current-index <=> root.site-index; selected => { root.site-load(); } }
+                    Field { label: @tr("Site origin"); LineEdit { text <=> root.host; placeholder-text: "https://example.org"; horizontal-stretch: 1; } }
+                    Field { label: @tr("Username"); LineEdit { text <=> root.username; horizontal-stretch: 1; } }
+                    Field { label: @tr("Session password"); LineEdit { text <=> root.password; input-type: InputType.password; horizontal-stretch: 1; } }
+                    Text { text: @tr("Passwords stay in memory for this session. Include http:// or a port when needed."); wrap: word-wrap; }
+                    Field { label: @tr("Concurrent downloads"); SpinBox { value <=> root.concurrent; minimum: 1; maximum: 20; } }
+                    Field { label: @tr("Connections"); SpinBox { value <=> root.connections; minimum: 1; maximum: 32; } }
+                    HorizontalLayout {
+                        Button { text: @tr("New profile"); clicked => { root.site-index = -1; root.host = ""; root.username = ""; root.password = ""; } }
+                        Button { text: @tr("Save site profile"); enabled: !root.busy; clicked => { root.site-save(); } }
+                        Button { text: @tr("Remove site profile"); enabled: !root.busy && root.site-index >= 0; clicked => { root.site-remove(); } }
+                    }
+                    Text { text: @tr("Custom folder rules (first match wins)"); font-weight: 600; }
+                    ComboBox { model: root.folders; current-index <=> root.folder-index; selected => { root.folder-load(); } }
+                    Field { label: @tr("Extensions (comma separated)"); LineEdit { text <=> root.extensions; placeholder-text: "zip,7z,rar"; horizontal-stretch: 1; } }
+                    Field {
+                        label: @tr("Save to");
+                        LineEdit { text <=> root.folder; horizontal-stretch: 1; }
+                        Button { text: @tr("Browse…"); enabled: !root.busy; clicked => { root.folder-browse(); } }
+                    }
+                    HorizontalLayout {
+                        Button { text: @tr("Save folder rule"); enabled: !root.busy; clicked => { root.folder-save(); } }
+                        Button { text: @tr("Remove folder rule"); enabled: !root.busy && root.folder-index >= 0; clicked => { root.folder-remove(); } }
+                        Button { text: @tr("New rule"); clicked => { root.folder-index = -1; root.extensions = ""; root.folder = ""; } }
+                    }
+                }
+                if root.tab == 2: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: @tr("Collect links from a website"); font-weight: 600; }
+                    Field { label: @tr("Page URL"); LineEdit { text <=> root.web-url; placeholder-text: "https://"; horizontal-stretch: 1; } }
+                    HorizontalLayout {
+                        Text { text: @tr("Depth"); vertical-alignment: center; }
+                        SpinBox { value <=> root.depth; minimum: 0; maximum: 8; }
+                        Text { text: @tr("Maximum pages"); vertical-alignment: center; }
+                        SpinBox { value <=> root.pages; minimum: 1; maximum: 100; }
+                        Button { text: @tr("Collect links"); enabled: !root.busy; clicked => { root.crawl(); } }
+                    }
+                    Text { text: @tr("FTP directory"); font-weight: 600; }
+                    Field { label: @tr("FTP URL"); LineEdit { text <=> root.ftp-url; placeholder-text: "ftp://"; horizontal-stretch: 1; } }
+                    Field { label: @tr("Username"); LineEdit { text <=> root.ftp-user; horizontal-stretch: 1; } }
+                    Field { label: @tr("Session password"); LineEdit { text <=> root.ftp-password; input-type: InputType.password; horizontal-stretch: 1; } }
+                    Button { text: @tr("List FTP directory"); enabled: !root.busy; clicked => { root.ftp-list(); } }
+                    Text { text: @tr("Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."); wrap: word-wrap; }
+                    TextEdit { text <=> root.links; preferred-height: 180px; accessible-label: @tr("Collected links"); }
+                    Button { text: @tr("Add collected links"); enabled: !root.busy && root.links != ""; clicked => { root.enqueue(); } }
+                }
+                if root.tab == 3: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: @tr("Schedule a one-time action"); font-weight: 600; }
+                    Field { label: @tr("Delay (minutes)"); SpinBox { value <=> root.delay; minimum: 1; maximum: 525600; } }
+                    Field { label: @tr("Action"); ComboBox { model: [@tr("Start all"), @tr("Pause all"), @tr("Run a program"), @tr("Shut down computer")]; current-index <=> root.action; horizontal-stretch: 1; } }
+                    if root.action == 2: Field { label: @tr("Program path"); LineEdit { text <=> root.program; horizontal-stretch: 1; } }
+                    if root.action == 2: VerticalLayout {
+                        Text { text: @tr("Arguments (one per line)"); }
+                        TextEdit { text <=> root.args; preferred-height: 95px; }
+                    }
+                    if root.action >= 2: Text { text: @tr("This action will run once at the scheduled time, even if downloads are still active."); color: #a03020; wrap: word-wrap; }
+                    Button { text: @tr("Schedule action"); enabled: !root.busy; clicked => { root.schedule-add(); } }
+                    ComboBox { model: root.actions; current-index <=> root.action-index; }
+                    Button { text: @tr("Remove scheduled action"); enabled: !root.busy && root.action-index >= 0; clicked => { root.schedule-remove(); } }
+                    Text { text: @tr("Action log"); font-weight: 600; }
+                    TextEdit { text: root.automation-log; read-only: true; preferred-height: 150px; }
+                }
+                if root.tab == 4: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: @tr("Remote control is off by default. Every request requires the token."); wrap: word-wrap; }
+                    CheckBox { text: @tr("Enable remote API"); checked <=> root.remote-enabled; }
+                    Field { label: @tr("Listen address"); LineEdit { text <=> root.bind-address; placeholder-text: "127.0.0.1:8787"; horizontal-stretch: 1; } }
+                    Field { label: @tr("Access token"); LineEdit { text <=> root.token; input-type: InputType.password; horizontal-stretch: 1; } }
+                    HorizontalLayout {
+                        Button { text: @tr("Generate token"); enabled: !root.busy; clicked => { root.token-generate(); } }
+                        Button { text: @tr("Copy token"); enabled: !root.busy && root.token != ""; clicked => { root.token-copy(); } }
+                    }
+                    Text { text: @tr("Use a loopback address for access from this computer only. A network address makes the API reachable from other computers."); wrap: word-wrap; }
+                    Button { text: @tr("Apply remote API"); enabled: !root.busy; clicked => { root.remote-save(); } }
+                    Text { text: root.remote-status; wrap: word-wrap; }
+                }
+                Rectangle { vertical-stretch: 1; min-height: 1px; }
+            }
+        }
+        if root.message != "": Text { text: root.message; wrap: word-wrap; color: #245078; max-height: 75px; overflow: elide; }
+        HorizontalLayout {
+            Button { text: @tr("Refresh"); enabled: !root.busy; clicked => { root.refresh(); } }
+            Rectangle { horizontal-stretch: 1; }
+            Button { text: @tr("Close"); clicked => { root.dismiss(); } }
+        }
+    }
+    }
+}

@@ -1,4 +1,5 @@
-import { Button, ComboBox, LineEdit, CheckBox, SpinBox, ListView, ScrollView } from "std-widgets.slint";
+export { ToolsWindow, ToolTr, LogWindow } from "tools.slint";
+import { Button, ComboBox, LineEdit, TextEdit, CheckBox, SpinBox, ListView, ScrollView } from "std-widgets.slint";
 
 export struct Row {
     id: int,
@@ -24,6 +25,22 @@ export struct SegBar {
 }
 
 export global Tr {
+    pure public function preview-unsupported() -> string { return @tr("Preview supports media, images, text, PDF and EPUB. Use Open folder for other file types."); }
+    pure public function preview-failed() -> string { return @tr("Could not open the registered preview application:"); }
+
+    pure public function batch-line(line: int, reason: string) -> string { return @tr("Line {}: {}", line, reason); }
+    pure public function batch-empty() -> string { return @tr("Enter at least one download link."); }
+    pure public function batch-limit() -> string { return @tr("Add at most 1000 links at a time."); }
+    pure public function batch-checksum() -> string { return @tr("A checksum can only be used with one download."); }
+    pure public function saved() -> string { return @tr("Saved."); }
+    pure public function working() -> string { return @tr("Working…"); }
+    pure public function copied() -> string { return @tr("URL copied."); }
+    pure public function missing-tool() -> string { return @tr("Not installed"); }
+    pure public function ready-tool() -> string { return @tr("Available"); }
+    pure public function remote-off() -> string { return @tr("Remote API is stopped."); }
+    pure public function remote-on(address: string) -> string { return @tr("Remote API is listening on {}.", address); }
+    pure public function links-added(count: int) -> string { return @tr("Added {} downloads.", count); }
+
     pure public function browser-unchecked() -> string { return @tr("Not checked yet."); }
     pure public function browser-host-ready() -> string { return @tr("Native host is ready. Finish installing the extension in your browser profile."); }
     pure public function browser-host-missing() -> string { return @tr("Native host needs registration or repair."); }
@@ -288,6 +305,8 @@ export component AppWindow inherits Window {
     in property <string> d-resume;
     in property <string> d-conns;
     in property <string> d-error;
+    in property <string> d-log;
+    in property <bool> d-completed;
     in property <[SegBar]> d-segs;
     in property <int> d-verify: -1;
     in property <float> d-verify-progress;
@@ -302,6 +321,8 @@ export component AppWindow inherits Window {
 
     // add dialog
     in-out property <bool> add-open;
+    in property <bool> add-busy;
+    in-out property <int> add-kind;
     in-out property <string> add-url;
     in-out property <string> add-folder;
     in-out property <int> add-conns: 8;
@@ -355,6 +376,13 @@ export component AppWindow inherits Window {
     in-out property <bool> s-verify: true;
     in-out property <string> s-error;
 
+    callback tools-clicked();
+    callback import-files();
+    callback paste-links();
+    callback preview();
+    callback copy-url();
+    callback show-log();
+    callback download-added(int);
     callback add-clicked();
     callback start-clicked();
     callback pause-clicked();
@@ -435,6 +463,7 @@ export component AppWindow inherits Window {
                 ToolButton { icon: @image-url("icons/pauseall.svg"); label: @tr("Pause all"); clicked => { root.pause-all(); } }
                 Rectangle { width: 1px; background: #e3e6ea; }
                 settings-button := ToolButton { icon: @image-url("icons/settings.svg"); label: @tr("Settings"); clicked => { root.settings-clicked(); } }
+                ToolButton { icon: @image-url("icons/folder.svg"); label: @tr("Tools"); clicked => { root.tools-clicked(); } }
                 Rectangle { horizontal-stretch: 1; }
                 VerticalLayout {
                     alignment: center;
@@ -608,6 +637,8 @@ export component AppWindow inherits Window {
                         HorizontalLayout {
                             spacing: 10px;
                             Text { text: root.d-name; font-size: 15px; font-weight: 600; overflow: elide; horizontal-stretch: 1; }
+                            Button { text: @tr("Preview"); enabled: root.d-completed && !root.reveal-busy; clicked => { root.preview(); } }
+                            Button { text: @tr("Copy URL"); clicked => { root.copy-url(); } }
                             Button { text: @tr("Open folder"); clicked => { root.open-folder(); } }
                         }
                         Text { text: root.d-url; color: #607080; font-size: 12px; overflow: elide; }
@@ -660,6 +691,7 @@ export component AppWindow inherits Window {
                             Text { text: @tr("Priority"); vertical-alignment: center; font-size: 12px; }
                             ComboBox { model: [@tr("Low"), @tr("Normal"), @tr("High")]; current-index <=> root.d-priority; width: 90px; }
                             Button { text: @tr("Apply"); clicked => { root.detail-apply(); } }
+                            Button { text: @tr("Connection / status log"); clicked => { root.show-log(); } }
                             Rectangle { horizontal-stretch: 1; }
                         }
                     }
@@ -681,7 +713,13 @@ export component AppWindow inherits Window {
     // ---------- add dialog ----------
     if root.add-open: Dialog {
         title: @tr("Add download");
-        Field { label: @tr("URL"); LineEdit { text <=> root.add-url; placeholder-text: "https://"; horizontal-stretch: 1; } }
+        Text { text: @tr("URLs (one per line, duplicates are ignored)"); }
+        TextEdit { text <=> root.add-url; preferred-height: 110px; accessible-label: @tr("Download URLs"); }
+        HorizontalLayout {
+            Button { text: @tr("Paste links"); enabled: !root.add-busy; clicked => { root.paste-links(); } }
+            Button { text: @tr("Import torrent / Metalink…"); enabled: !root.add-busy; clicked => { root.import-files(); } }
+        }
+        Field { label: @tr("Download mode"); ComboBox { model: [@tr("Automatic"), @tr("Video (yt-dlp)")]; current-index <=> root.add-kind; horizontal-stretch: 1; } }
         Field {
             label: @tr("Save to");
             LineEdit { text <=> root.add-folder; placeholder-text: @tr("Default folder for the file type"); horizontal-stretch: 1; }
@@ -694,8 +732,8 @@ export component AppWindow inherits Window {
         HorizontalLayout {
             alignment: end;
             spacing: 8px;
-            Button { text: @tr("Cancel"); clicked => { root.add-open = false; } }
-            Button { text: @tr("OK"); primary: true; clicked => { root.add-ok(); } }
+            Button { text: @tr("Cancel"); enabled: !root.add-busy; clicked => { root.add-open = false; } }
+            Button { text: root.add-busy ? @tr("Working…") : @tr("OK"); enabled: !root.add-busy; primary: true; clicked => { root.add-ok(); } }
         }
     }
 
@@ -916,6 +954,7 @@ export component CompactWindow inherits Window {
                 Text { text: Tr.status(r.status) + "  " + r.progress-text + "  " + r.speed; font-size: 12px; }
             }
         }
+        Text { text: @tr("Drop torrent / Metalink files here to add downloads."); font-size: 11px; wrap: word-wrap; }
         CheckBox { text: @tr("Always on top"); checked <=> root.pinned; }
         Text { text: @tr("Closing this window restores the main window."); font-size: 11px; wrap: word-wrap; }
         Button { text: @tr("Restore main window"); clicked => { root.restore(); } }

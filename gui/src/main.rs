@@ -2,7 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use dlcore::util::{human_eta, human_size, looks_like_url};
-use dlcore::{Checksum, Manager, NewDownload, Snapshot, Status};
+use dlcore::{Manager, NewDownload, Snapshot, Status};
 use slint::winit_030::WinitWindowAccessor;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
@@ -12,9 +12,12 @@ use std::time::Duration;
 mod window_placement;
 
 slint::include_modules!();
+mod batch;
 mod browser_controller;
 mod browser_setup;
+mod desktop;
 mod reveal;
+mod tools;
 mod tray;
 
 fn schedule_initial_placement(_ui: &AppWindow) {
@@ -423,6 +426,8 @@ fn refresh(ui: &AppWindow, app: &mut App, snaps: &[Snapshot]) {
         ui.set_d_resume(tr.invoke_yes_no(s.resumable));
         ui.set_d_conns(format!("{} / {}", s.active_connections, s.connections).into());
         ui.set_d_error(s.error.clone().unwrap_or_default().into());
+        ui.set_d_completed(s.status == Status::Completed);
+        ui.set_d_log(s.log.join("\n").into());
         let total = s.total.unwrap_or(0).max(1) as f32;
         let segs: Vec<SegBar> = if s.total.is_some() {
             s.segments
@@ -465,6 +470,8 @@ fn refresh(ui: &AppWindow, app: &mut App, snaps: &[Snapshot]) {
         }
     } else {
         app.detail_for = None;
+        ui.set_d_log("".into());
+        ui.set_d_completed(false);
     }
 }
 
@@ -486,6 +493,7 @@ fn open_add(ui: &AppWindow, app: &App, url: &str) {
     ui.set_add_conns(app.mgr().settings().max_connections as i32);
     ui.set_add_checksum("".into());
     ui.set_add_start(true);
+    ui.set_add_kind(0);
     ui.set_add_error("".into());
     ui.set_add_open(true);
 }
@@ -589,6 +597,8 @@ fn main() -> Result<(), slint::PlatformError> {
     }));
     bind_models(&ui, &compact, &app.borrow().models);
     browser_controller::bind(&ui, &app);
+    let desktop = desktop::bind(&ui, &compact, &app)?;
+    let tools = tools::bind(&ui, &app)?;
 
     refresh_now(&ui, &mut app.borrow_mut());
 
@@ -705,9 +715,17 @@ fn main() -> Result<(), slint::PlatformError> {
                         .unwrap_or_default();
                     if text != a.last_clip {
                         a.last_clip = text.clone();
-                        let t = text.trim();
-                        if looks_like_url(t) && !snaps.iter().any(|s| s.url == t) {
-                            open_add(&ui, &a, t);
+                        let fresh = text.lines().map(str::trim).any(|line| {
+                            [
+                                "https://", "http://", "ftp://", "magnet:", "rtsp://", "mms://",
+                                "mmsh://", "mmst://",
+                            ]
+                            .iter()
+                            .any(|scheme| line.starts_with(scheme))
+                                && !snaps.iter().any(|s| s.url == line)
+                        });
+                        if fresh {
+                            open_add(&ui, &a, text.trim());
                         }
                     }
                 }
@@ -742,37 +760,6 @@ fn main() -> Result<(), slint::PlatformError> {
 
     on!(ui, app, on_add_clicked, || {
         open_add(&ui, &app, "");
-    });
-    on!(ui, app, on_add_ok, || {
-        let url = ui.get_add_url().trim().to_string();
-        if !(url.starts_with("http://") || url.starts_with("https://")) || !looks_like_url(&url) {
-            ui.set_add_error(ui.global::<Tr>().invoke_invalid_url());
-            return;
-        }
-        let sum = ui.get_add_checksum().trim().to_string();
-        let checksum = if sum.is_empty() {
-            None
-        } else {
-            match Checksum::guess(&sum) {
-                Some(c) => Some(c),
-                None => {
-                    ui.set_add_error(ui.global::<Tr>().invoke_invalid_checksum());
-                    return;
-                }
-            }
-        };
-        let folder = ui.get_add_folder().trim().to_string();
-        let id = app.mgr().add(NewDownload {
-            url,
-            dir: (!folder.is_empty()).then(|| PathBuf::from(folder)),
-            connections: Some(ui.get_add_conns().clamp(1, 32) as u32),
-            checksum,
-            start: ui.get_add_start(),
-            ..Default::default()
-        });
-        app.selected = Some(id);
-        ui.set_add_open(false);
-        refresh_now(&ui, &mut app);
     });
     on!(ui, app, on_start_clicked, || {
         if let Some(id) = app.selected {
@@ -933,6 +920,8 @@ fn main() -> Result<(), slint::PlatformError> {
     schedule_initial_placement(&ui);
     let result = slint::run_event_loop_until_quit();
     drop(timer);
+    drop(desktop);
+    drop(tools);
     let _ = std::fs::remove_file(dlcore::ipc::endpoint_path(&state_dir()));
     if let Some(m) = app.borrow_mut().mgr.take() {
         m.shutdown();
@@ -1131,6 +1120,47 @@ mod lifecycle_tests {
                 .mock_single_click(slint::platform::PointerEventButton::Left);
         }
         assert_eq!(compact_calls.get(), 3);
+    }
+
+    #[test]
+    fn batch_input_preserves_lines_and_disables_submission_while_working() {
+        use i_slint_backend_testing::ElementHandle;
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = AppWindow::new().unwrap();
+        apply_lang("en");
+        ui.set_add_open(true);
+        ui.set_add_url("https://example.org/a\nhttps://example.org/b".into());
+        ui.set_add_kind(1);
+        ui.show().unwrap();
+        assert!(ui.get_add_url().contains('\n'));
+        for label in ["Download URLs", "Paste links", "Import torrent / Metalink…"] {
+            assert!(
+                ElementHandle::find_by_accessible_label(&ui, label)
+                    .next()
+                    .is_some(),
+                "missing {label}"
+            );
+        }
+        assert_eq!(ui.get_add_kind(), 1);
+        ui.set_add_busy(true);
+        let paste = ElementHandle::find_by_accessible_label(&ui, "Paste links")
+            .next()
+            .unwrap();
+        assert_eq!(paste.accessible_enabled(), Some(false));
+        let working = ElementHandle::find_by_accessible_label(&ui, "Working…")
+            .next()
+            .unwrap();
+        assert_eq!(working.accessible_enabled(), Some(false));
+        ui.set_add_busy(false);
+        apply_lang("zh_TW");
+        for label in ["貼上連結", "匯入 torrent／Metalink…"] {
+            assert!(
+                ElementHandle::find_by_accessible_label(&ui, label)
+                    .next()
+                    .is_some(),
+                "missing Traditional Chinese control {label}"
+            );
+        }
     }
 
     #[test]

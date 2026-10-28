@@ -437,3 +437,282 @@ msgstr "從這裡開始下載"
 
 msgid "{0} downloads, {1} active"
 msgstr "共 {0} 個下載，{1} 個進行中"
+
+msgid "Downloader tools"
+msgstr "Downloader 工具"
+
+msgid "Line {}: {}"
+msgstr "第 {} 行：{}"
+
+msgid "Enter at least one download link."
+msgstr "請至少輸入一個下載連結。"
+
+msgid "Add at most 1000 links at a time."
+msgstr "每次最多新增 1000 個連結。"
+
+msgid "A checksum can only be used with one download."
+msgstr "只有單一下載可以指定校驗碼。"
+
+msgid "Saved."
+msgstr "已儲存。"
+
+msgid "Working…"
+msgstr "處理中…"
+
+msgid "URL copied."
+msgstr "已複製網址。"
+
+msgid "Not installed"
+msgstr "尚未安裝"
+
+msgid "Available"
+msgstr "可使用"
+
+msgid "Remote API is stopped."
+msgstr "遠端 API 已停止。"
+
+msgid "Remote API is listening on {}."
+msgstr "遠端 API 正在 {} 接受連線。"
+
+msgid "Added {} downloads."
+msgstr "已新增 {} 個下載。"
+
+msgid "Traffic"
+msgstr "流量"
+
+msgid "Sites / folders"
+msgstr "網站／資料夾"
+
+msgid "Web / FTP"
+msgstr "網頁／FTP"
+
+msgid "Actions"
+msgstr "排程動作"
+
+msgid "Remote API"
+msgstr "遠端 API"
+
+msgid "Choose a traffic mode. Limits are KB/s; 0 means unlimited."
+msgstr "選擇流量模式。速率單位為 KB/s；0 代表不限速。"
+
+msgid "Traffic mode"
+msgstr "流量模式"
+
+msgid "Custom"
+msgstr "自訂"
+
+msgid "Medium"
+msgstr "中速"
+
+msgid "Low limit"
+msgstr "低速上限"
+
+msgid "Medium limit"
+msgstr "中速上限"
+
+msgid "High limit"
+msgstr "高速上限"
+
+msgid "Custom limit"
+msgstr "自訂上限"
+
+msgid "Apply traffic limits"
+msgstr "套用流量限制"
+
+msgid "Protocol tools"
+msgstr "協定工具"
+
+msgid "Install the missing tools on PATH to enable the corresponding protocols."
+msgstr "將缺少的工具安裝至 PATH 後，即可啟用對應的協定。"
+
+msgid "Site profiles"
+msgstr "網站設定檔"
+
+msgid "Site origin"
+msgstr "網站來源"
+
+msgid "Username"
+msgstr "使用者名稱"
+
+msgid "Session password"
+msgstr "本次工作階段密碼"
+
+msgid "Passwords stay in memory for this session. Include http:// or a port when needed."
+msgstr "密碼只保留於本次工作階段的記憶體中。需要時請包含 http:// 或連接埠。"
+
+msgid "Concurrent downloads"
+msgstr "同時下載數"
+
+msgid "Save site profile"
+msgstr "儲存網站設定"
+
+msgid "Remove site profile"
+msgstr "移除網站設定"
+
+msgid "New profile"
+msgstr "新增設定檔"
+
+msgid "Custom folder rules (first match wins)"
+msgstr "自訂資料夾規則（依順序採用第一個符合項目）"
+
+msgid "Extensions (comma separated)"
+msgstr "副檔名（以逗號分隔）"
+
+msgid "Save folder rule"
+msgstr "儲存資料夾規則"
+
+msgid "Remove folder rule"
+msgstr "移除資料夾規則"
+
+msgid "New rule"
+msgstr "新增規則"
+
+msgid "Collect links from a website"
+msgstr "收集網站中的連結"
+
+msgid "Page URL"
+msgstr "網頁網址"
+
+msgid "Depth"
+msgstr "深度"
+
+msgid "Maximum pages"
+msgstr "最多頁數"
+
+msgid "Collect links"
+msgstr "收集連結"
+
+msgid "FTP directory"
+msgstr "FTP 目錄"
+
+msgid "FTP URL"
+msgstr "FTP 網址"
+
+msgid "List FTP directory"
+msgstr "列出 FTP 目錄"
+
+msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
+msgstr "請先檢查下方的連結再新增。需要驗證的下載，請在「網站／資料夾」儲存本次登入資料。"
+
+msgid "Collected links"
+msgstr "收集到的連結"
+
+msgid "Add collected links"
+msgstr "新增收集到的連結"
+
+msgid "Schedule a one-time action"
+msgstr "安排單次動作"
+
+msgid "Delay (minutes)"
+msgstr "延後時間（分鐘）"
+
+msgid "Action"
+msgstr "動作"
+
+msgid "Run a program"
+msgstr "執行程式"
+
+msgid "Shut down computer"
+msgstr "關閉電腦"
+
+msgid "Program path"
+msgstr "程式路徑"
+
+msgid "Arguments (one per line)"
+msgstr "參數（每行一個）"
+
+msgid "This action will run once at the scheduled time, even if downloads are still active."
+msgstr "此動作會在排定的時間執行一次，即使下載仍在進行中。"
+
+msgid "Schedule action"
+msgstr "新增排程動作"
+
+msgid "Remove scheduled action"
+msgstr "移除排程動作"
+
+msgid "Action log"
+msgstr "動作記錄"
+
+msgid "Remote control is off by default. Every request requires the token."
+msgstr "遠端控制預設關閉。每個請求都需要存取權杖。"
+
+msgid "Enable remote API"
+msgstr "啟用遠端 API"
+
+msgid "Listen address"
+msgstr "監聽位址"
+
+msgid "Access token"
+msgstr "存取權杖"
+
+msgid "Generate token"
+msgstr "產生權杖"
+
+msgid "Use a loopback address for access from this computer only. A network address makes the API reachable from other computers."
+msgstr "只允許本機存取時，請使用回送位址。使用網路位址會讓其他電腦可以連線到此 API。"
+
+msgid "Apply remote API"
+msgstr "套用遠端 API"
+
+msgid "Close"
+msgstr "關閉"
+
+msgid "Enter a valid non-negative number."
+msgstr "請輸入有效的非負數。"
+
+msgid "#{} {} — in {} min"
+msgstr "#{} {} — {} 分鐘後"
+
+msgid "#{} {} — finished"
+msgstr "#{} {} — 已執行"
+
+msgid "Tools"
+msgstr "工具"
+
+msgid "Preview"
+msgstr "預覽"
+
+msgid "Copy URL"
+msgstr "複製網址"
+
+msgid "Connection / status log"
+msgstr "連線／狀態記錄"
+
+msgid "URLs (one per line, duplicates are ignored)"
+msgstr "網址（每行一個，自動略過重複項目）"
+
+msgid "Download URLs"
+msgstr "下載網址"
+
+msgid "Paste links"
+msgstr "貼上連結"
+
+msgid "Import torrent / Metalink…"
+msgstr "匯入 torrent／Metalink…"
+
+msgid "Download mode"
+msgstr "下載模式"
+
+msgid "Automatic"
+msgstr "自動"
+
+msgid "Video (yt-dlp)"
+msgstr "影片（yt-dlp）"
+
+msgid "Drop torrent / Metalink files here to add downloads."
+msgstr "將 torrent／Metalink 檔案拖放到此處即可新增下載。"
+
+msgid "Preview supports media, images, text, PDF and EPUB. Use Open folder for other file types."
+msgstr "預覽支援影音、圖片、文字、PDF 與 EPUB。其他檔案類型請使用「開啟資料夾」。"
+
+msgid "Could not open the registered preview application:"
+msgstr "無法開啟預設的預覽應用程式："
+
+msgid "Copy token"
+msgstr "複製權杖"
+
+msgid "Access token copied."
+msgstr "已複製存取權杖。"
+
+msgid "Clipboard is unavailable."
+msgstr "無法使用剪貼簿。"
