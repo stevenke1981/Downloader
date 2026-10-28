@@ -18,10 +18,10 @@ struct Args {
     /// URL(s), local .torrent/.metalink/.meta4 descriptor(s)
     #[arg(required_unless_present = "tools")]
     urls: Vec<String>,
-    /// Extract a website video using optional yt-dlp (explicit opt-in)
+    /// Extract direct webpage media or HLS using the built-in Rust engine
     #[arg(long)]
     video: bool,
-    /// Show available optional protocol engines
+    /// Show built-in Rust protocol engines
     #[arg(long)]
     tools: bool,
     /// Output directory
@@ -68,9 +68,11 @@ async fn main() {
             println!(
                 "{}: {}",
                 tool.name,
-                tool.path
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "unavailable".into())
+                if tool.available {
+                    "built-in Rust"
+                } else {
+                    "unavailable"
+                }
             );
         }
         if a.urls.is_empty() {
@@ -111,6 +113,10 @@ async fn main() {
         std::process::exit(2)
     });
     let cancel = CancellationToken::new();
+    let protocol_client = settings.build_protocol_client().unwrap_or_else(|e| {
+        eprintln!("{e}");
+        std::process::exit(2)
+    });
     {
         let c = cancel.clone();
         tokio::spawn(async move {
@@ -148,6 +154,7 @@ async fn main() {
             eprintln!("resuming at {}", util::human_size(resumed));
         }
         let ctx = Ctx {
+            protocol_client: protocol_client.clone(),
             client: client.clone(),
             global: global.clone(),
             local: Arc::new(RateLimiter::new(limit)),

@@ -225,12 +225,7 @@ pub(crate) async fn download(
 async fn transfer(task: Arc<Mutex<Task>>, ctx: &Ctx, stage: &Path) -> Result<(), String> {
     let snapshot = task.lock().unwrap().clone();
     // Redirects are followed manually so Cookie as well as Authorization obey exact origin.
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .connect_timeout(std::time::Duration::from_secs(30))
-        .read_timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = ctx.protocol_client.clone();
     let source = reqwest::Url::parse(&snapshot.url)
         .ok()
         .filter(|u| matches!(u.scheme(), "http" | "https"));
@@ -442,6 +437,7 @@ mod tests {
 
     fn context() -> Ctx {
         Ctx {
+            protocol_client: crate::settings::Settings::default().build_protocol_client().unwrap(),
             client: reqwest::Client::new(),
             global: Arc::new(RateLimiter::new(0)),
             local: Arc::new(RateLimiter::new(0)),

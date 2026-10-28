@@ -7,8 +7,8 @@ export global ToolTr {
     pure public function saved() -> string { return @tr("Saved."); }
     pure public function working() -> string { return @tr("Working…"); }
     pure public function invalid-number() -> string { return @tr("Enter a valid non-negative number."); }
-    pure public function missing-tool() -> string { return @tr("Not installed"); }
-    pure public function ready-tool() -> string { return @tr("Available"); }
+    pure public function missing-tool() -> string { return @tr("Unavailable"); }
+    pure public function ready-tool() -> string { return @tr("Built-in Rust"); }
     pure public function remote-off() -> string { return @tr("Remote API is stopped."); }
     pure public function remote-on(address: string) -> string { return @tr("Remote API is listening on {}.", address); }
     pure public function links-added(count: int) -> string { return @tr("Added {} downloads.", count); }
@@ -35,6 +35,25 @@ export component LogWindow inherits Window {
         spacing: 10px;
         Text { text: root.download-name; overflow: elide; font-weight: 600; }
         TextEdit { text: root.log; read-only: true; }
+    }
+}
+
+export component PreviewWindow inherits Window {
+    title: @tr("Download preview");
+    preferred-width: 760px;
+    preferred-height: 560px;
+    min-width: 420px;
+    min-height: 300px;
+    in property <string> download-name;
+    in property <string> content;
+    in property <image> picture;
+    in property <bool> has-image;
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+        Text { text: root.download-name; overflow: elide; font-weight: 600; }
+        if root.has-image: Image { source: root.picture; image-fit: contain; vertical-stretch: 1; }
+        TextEdit { text: root.content; read-only: true; vertical-stretch: root.has-image ? 0 : 1; preferred-height: root.has-image ? 74px : 400px; }
     }
 }
 
@@ -141,9 +160,9 @@ export component ToolsWindow inherits Window {
                     Field { label: @tr("High limit"); LineEdit { text <=> root.high; horizontal-stretch: 1; } }
                     Field { label: @tr("Custom limit"); LineEdit { text <=> root.custom; horizontal-stretch: 1; } }
                     Button { text: @tr("Apply traffic limits"); enabled: !root.busy; clicked => { root.traffic-save(); } }
-                    Text { text: @tr("Protocol tools"); font-weight: 600; }
+                    Text { text: @tr("Built-in protocols"); font-weight: 600; }
                     Text { text: root.capabilities; wrap: word-wrap; }
-                    Text { text: @tr("Install the missing tools on PATH to enable the corresponding protocols."); wrap: word-wrap; }
+                    Text { text: @tr("All protocol engines run inside Downloader using Rust libraries."); wrap: word-wrap; }
                 }
                 if root.tab == 1: VerticalLayout {
                     spacing: 10px;

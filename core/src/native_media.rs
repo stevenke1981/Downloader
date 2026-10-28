@@ -1449,26 +1449,26 @@ mod tests {
                     let mut status = reply.status;
                     let mut extra = reply.headers.clone();
                     let mut body = reply.body.as_slice();
-                    if path != "/ignore-range" {
-                        if let Some(value) = header.lines().find_map(|line| {
+                    if path != "/ignore-range"
+                        && let Some(value) = header.lines().find_map(|line| {
                             line.to_ascii_lowercase()
                                 .strip_prefix("range: ")
                                 .map(str::to_owned)
-                        }) {
-                            let (start, end) = value
-                                .strip_prefix("bytes=")
-                                .unwrap()
-                                .split_once('-')
-                                .unwrap();
-                            let start: usize = start.parse().unwrap();
-                            let end: usize = end.parse().unwrap();
-                            extra.push_str(&format!(
-                                "Content-Range: bytes {start}-{end}/{}\r\n",
-                                body.len()
-                            ));
-                            body = &body[start..=end];
-                            status = "206 Partial Content";
-                        }
+                        })
+                    {
+                        let (start, end) = value
+                            .strip_prefix("bytes=")
+                            .unwrap()
+                            .split_once('-')
+                            .unwrap();
+                        let start: usize = start.parse().unwrap();
+                        let end: usize = end.parse().unwrap();
+                        extra.push_str(&format!(
+                            "Content-Range: bytes {start}-{end}/{}\r\n",
+                            body.len()
+                        ));
+                        body = &body[start..=end];
+                        status = "206 Partial Content";
                     }
                     let length = if reply.stall {
                         String::new()
@@ -1639,9 +1639,42 @@ mod tests {
         );
         let output = std::fs::read(stage.path().join("payload/media.ts")).unwrap();
         assert_eq!(output, [first, second].concat());
-        assert!(output.chunks_exact(188).all(|packet| packet[0] == 0x47));
+        let (packets, remainder) = output.as_chunks::<188>();
+        assert!(remainder.is_empty());
+        assert!(packets.iter().all(|packet| packet[0] == 0x47));
         let digest = hex::encode(Sha256::digest(&output));
         println!("native HLS MPEG-TS fixture SHA-256 {digest}");
+    }
+
+    #[tokio::test]
+    async fn browser_playlist_name_preserves_actual_output_format() {
+        let expected = transport_segment(0);
+        let fixture = http_fixture(HashMap::from([
+            (
+                "/stream.m3u8".into(),
+                reply(
+                    "application/vnd.apple.mpegurl",
+                    b"#EXTM3U\n#EXTINF:0.093,\nfirst.ts\n#EXT-X-ENDLIST\n".to_vec(),
+                ),
+            ),
+            ("/first.ts".into(), reply("video/mp2t", expected.clone())),
+        ]))
+        .await;
+        let directory = tempfile::tempdir().unwrap();
+        let (_, task, ctx) = environment(format!("{}/stream.m3u8", fixture.base));
+        {
+            let mut task = task.lock().unwrap();
+            task.dir = directory.path().to_owned();
+            task.suggested_name = Some("browser-title.m3u8".into());
+        }
+        assert_eq!(
+            crate::external::run(task.clone(), ctx).await.unwrap(),
+            Outcome::Completed
+        );
+        let task = task.lock().unwrap();
+        assert_eq!(task.file_name, "browser-title.ts");
+        assert_eq!(std::fs::read(task.final_path()).unwrap(), expected);
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
     }
 
     #[tokio::test]

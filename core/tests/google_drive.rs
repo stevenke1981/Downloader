@@ -119,6 +119,7 @@ impl Fixture {
 
     fn ctx(&self) -> Ctx {
         Ctx {
+            protocol_client: dlcore::Settings::default().build_protocol_client().unwrap(),
             client: reqwest::Client::builder()
                 .no_proxy()
                 .http1_only()

@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 fn ctx(limit: u64) -> Ctx {
     Ctx {
+        protocol_client: dlcore::Settings::default().build_protocol_client().unwrap(),
         client: Settings::default().build_client().unwrap(),
         global: Arc::new(RateLimiter::new(0)),
         local: Arc::new(RateLimiter::new(limit)),

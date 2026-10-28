@@ -38,5 +38,12 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 dirs = "6"
 clap = { version = "4", features = ["derive"] }
 
+roxmltree = "0.21"
+librqbit = { version = "=9.0.1", default-features = false, features = ["rust-tls"] }
+retina = { version = "=0.4.20", default-features = false }
+aes = "=0.8.4"
+cbc = { version = "=0.1.2", features = ["alloc"] }
+scraper = { version = "=0.24.0", default-features = false }
+
 [dev-dependencies]
 tempfile = "3"

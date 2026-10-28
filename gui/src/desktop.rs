@@ -1,5 +1,7 @@
 //! Download input, OS drops, sharing and preview commands.
-use crate::{App, AppWindow, CompactWindow, LogWindow, Tr, batch, open_add, restore_main};
+use crate::{
+    App, AppWindow, CompactWindow, LogWindow, PreviewWindow, Tr, batch, open_add, restore_main,
+};
 use dlcore::task::DownloadKind;
 use dlcore::{Checksum, NewDownload};
 use slint::ComponentHandle;
@@ -10,6 +12,7 @@ use std::rc::Rc;
 
 pub struct Controller {
     logs: LogWindow,
+    preview: PreviewWindow,
     timer: slint::Timer,
 }
 
@@ -17,6 +20,7 @@ impl Drop for Controller {
     fn drop(&mut self) {
         self.timer.stop();
         let _ = self.logs.hide();
+        let _ = self.preview.hide();
     }
 }
 
@@ -30,6 +34,7 @@ pub fn bind(
     app: &Rc<RefCell<App>>,
 ) -> Result<Controller, slint::PlatformError> {
     let logs = LogWindow::new()?;
+    let preview = PreviewWindow::new()?;
     {
         let (weak, select_app) = (ui.as_weak(), app.clone());
         ui.on_download_added(move |id| {
@@ -175,7 +180,7 @@ pub fn bind(
                 Err(error) => error.into(),
             });
         });
-        let (weak, app) = (ui.as_weak(), app.clone());
+        let (weak, app, preview_weak) = (ui.as_weak(), app.clone(), preview.as_weak());
         ui.on_preview(move || {
             let Some(ui) = weak.upgrade() else { return };
             if ui.get_reveal_busy() {
@@ -190,11 +195,28 @@ pub fn bind(
             };
             ui.set_reveal_busy(true);
             let weak = ui.as_weak();
+            let preview_weak = preview_weak.clone();
             std::thread::spawn(move || {
                 let result = crate::reveal::preview(snapshot.status, &snapshot.path);
                 let _ = weak.upgrade_in_event_loop(move |ui| {
                     ui.set_reveal_busy(false);
-                    if let Err(error) = result {
+                    if let Ok(content) = result {
+                        if let Some(preview) = preview_weak.upgrade() {
+                            preview.set_download_name(content.name.into());
+                            preview.set_content(content.text.into());
+                            let image = content.image.map(|(width, height, bytes)| {
+                                let pixels =
+                                    slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(
+                                        &bytes, width, height,
+                                    );
+                                slint::Image::from_rgba8(pixels)
+                            });
+                            preview.set_has_image(image.is_some());
+                            preview.set_picture(image.unwrap_or_default());
+                            let _ = preview.show();
+                            preview.window().set_minimized(false);
+                        }
+                    } else if let Err(error) = result {
                         use crate::reveal::{PreviewError, RevealError};
                         let tr = ui.global::<Tr>();
                         ui.set_notice(match error {
@@ -236,7 +258,11 @@ pub fn bind(
             }
         },
     );
-    Ok(Controller { logs, timer })
+    Ok(Controller {
+        logs,
+        preview,
+        timer,
+    })
 }
 
 #[cfg(test)]

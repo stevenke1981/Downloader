@@ -238,6 +238,11 @@ impl Settings {
 
     /// Crawler requests inspect each Location header before following it.
     pub fn build_crawl_client(&self) -> Result<crate::grabber::CrawlClient, String> {
+        self.build_protocol_client().map(crate::grabber::CrawlClient::new)
+    }
+
+    /// Protocol adapters follow redirects explicitly and retain the configured proxy.
+    pub fn build_protocol_client(&self) -> Result<reqwest::Client, String> {
         let mut builder = reqwest::Client::builder()
             .user_agent(concat!("Downloader/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(std::time::Duration::from_secs(20))
@@ -249,7 +254,6 @@ impl Settings {
         }
         builder
             .build()
-            .map(crate::grabber::CrawlClient::new)
             .map_err(|e| e.to_string())
     }
 }

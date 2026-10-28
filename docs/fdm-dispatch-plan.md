@@ -1,3 +1,6 @@
+# Historical external-engine dispatch (superseded)
+Current native Rust plan: native-rust-plan.md.
+
 # FDM alignment dispatch evidence
 
 - Base SHA: `6e5cb2bbdd3933b7a613505115defebe0212b318`.

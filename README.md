@@ -69,13 +69,12 @@ dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha
 
 資料夾連結請在瀏覽器開啟後選取檔案下載；Downloader 不會遞迴列出資料夾。瀏覽器自行產生的 `blob:` ZIP 由瀏覽器下載。更新本機擴充功能檔案後，請在瀏覽器的擴充功能頁按「重新載入」。
 
-### 選用的協定工具
-- **aria2c**：FTP、BitTorrent／磁力連結、Metalink 鏡像下載。
-- **FFmpeg**：RTSP／MMS 串流擷取。
-- **yt-dlp**：明確選擇影音模式後下載網站影片。
-- **curl**：FTP 目錄瀏覽。
+### 內建 Rust 通訊協定
+FTP／目錄瀏覽、Metalink、BitTorrent／磁力連結、HLS、RTSP H.264／G.711 與 MMS-over-HTTP 均在程式內執行，不需要安裝 aria2、FFmpeg、yt-dlp 或 curl。`dlx --tools` 與工具視窗列出內建引擎。
 
-這些工具需另外提供可執行檔並放在 PATH，或指定 `DOWNLOADER_ARIA2`、`DOWNLOADER_FFMPEG`、`DOWNLOADER_YTDLP`、`DOWNLOADER_CURL` 絕對路徑；`dlx --tools` 與工具視窗顯示可用狀態。HTTP/HTTPS 沿用內建引擎。外部工具的續傳與限速依引擎能力：aria2c／yt-dlp 使用啟動時的單程序上限，沒有跨程序的總流量協調或即時變更限速；FFmpeg 串流擷取沒有位元組限速。外部引擎不接收瀏覽器 Cookie；FTP 可使用站點帳密。
+`.m3u8` 可直接加入；一般網頁請選擇「網頁影音（Rust）」或使用 `dlx --video`。擷取支援網頁直接提供的媒體與 HLS，不解密 DRM 或執行網站的簽章 JavaScript。RTSP 輸出 H.264 Annex B 或獨立 G.711 音軌的 PCM16 WAV，不進行音訊／影片混流；MMS 支援 HTTP transport，未實作舊 MMST transport。詳細支援範圍、續傳與測試請見 [原生引擎說明](docs/fdm-tools.zh-TW.md) 與 [功能對照](docs/fdm-feature-matrix.zh-TW.md)。
+
+「預覽」會開啟內建圖片／文字視窗；其他支援媒體與文件顯示檔案資訊，尚無影音播放或 PDF／EPUB 排版。開啟資料夾與使用者明確新增的排程程式仍是系統整合功能。
 
 ### 平台限制
 - **系統匣圖示**：目前只有 Windows；其他平台可用精簡視窗。
@@ -127,8 +126,10 @@ Public single-file share links resolve their download confirmation page and use 
 
 Open folder links in the browser and select files to download; recursive folder listing is not supported. Browser-generated `blob:` ZIPs stay with the browser. Reload the extension in the browser after updating its local files.
 
-### Optional protocol tools
-Provide `aria2c` for FTP, BitTorrent/magnet and Metalink; FFmpeg for RTSP/MMS capture; yt-dlp for explicit website-video mode; and curl for FTP listing. Put them on PATH or set executable paths through `DOWNLOADER_ARIA2`, `DOWNLOADER_FFMPEG`, `DOWNLOADER_YTDLP`, and `DOWNLOADER_CURL`. `dlx --tools` reports availability. They are not bundled. Native HTTP/HTTPS behavior is retained. External aria2c/yt-dlp limits apply at process start, without aggregate or live rate coordination across processes; FFmpeg capture has no byte-rate limiter. Browser cookies are not passed to external engines; FTP site credentials are supported. The system tray icon remains Windows-only.
+### Built-in Rust protocols
+FTP/listing, Metalink, BitTorrent/magnet, HLS, RTSP H.264/G.711 and MMS-over-HTTP run in process using Rust libraries. No aria2, FFmpeg, yt-dlp or curl installation is required. `dlx --tools` lists embedded engines. Add `.m3u8` directly; use `--video` for direct media/HLS exposed by a webpage. DRM and JavaScript signature deciphering are unsupported. RTSP writes H.264 Annex B or audio-only G.711 decoded to PCM16 WAV, without audio/video remuxing; legacy MMST is unsupported. See the [engine guide](docs/fdm-tools.zh-TW.md) for protocol limits.
+
+Preview displays images/text inside Downloader and metadata for other supported media/documents; audio/video playback and PDF/EPUB rendering are not implemented. Open folder and explicitly configured scheduled programs remain OS integration features. The system tray icon remains Windows-only.
 
 ### License
 MIT. This is an independent project; it is not affiliated with Free Download Manager, and all icons are original.

@@ -381,6 +381,7 @@ pub(crate) mod tests {
 
     fn context() -> Ctx {
         Ctx {
+            protocol_client: crate::settings::Settings::default().build_protocol_client().unwrap(),
             client: reqwest::Client::new(),
             global: Arc::new(RateLimiter::new(0)),
             local: Arc::new(RateLimiter::new(0)),

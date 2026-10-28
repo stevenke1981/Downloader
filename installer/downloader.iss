@@ -77,6 +77,10 @@ Source: "..\docs\dispatch-plan.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\validation-0.5.2.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\small-window-validation.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+Source: "..\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs
+Source: "..\docs\fdm-*.md"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "..\docs\native-rust-plan.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"

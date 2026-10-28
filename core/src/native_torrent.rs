@@ -214,6 +214,7 @@ pub(crate) async fn download(
             fastresume: false,
             persistence: None,
             disable_local_service_discovery: true,
+            peer_limit: Some(snapshot.connections.clamp(1, 128) as usize),
             cancellation_token: Some(session_cancel),
             ratelimits: librqbit::limits::LimitsConfig { download_bps: initial_rate, ..Default::default() },
             ..Default::default()
@@ -264,6 +265,21 @@ pub(crate) async fn download(
                 || path.to_string_lossy().contains(':') {
                 return Err("torrent contains an unsafe file path or symbolic link".into());
             }
+        }
+        let same_torrent = match tokio::fs::read(state.join("metadata.torrent")).await {
+            Ok(previous) => previous.len() <= MAX_DESCRIPTOR
+                && librqbit::torrent_from_bytes(&previous)
+                    .is_ok_and(|torrent| torrent.info_hash == metadata.info_hash),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(format!("cannot read saved torrent metadata: {error}")),
+        };
+        if !same_torrent {
+            // Metadata resolution is list-only: no active storage owns payload yet.
+            // A URL/local descriptor can change identity between retries; old files
+            // must not be published alongside the new torrent's verified pieces.
+            tokio::fs::remove_dir_all(&payload).await
+                .map_err(|e| format!("cannot discard previous torrent payload: {e}"))?;
+            tokio::fs::create_dir_all(&payload).await.map_err(|e| e.to_string())?;
         }
         tokio::fs::write(state.join("metadata.torrent"), &metadata.torrent_bytes).await
             .map_err(|e| format!("cannot save torrent metadata: {e}"))?;
@@ -606,6 +622,56 @@ mod tests {
             Outcome::Completed
         );
         swarm.check(stage.path()).await;
+        swarm.stop().await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn changed_descriptor_discards_stale_payload_before_publication() {
+        let previous = Swarm::new(true, 32 * 1024 + 11).await;
+        let swarm = Swarm::new(false, 48 * 1024 + 13).await;
+        let directory = tempfile::tempdir().unwrap();
+        let task = Arc::new(Mutex::new(Task {
+            url: format!("{}/file.torrent", swarm.http),
+            dir: directory.path().to_owned(),
+            suggested_name: Some("file.torrent".into()),
+            connections: 4,
+            ..Default::default()
+        }));
+        let stage = crate::external::staging_path(&task.lock().unwrap());
+        tokio::fs::create_dir_all(stage.join("state"))
+            .await
+            .unwrap();
+        tokio::fs::create_dir_all(stage.join("payload/nested"))
+            .await
+            .unwrap();
+        tokio::fs::write(stage.join("state/metadata.torrent"), &previous.torrent)
+            .await
+            .unwrap();
+        for (name, bytes) in &previous.files {
+            tokio::fs::write(stage.join("payload").join(name), bytes)
+                .await
+                .unwrap();
+        }
+        previous.stop().await;
+        let ctx = context(Arc::new(RateLimiter::new(0)), Arc::new(RateLimiter::new(0)));
+        assert_eq!(
+            tokio::time::timeout(
+                Duration::from_secs(30),
+                crate::external::run(task.clone(), ctx)
+            )
+            .await
+            .unwrap()
+            .unwrap(),
+            Outcome::Completed
+        );
+        let output = {
+            let task = task.lock().unwrap();
+            assert_eq!(task.file_name, "fixture.bin");
+            task.final_path()
+        };
+        assert_eq!(tokio::fs::read(output).await.unwrap(), swarm.files[0].1);
+        assert!(!stage.exists());
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
         swarm.stop().await;
     }
 

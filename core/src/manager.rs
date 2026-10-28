@@ -33,6 +33,7 @@ struct Inner {
     entries: Mutex<Vec<Entry>>,
     settings: Mutex<Settings>,
     client: Mutex<reqwest::Client>,
+    protocol_client: Mutex<reqwest::Client>,
     global: Arc<RateLimiter>,
     dir: PathBuf,
     next_id: AtomicU64,
@@ -141,6 +142,9 @@ impl Manager {
             .or_else(|_| Settings::default().build_client())
             .expect("http client");
         let global = Arc::new(RateLimiter::new(settings.effective_global_limit()));
+        let protocol_client = settings.build_protocol_client()
+            .or_else(|_| Settings::default().build_protocol_client())
+            .expect("native protocol client");
         let entries = tasks
             .into_iter()
             .map(|t| Entry {
@@ -157,6 +161,7 @@ impl Manager {
             entries: Mutex::new(entries),
             settings: Mutex::new(settings),
             client: Mutex::new(client),
+            protocol_client: Mutex::new(protocol_client),
             global,
             dir: dir.to_path_buf(),
             next_id: AtomicU64::new(next),
@@ -198,6 +203,7 @@ impl Manager {
             rule.host = crate::site::origin(&rule.host)?;
         }
         let client = s.build_client()?;
+        let protocol_client = s.build_protocol_client()?;
         std::fs::create_dir_all(&self.inner.dir).map_err(|e| e.to_string())?;
         {
             // Serialize settings changes with dispatch. A timer tick must not
@@ -218,6 +224,7 @@ impl Manager {
             write_atomic(&self.inner.dir.join("settings.json"), &json)
                 .map_err(|e| e.to_string())?;
             *self.inner.client.lock().unwrap() = client;
+            *self.inner.protocol_client.lock().unwrap() = protocol_client;
             self.inner.global.set_rate(s.effective_global_limit());
             *current = s;
         }
@@ -824,6 +831,7 @@ impl Inner {
             e.speed = 0.0;
             let ctx = Ctx {
                 client: client.clone(),
+                protocol_client: self.protocol_client.lock().unwrap().clone(),
                 global: self.global.clone(),
                 local: e.limiter.clone(),
                 retries: settings.retries,

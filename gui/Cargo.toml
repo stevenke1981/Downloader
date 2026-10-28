@@ -12,6 +12,7 @@ arboard = { version = "3", default-features = false }
 sys-locale = "0.3"
 dirs = "6"
 url = "2"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 
 # Windows: the software renderer's partial (damage-region) presentation via softbuffer
 # leaves parts of the window unpainted/transparent on some systems, so use Skia there.

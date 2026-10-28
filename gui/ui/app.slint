@@ -1,4 +1,4 @@
-export { ToolsWindow, ToolTr, LogWindow } from "tools.slint";
+export { ToolsWindow, ToolTr, LogWindow, PreviewWindow } from "tools.slint";
 import { Button, ComboBox, LineEdit, TextEdit, CheckBox, SpinBox, ListView, ScrollView } from "std-widgets.slint";
 
 export struct Row {
@@ -25,8 +25,8 @@ export struct SegBar {
 }
 
 export global Tr {
-    pure public function preview-unsupported() -> string { return @tr("Preview supports media, images, text, PDF and EPUB. Use Open folder for other file types."); }
-    pure public function preview-failed() -> string { return @tr("Could not open the registered preview application:"); }
+    pure public function preview-unsupported() -> string { return @tr("Preview supports images and text, plus media and document metadata. Use Open folder for other file types."); }
+    pure public function preview-failed() -> string { return @tr("Could not load the built-in preview:"); }
 
     pure public function batch-line(line: int, reason: string) -> string { return @tr("Line {}: {}", line, reason); }
     pure public function batch-empty() -> string { return @tr("Enter at least one download link."); }
@@ -719,7 +719,7 @@ export component AppWindow inherits Window {
             Button { text: @tr("Paste links"); enabled: !root.add-busy; clicked => { root.paste-links(); } }
             Button { text: @tr("Import torrent / Metalink…"); enabled: !root.add-busy; clicked => { root.import-files(); } }
         }
-        Field { label: @tr("Download mode"); ComboBox { model: [@tr("Automatic"), @tr("Video (yt-dlp)")]; current-index <=> root.add-kind; horizontal-stretch: 1; } }
+        Field { label: @tr("Download mode"); ComboBox { model: [@tr("Automatic"), @tr("Webpage media (Rust)")]; current-index <=> root.add-kind; horizontal-stretch: 1; } }
         Field {
             label: @tr("Save to");
             LineEdit { text <=> root.add-folder; placeholder-text: @tr("Default folder for the file type"); horizontal-stretch: 1; }

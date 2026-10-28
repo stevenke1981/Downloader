@@ -696,8 +696,8 @@ msgstr "下載模式"
 msgid "Automatic"
 msgstr "自動"
 
-msgid "Video (yt-dlp)"
-msgstr "影片（yt-dlp）"
+msgid "Webpage media (Rust)"
+msgstr "網頁影音（Rust）"
 
 msgid "Drop torrent / Metalink files here to add downloads."
 msgstr "將 torrent／Metalink 檔案拖放到此處即可新增下載。"
@@ -719,3 +719,24 @@ msgstr "無法使用剪貼簿。"
 
 msgid "Connections (0 = automatic / site default)"
 msgstr "連線數（0 = 自動／網站預設）"
+
+msgid "Download preview"
+msgstr "下載預覽"
+
+msgid "Built-in protocols"
+msgstr "內建通訊協定"
+
+msgid "All protocol engines run inside Downloader using Rust libraries."
+msgstr "所有下載引擎均以 Rust 函式庫在程式內執行。"
+
+msgid "Could not load the built-in preview:"
+msgstr "無法載入內建預覽："
+
+msgid "Preview supports images and text, plus media and document metadata. Use Open folder for other file types."
+msgstr "支援圖片與文字預覽，以及媒體和文件資訊。其他檔案可使用「開啟資料夾」。"
+
+msgid "Built-in Rust"
+msgstr "內建 Rust"
+
+msgid "Unavailable"
+msgstr "無法使用"

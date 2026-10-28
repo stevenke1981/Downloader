@@ -1,15 +1,10 @@
-//! Optional protocol engines. Every invocation uses argv and task-scoped staging.
+//! In-process Rust protocol adapters and verified publication.
+//! The module name is retained for persisted task/API compatibility.
 use crate::engine::{Ctx, Outcome};
 use crate::task::{DownloadKind, Seg, Status, Task, Verification, VerifyState};
 use crate::{checksum, util};
-use base64::Engine as _;
-use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio::io::AsyncReadExt;
-use tokio::process::Command;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Capability {
@@ -18,95 +13,65 @@ pub struct Capability {
     pub path: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Tool {
-    Aria2,
-    Ffmpeg,
-    Ytdlp,
-    Curl,
-}
-
-impl Tool {
-    fn names(self) -> (&'static str, &'static str) {
-        match self {
-            Self::Aria2 => ("aria2c", "DOWNLOADER_ARIA2"),
-            Self::Ffmpeg => ("ffmpeg", "DOWNLOADER_FFMPEG"),
-            Self::Ytdlp => ("yt-dlp", "DOWNLOADER_YTDLP"),
-            Self::Curl => ("curl", "DOWNLOADER_CURL"),
-        }
-    }
-
-    fn path(self) -> Option<PathBuf> {
-        let (name, variable) = self.names();
-        let executable = |path: &Path| {
-            path.is_file()
-                && (!cfg!(windows)
-                    || path.extension().is_some_and(|ext| {
-                        ext.eq_ignore_ascii_case("exe") || ext.eq_ignore_ascii_case("com")
-                    }))
-        };
-        if let Some(path) = std::env::var_os(variable).filter(|s| !s.is_empty()) {
-            let path = PathBuf::from(path);
-            return executable(&path).then_some(path);
-        }
-        let path = std::env::var_os("PATH")?;
-        for directory in std::env::split_paths(&path) {
-            let candidate = directory.join(name);
-            if executable(&candidate) {
-                return Some(candidate);
-            }
-            if cfg!(windows) {
-                let candidate = directory.join(format!("{name}.exe"));
-                if executable(&candidate) {
-                    return Some(candidate);
-                }
-            }
-        }
-        None
-    }
-}
-
 pub fn capabilities() -> Vec<Capability> {
-    [Tool::Aria2, Tool::Ffmpeg, Tool::Ytdlp, Tool::Curl]
-        .into_iter()
-        .map(|tool| {
-            let path = tool.path();
-            Capability {
-                name: tool.names().0.into(),
-                available: path.is_some(),
-                path,
-            }
-        })
-        .collect()
+    [
+        "Rust FTP / directory browser",
+        "Rust Metalink",
+        "Rust BitTorrent / magnet",
+        "Rust HLS / webpage media",
+        "Rust RTSP H.264 / G.711",
+        "Rust MMS-over-HTTP",
+    ]
+    .into_iter()
+    .map(|name| Capability {
+        name: name.into(),
+        available: true,
+        path: None,
+    })
+    .collect()
 }
 
-fn source_tool(source: &str, kind: DownloadKind) -> Option<Tool> {
+#[derive(Debug, Clone, Copy)]
+enum Protocol {
+    Ftp,
+    Metalink,
+    Torrent,
+    Media,
+}
+
+fn protocol(source: &str, kind: DownloadKind) -> Option<Protocol> {
     if kind == DownloadKind::Video {
-        return Some(Tool::Ytdlp);
+        return Some(Protocol::Media);
     }
-    if util::descriptor_path(source).is_some() {
-        return Some(Tool::Aria2);
-    }
-    let url = reqwest::Url::parse(source).ok()?;
-    match url.scheme() {
-        "ftp" | "magnet" => Some(Tool::Aria2),
-        "rtsp" | "mms" | "mmsh" | "mmst" => Some(Tool::Ffmpeg),
-        "http" | "https" => {
-            let name = url.path().to_ascii_lowercase();
-            [".torrent", ".metalink", ".meta4"]
-                .iter()
-                .any(|ext| name.ends_with(ext))
-                .then_some(Tool::Aria2)
+    let extension = if let Some(path) = util::descriptor_path(source) {
+        path.extension()?.to_str()?.to_ascii_lowercase()
+    } else {
+        let url = reqwest::Url::parse(source).ok()?;
+        match url.scheme() {
+            "ftp" => return Some(Protocol::Ftp),
+            "magnet" => return Some(Protocol::Torrent),
+            "rtsp" | "mms" | "mmsh" | "mmst" => return Some(Protocol::Media),
+            "http" | "https" => {}
+            _ => return None,
         }
+        Path::new(url.path())
+            .extension()?
+            .to_str()?
+            .to_ascii_lowercase()
+    };
+    match extension.as_str() {
+        "torrent" => Some(Protocol::Torrent),
+        "metalink" | "meta4" => Some(Protocol::Metalink),
+        "m3u8" => Some(Protocol::Media),
         _ => None,
     }
 }
 
 pub(crate) fn handles(source: &str, kind: DownloadKind) -> bool {
-    source_tool(source, kind).is_some()
+    protocol(source, kind).is_some()
 }
 
-/// Stable across pause/restart. Kept separate from final filenames and unrelated tasks.
+/// Stable across pause/restart. Legacy prefix keeps existing task cleanup compatible.
 pub fn staging_path(task: &Task) -> PathBuf {
     let hash = task
         .url
@@ -119,7 +84,7 @@ pub fn staging_path(task: &Task) -> PathBuf {
         .join(format!(".dlx-external-{:016x}-{hash:016x}", task.id))
 }
 
-fn outputs(directory: &Path, partial: bool) -> Result<Vec<(PathBuf, u64)>, String> {
+fn outputs(directory: &Path) -> Result<Vec<(PathBuf, u64)>, String> {
     let mut files = Vec::new();
     let mut pending = vec![directory.to_path_buf()];
     while let Some(directory) = pending.pop() {
@@ -135,16 +100,6 @@ fn outputs(directory: &Path, partial: bool) -> Result<Vec<(PathBuf, u64)>, Strin
                 pending.push(entry.path());
             }
             if kind.is_file() {
-                let name = entry.file_name();
-                let name = name.to_string_lossy();
-                if name.ends_with(".aria2")
-                    || (!partial
-                        && [".part", ".ytdl", ".tmp"]
-                            .iter()
-                            .any(|ext| name.ends_with(ext)))
-                {
-                    continue;
-                }
                 files.push((
                     entry.path(),
                     entry.metadata().map_err(|e| e.to_string())?.len(),
@@ -156,207 +111,42 @@ fn outputs(directory: &Path, partial: bool) -> Result<Vec<(PathBuf, u64)>, Strin
     Ok(files)
 }
 
-fn command(path: &Path) -> Command {
-    let mut command = Command::new(path);
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .kill_on_drop(true);
-    #[cfg(windows)]
-    command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    command
-}
-
-/// Stop the process tree on Windows, then always reap the direct child.
-async fn stop(child: &mut tokio::process::Child) -> Result<(), String> {
-    #[cfg(windows)]
-    if let (Some(pid), Some(root)) = (child.id(), std::env::var_os("SystemRoot")) {
-        let _ = command(&PathBuf::from(root).join("System32/taskkill.exe"))
-            .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .status()
-            .await;
-    }
-    let _ = child.start_kill();
-    child
-        .wait()
-        .await
-        .map_err(|e| format!("cannot wait for stopped protocol engine: {e}"))?;
-    Ok(())
-}
-
 pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     let snapshot = task.lock().unwrap().clone();
     util::validate_source(&snapshot.url)?;
-    let tool = source_tool(&snapshot.url, snapshot.kind).ok_or("unsupported protocol engine")?;
+    let protocol = protocol(&snapshot.url, snapshot.kind).ok_or("unsupported native protocol")?;
     if snapshot.kind == DownloadKind::Video
         && !reqwest::Url::parse(&snapshot.url).is_ok_and(|u| matches!(u.scheme(), "http" | "https"))
     {
         return Err("website video mode requires an HTTP(S) page URL".into());
     }
-    let ftp = reqwest::Url::parse(&snapshot.url).is_ok_and(|url| url.scheme() == "ftp");
-    // HTTP authentication must never become a header forwarded by a third-party redirect handler.
-    if (snapshot.authorization.is_some() && !ftp)
-        || snapshot.cookie.as_ref().is_some_and(|c| !c.is_empty())
-    {
-        return Err(
-            "external protocol engines do not accept browser cookies or HTTP site credentials"
-                .into(),
-        );
-    }
-    let path = tool.path().ok_or_else(|| {
-        format!(
-            "{} is unavailable; install it or set {} to its executable path",
-            tool.names().0,
-            tool.names().1
-        )
-    })?;
     if ctx.cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
     }
     let stage = staging_path(&snapshot);
-    std::fs::create_dir_all(&stage)
+    std::fs::create_dir_all(stage.join("payload"))
         .map_err(|e| format!("cannot create protocol staging folder: {e}"))?;
+    std::fs::create_dir_all(stage.join("state")).map_err(|e| e.to_string())?;
     let stage = std::fs::canonicalize(stage).map_err(|e| e.to_string())?;
-    let mut cmd = command(&path);
-    let rate = match (ctx.local.rate(), ctx.global.rate()) {
-        (0, rate) | (rate, 0) => rate,
-        (local, global) => local.min(global),
-    };
-    match tool {
-        Tool::Aria2 => {
-            cmd.args([
-                "--no-conf",
-                "--enable-rpc=false",
-                "--continue=true",
-                "--allow-overwrite=false",
-                "--auto-file-renaming=false",
-                "--check-integrity=true",
-                "--seed-time=0",
-                "--bt-save-metadata=false",
-                "--follow-torrent=mem",
-                "--follow-metalink=mem",
-                "--summary-interval=0",
-                "--console-log-level=error",
-                "--download-result=hide",
-            ])
-            .arg(format!(
-                "--max-connection-per-server={}",
-                snapshot.connections.clamp(1, 16)
-            ))
-            .arg(format!("--split={}", snapshot.connections.clamp(1, 16)))
-            .arg(format!("--max-tries={}", ctx.retries.saturating_add(1)))
-            .arg(format!("--max-overall-download-limit={rate}"))
-            .arg("--dir")
-            .arg(&stage);
-            if let Some(value) = snapshot.authorization.as_deref() {
-                let credentials = value
-                    .strip_prefix("Basic ")
-                    .and_then(|value| base64::engine::general_purpose::STANDARD.decode(value).ok())
-                    .and_then(|value| String::from_utf8(value).ok())
-                    .ok_or("invalid FTP site credentials")?;
-                let (username, password) = credentials
-                    .split_once(':')
-                    .ok_or("invalid FTP site credentials")?;
-                cmd.arg(format!("--ftp-user={username}"))
-                    .arg(format!("--ftp-passwd={password}"));
-            }
-            let source = if let Some(local) = util::descriptor_path(&snapshot.url) {
-                std::fs::canonicalize(local)
-                    .map_err(|e| format!("cannot open descriptor: {e}"))?
-                    .into_os_string()
-            } else {
-                OsString::from(&snapshot.url)
-            };
-            cmd.arg("--").arg(source);
-        }
-        Tool::Ffmpeg => {
-            let mut url = reqwest::Url::parse(&snapshot.url).map_err(|e| e.to_string())?;
-            if url.scheme() == "mms" {
-                url.set_scheme("mmsh").map_err(|()| "invalid MMS URL")?;
-            }
-            cmd.args(["-hide_banner", "-nostdin", "-loglevel", "error", "-y"]);
-            if url.scheme() == "rtsp" {
-                cmd.args(["-rtsp_transport", "tcp"]);
-            }
-            cmd.arg("-i")
-                .arg(url.as_str())
-                .args(["-map", "0", "-c", "copy", "-f", "matroska"])
-                .arg(stage.join("capture.mkv"));
-        }
-        Tool::Ytdlp => {
-            cmd.args([
-                "--ignore-config",
-                "--no-playlist",
-                "--no-warnings",
-                "--no-progress",
-                "--restrict-filenames",
-                "--format",
-                "best",
-                "--paths",
-            ])
-            .arg(&stage)
-            .args(["--output", "%(title).150B [%(id)s].%(ext)s"]);
-            if rate > 0 {
-                cmd.arg("--limit-rate").arg(rate.to_string());
-            }
-            if let Some(ffmpeg) = Tool::Ffmpeg.path() {
-                cmd.arg("--ffmpeg-location").arg(ffmpeg);
-            }
-            cmd.arg("--").arg(&snapshot.url);
-        }
-        Tool::Curl => unreachable!(),
-    }
-    {
-        let mut task = task.lock().unwrap();
-        task.resumable = tool != Tool::Ffmpeg;
-        task.error = None;
-        task.segments = vec![Seg::new(0, u64::MAX)];
-        task.total = None;
-        task.append_log(format!("{} protocol engine started", tool.names().0));
-        if rate > 0 && tool == Tool::Ffmpeg {
-            task.append_log("FFmpeg live capture does not support a byte-per-second limit");
-        }
-        if ctx.global.rate() > 0 && tool != Tool::Ffmpeg {
-            task.append_log("External engine limit is applied per process at launch");
-        }
-    }
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("cannot start {}: {e}", tool.names().0))?;
-    let status = loop {
-        tokio::select! {
-            result = child.wait() => break result.map_err(|e| format!("protocol engine wait failed: {e}"))?,
-            _ = ctx.cancel.cancelled() => {
-                stop(&mut child).await?;
-                task.lock().unwrap().append_log("Protocol engine stopped; staged data retained");
-                return Ok(Outcome::Cancelled);
-            }
-            _ = tokio::time::sleep(Duration::from_millis(500)) => {
-                if let Ok(files) = outputs(&stage, true) {
-                    task.lock().unwrap().segments[0].pos = files.iter().map(|(_, size)| size).sum();
-                }
-            }
-        }
-    };
     task.lock()
         .unwrap()
-        .append_log(format!("{} exited with {status}", tool.names().0));
-    if ctx.cancel.is_cancelled() {
+        .append_log(format!("Starting native Rust {protocol:?} adapter"));
+    // Adapters own network cancellation and protocol integrity; state never enters publication.
+    let verify = ctx.verify;
+    let cancel = ctx.cancel.clone();
+    let result = match protocol {
+        Protocol::Ftp => crate::native_ftp::download(task.clone(), ctx, &stage).await,
+        Protocol::Metalink => crate::native_metalink::download(task.clone(), ctx, &stage).await,
+        Protocol::Torrent => crate::native_torrent::download(task.clone(), ctx, &stage).await,
+        Protocol::Media => crate::native_media::download(task.clone(), ctx, &stage).await,
+    }?;
+    if result == Outcome::Cancelled || cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
     }
-    if !status.success() {
-        return Err(format!(
-            "{} failed ({status}); staged data retained",
-            tool.names().0
-        ));
-    }
-    let files = outputs(&stage, false)?;
+    let payload = stage.join("payload");
+    let files = outputs(&payload)?;
     if files.is_empty() {
-        return Err(format!(
-            "{} exited successfully but produced no completed output",
-            tool.names().0
-        ));
+        return Err("native protocol produced no completed output".into());
     }
     let total = files.iter().map(|(_, size)| size).sum();
     if let Some(expected) = snapshot.checksum {
@@ -403,20 +193,28 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
             return Err("verification failed; staged output was not published".into());
         }
     } else {
-        task.lock().unwrap().verification = ctx.verify.then(|| Verification { state: VerifyState::NoChecksum, note: "No explicit whole-file checksum; protocol metadata checks, when present, are handled by the external engine".into(), ..Default::default() });
+        task.lock().unwrap().verification = verify.then(|| Verification { state: VerifyState::NoChecksum, note: "No explicit whole-file checksum; protocol metadata checks, when present, are validated by the native Rust adapter".into(), ..Default::default() });
     }
-    if ctx.cancel.is_cancelled() {
+    if cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
     }
     let name = if files.len() == 1 {
-        snapshot
+        let actual = util::sanitize(&files[0].0.file_name().unwrap_or_default().to_string_lossy());
+        let suggested = snapshot
             .suggested_name
             .as_deref()
             .map(util::sanitize)
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| {
-                util::sanitize(&files[0].0.file_name().unwrap_or_default().to_string_lossy())
-            })
+            .filter(|s| !s.is_empty());
+        match protocol {
+            Protocol::Ftp => suggested.unwrap_or(actual),
+            // Descriptor names describe the request, not the downloaded payload.
+            Protocol::Torrent | Protocol::Metalink => actual,
+            Protocol::Media => suggested.map_or(actual, |name| {
+                let mut name = PathBuf::from(name);
+                name.set_extension(files[0].0.extension().unwrap_or_default());
+                name.to_string_lossy().into_owned()
+            }),
+        }
     } else {
         let name = util::name_from_url(&snapshot.url);
         let stem = Path::new(&name)
@@ -434,13 +232,11 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     let source = if files.len() == 1 {
         &files[0].0
     } else {
-        &stage
+        &payload
     };
     std::fs::rename(source, &destination)
         .map_err(|e| format!("cannot publish protocol output: {e}"))?;
-    if files.len() == 1 {
-        let _ = std::fs::remove_dir_all(&stage);
-    }
+    let _ = std::fs::remove_dir_all(&stage);
     let mut task = task.lock().unwrap();
     task.file_name = name;
     task.category = crate::category::Category::from_name(&task.file_name);
@@ -455,66 +251,8 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     Ok(Outcome::Completed)
 }
 
-/// List one FTP directory. Credentials remain in memory and never enter URL/history/logs.
+/// List one FTP directory in process. Credentials are never persisted.
 pub async fn list_ftp(url: &str, username: &str, password: &str) -> Result<Vec<String>, String> {
     util::validate_source(url)?;
-    let url = reqwest::Url::parse(url.trim()).map_err(|e| e.to_string())?;
-    if url.scheme() != "ftp" {
-        return Err("FTP browser requires an ftp:// URL".into());
-    }
-    let path = Tool::Curl
-        .path()
-        .ok_or("curl is unavailable; set DOWNLOADER_CURL to its executable path")?;
-    let mut cmd = command(&path);
-    cmd.args([
-        "--disable",
-        "--silent",
-        "--fail",
-        "--list-only",
-        "--max-time",
-        "30",
-        "--proto",
-        "=ftp",
-    ]);
-    if !username.is_empty() || !password.is_empty() {
-        cmd.arg("--user").arg(format!("{username}:{password}"));
-    }
-    cmd.arg("--url").arg(url.as_str()).stdout(Stdio::piped());
-    let mut child = cmd.spawn().map_err(|e| format!("cannot start curl: {e}"))?;
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("cannot read FTP directory output")?;
-    let read = tokio::spawn(async move {
-        let mut bytes = Vec::new();
-        stdout
-            .take((1 << 20) + 1)
-            .read_to_end(&mut bytes)
-            .await
-            .map(|_| bytes)
-    });
-    let status = tokio::select! {
-        result = child.wait() => result.map_err(|e| e.to_string())?,
-        _ = tokio::time::sleep(Duration::from_secs(35)) => {
-            stop(&mut child).await?;
-            read.abort();
-            return Err("FTP directory listing timed out".into());
-        }
-    };
-    let bytes = read
-        .await
-        .map_err(|e| e.to_string())?
-        .map_err(|e| e.to_string())?;
-    if bytes.len() > 1 << 20 {
-        return Err("FTP directory listing exceeds 1 MiB".into());
-    }
-    if !status.success() {
-        return Err(format!("FTP directory listing failed ({status})"));
-    }
-    let text = String::from_utf8(bytes).map_err(|_| "FTP directory listing is not UTF-8")?;
-    Ok(text
-        .lines()
-        .filter(|line| !line.is_empty() && *line != "." && *line != "..")
-        .map(str::to_owned)
-        .collect())
+    crate::native_ftp::list(url, username, password).await
 }

@@ -25,3 +25,8 @@ pub use limiter::RateLimiter;
 pub use manager::{Manager, NewDownload, Snapshot};
 pub use settings::{Schedule, Settings};
 pub use task::{Seg, Status, Task, Verification, VerifyState};
+
+mod native_ftp;
+mod native_metalink;
+mod native_torrent;
+mod native_media;

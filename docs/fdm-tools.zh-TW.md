@@ -1,55 +1,28 @@
-# 下載工具使用說明
+# 內建 Rust 下載引擎
 
-HTTP／HTTPS 使用內建下載引擎；原有分段續傳、Google Drive 登入頁拒收與校驗功能保留。新增功能集中在主視窗的「工具」按鈕。
+所有下載協定均在 Downloader 程序內執行，無 aria2、FFmpeg、yt-dlp、curl 或其他可執行檔 fallback。`dlx --tools` 顯示「built-in Rust」。舊 `DOWNLOADER_ARIA2` 等環境變數不再生效。Windows GUI 仍使用 Slint／Skia；「原生 Rust」指下載實作與內嵌 Rust 協定函式庫，並非宣稱整個桌面相依樹沒有作業系統或 C/C++ 元件。
 
-## 新增、批次與影音
-
-新增視窗可貼上多個網址。整批資料會先驗證與去重，錯誤時保留輸入供修正；不會只加入一部分再忽略錯誤。透過匯入按鈕或將 `.torrent`、`.metalink`、`.meta4` 檔案拖到主視窗／精簡視窗也能加入。網址清單文字檔可使用匯入流程。
-
-普通網頁與影片頁不能從副檔名判定，網站影片需明確選擇影音模式，交由 yt-dlp 擷取。已完成的支援媒體／圖片／文件可按預覽，使用系統預設檢視器；其他檔案請使用開啟資料夾。來源連結可複製，記錄視窗可查看狀態與引擎訊息。
-
-## 外部引擎
-
-| 工具 | 用途 | 官方來源 |
+| 協定 | Rust 實作與範圍 | 續傳／限制 |
 |---|---|---|
-| aria2c | FTP、Torrent、磁力連結、Metalink 鏡像與內建 piece 校驗 | https://aria2.github.io/ |
-| FFmpeg | RTSP／MMS 串流擷取 | https://ffmpeg.org/ |
-| yt-dlp | 明確指定的網站影音下載 | https://github.com/yt-dlp/yt-dlp |
-| curl | FTP 目錄列表 | https://curl.se/ |
+| HTTP／HTTPS | 原有 Tokio／reqwest 分段引擎 | Range、ETag／Last-Modified、共用動態限速與 checksum |
+| FTP | Tokio TCP；USER/PASS、binary、EPSV／PASV、SIZE／MDTM／REST、NLST | 只有來源大小與時間識別一致且 REST 接受才接續；其他情況重新下載；無 FTPS |
+| Metalink v3／v4 | roxmltree；HTTP／FTP 多鏡像、多檔案、digest 校驗 | 已驗證的完成檔可保留；HTTP 半成品重抓；無分塊鏡像拼接 |
+| Torrent／magnet | 內嵌 librqbit 9.0.1（Apache-2.0） | peer／tracker／DHT／piece SHA-1 校驗與持久化狀態；單任務限速與共用接收量節流 |
+| HLS | master／media、byte range、AES-128 identity、直播輪詢；TS／fMP4／AAC／ID3 | 中斷後重新擷取；無 DRM、LL-HLS、discontinuity、外部分離音軌、加密 init map 或轉碼 |
+| 網頁影音 | scraper HTML、直接 media／OpenGraph／公開 player JSON URL、HLS | 不執行網頁 JavaScript，不破解 signatureCipher；不保證所有 YouTube 影片或網站 |
+| RTSP | retina 0.4.20（MIT OR Apache-2.0）；RTP over TCP H.264、音訊獨立串流 PCMU／PCMA | H.264 優先，輸出 Annex B .h264；G.711 解碼為 PCM16 WAV；不混流；須收到 RTCP BYE 才完成，重新擷取 |
+| MMS | Microsoft MMS-over-HTTP（MMSH／MS-WMSP）固定 packet ASF 封裝解析 | 不支援 MMST TCP transport 或可變 packet ASF；不宣稱所有舊伺服器相容 |
 
-工具視窗與 `dlx --tools` 會顯示可用性。將工具放在 PATH，或把環境變數 `DOWNLOADER_ARIA2`／`DOWNLOADER_FFMPEG`／`DOWNLOADER_YTDLP`／`DOWNLOADER_CURL` 設為對應可執行檔的完整路徑，再重新啟動 App。專案不自動安裝或綁定第三方工具。
+每個任務使用專屬 staging：`payload/` 只放可發布內容，`state/` 保留協定與續傳資料。下載成功後先檢查顯式 whole-file checksum，再發布檔案。多檔下載無法用單一 whole-file checksum 驗證，會明確失敗；不發布控制檔。失敗／取消保留 staging，刪除任務會等待 worker 結束後清理。
 
-外部引擎以任務專屬暫存資料夾執行；沒有產生可確認的輸出不會標成完成。多檔 Torrent／Metalink 的輸出以資料夾表示。續傳依引擎的控制檔與來源能力，串流擷取不能保證接續。aria2c／yt-dlp 以啟動當時的單程序限速執行，沒有跨程序總限速與即時限速同步；FFmpeg 沒有位元組限速。外部引擎不接收瀏覽器 Cookie。
+同一 Torrent 來源若換成不同 info hash，會先捨棄舊 payload；相同 hash 的重啟仍重算 piece hash。Torrent／Metalink 採實際內容檔名，媒體保留瀏覽器建議名稱的主幹並採實際格式的副檔名，避免把 TS 內容存成 `.m3u8`。
 
-## 流量、站點與資料夾
+HTTP／FTP／HLS 等位元組路徑使用共用全域與單項 limiter。BitTorrent 使用 session cap 加上暫停／恢復式共用節流，已在網路中的 peer blocks 與取樣期間可能造成短暫超量，不宣稱逐封包精確整形。所有等待均可取消。設定的 HTTP／SOCKS proxy 適用 reqwest 的 HTTP descriptor／鏡像／媒體請求；原始 FTP、RTSP 與 Torrent peer／tracker 連線尚未接上自訂 proxy。
 
-流量頁可設定低／中／高三種每秒位元組上限，也能保留原有自訂限速。內建 HTTP 引擎的模式變更會更新實際全域 limiter。
+瀏覽器 Cookie 與站點帳密只在記憶體中使用，不寫入狀態或記錄。HTTP 子資源只對原始來源傳送授權資料，跨來源鏡像／媒體不繼承。FTP 帳密透過站點設定輸入，來源 URL 不接受內嵌密碼。
 
-站點規則以完整 origin（協定、主機、連接埠）識別，設定每站同時下載數與每項連線數。新增下載的連線數預設為 0，表示採用該站設定；填入正整數才覆寫此預設。站點密碼僅保留本次執行記憶體，重啟後須重輸；不會寫入設定、下載歷史或任務記錄。FTP 目錄可先列出，再編輯網址清單、只保留要下載的項目後加入；檔名中的空白、#、% 等會編碼為完整網址。副檔名資料夾規則優先於原有分類子資料夾。
+GUI 支援批次貼上、拖放 descriptor、FTP 目錄選檔、遞迴同源 HTML 擷取、站點限制、分類資料夾、三組流量模式、一次性排程與 token 遠端 API。遠端 API 預設關閉且綁定 loopback；跨 Internet tunnel 需另設，不把本機測試宣稱為跨網路驗證。
 
-## 網頁擷取
+內建預覽解碼 PNG／JPEG／GIF 首幀／BMP／WebP，限制 32 MiB 壓縮檔、8192×8192 尺寸、16 百萬像素輸出與 64 MiB 解碼配置；文字顯示前 256 KiB，HTML 只顯示文字。其他支援媒體／PDF／EPUB 顯示檔案資訊，尚無播放或排版。下載檔案不交給外部檢視器執行。
 
-輸入網址、最大深度與最大頁數後，程式列出同源連結。只有明確按下加入才建立下載。擷取器不執行網頁腳本，不跨 origin 跟隨重新導向；它是 HTML 連結擷取，不是 Google Drive 資料夾列舉或完整網站離線重寫。
-
-## 計劃任務
-
-原有每日下載時段保留；工具頁可另外建立單次開始全部、暫停全部、啟動外部程式或關機動作。外部程式的程式路徑與參數分開輸入，不經 shell。單次動作先持久化為已消耗才執行，重啟不會再次啟動；執行結果可查看記錄。App／headless manager 必須保持執行，這不是作業系統排程服務。請僅在確實需要時明確建立關機或啟動程式動作。
-
-## 遠端控制
-
-遠端 API 預設關閉。從工具頁產生 token，設定 loopback 位址並啟用後，可以用 `dlxctl` 控制佇列。token 不應放進公開網址或分享截圖；CLI 可從 `DOWNLOADER_REMOTE_TOKEN` 讀取，避免寫入命令列歷史。伺服器不提供設定／密碼讀取或遠端程式執行／關機。
-
-跨網路使用可建立 SSH tunnel 將遠端本機埠轉發至 App 的 loopback 監聽埠；程式不自動開放防火牆或部署公開服務。實際 Internet tunnel 驗證若未執行，驗收會另列 NOT_RUN。
-
-```text
-dlx --tools
-dlx ftp://example.org/file.zip -o Downloads
-dlx ./example.torrent -o Downloads
-dlx ./example.meta4 -o Downloads
-dlx --video https://example.org/video -o Downloads
-dlxctl --help
-dlxctl list
-dlxctl crawl https://example.org/ --depth 1 --pages 16
-```
-
-API 與 GUI／命令列的實測結果見 [驗收記錄](fdm-validation.md)。
+驗收入口：`powershell -File scripts/verify-fdm.ps1`。它執行 release 建置、Rust loopback 協定測試、GUI 元件測試與 extension 回歸，不需要另外安裝下載工具。實際 GUI 操作、公開網站相容性與其他平台分開記錄於 [驗收紀錄](fdm-validation.md)。

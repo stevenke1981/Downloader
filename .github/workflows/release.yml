@@ -38,7 +38,10 @@ jobs:
         run: |
           N=downloader-${{ matrix.name }}
           mkdir -p dist/$N
-          cp README.md LICENSE dist/$N/
+          cp README.md LICENSE THIRD_PARTY.md dist/$N/
+          cp -r licenses dist/$N/licenses
+          mkdir -p dist/$N/docs
+          cp docs/fdm-*.md docs/native-rust-plan.md dist/$N/docs/
           cp docs/desktop-controls.zh-TW.md dist/$N/
           cp docs/browser-setup.zh-TW.md dist/$N/
           cp docs/fdm-tools.zh-TW.md docs/fdm-feature-matrix.zh-TW.md dist/$N/

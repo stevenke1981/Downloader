@@ -1,33 +1,32 @@
 # Free Download Manager 功能對照
 
-需求來源：[維基百科 Free Download Manager](https://zh.wikipedia.org/zh-tw/Free_Download_Manager)（2026-10-28 讀取，oldid=94816096）。下表以功能用途對齊，並區分內建引擎、外部工具與歷史服務。
+需求來源：[維基百科 Free Download Manager](https://zh.wikipedia.org/zh-tw/Free_Download_Manager)（2026-10-28 讀取，oldid=94816096）。以功能用途對齊；2026-10-28 新要求將下載引擎改為程序內 Rust。下列「支援」仍以 [驗收證據](fdm-validation.md) 為準，不能把入口或函式庫能力視為實際測試。
 
-| 來源功能 | Downloader 基準 | 本次交付入口／驗收 |
+| 來源功能 | Downloader 實作 | 邊界 |
 |---|---|---|
-| 分頁／依類型組織下載 | 側邊分類、詳細資訊、設定分頁 | 保留既有流程，新增工具分頁 |
-| 每項進度與連線狀態 | 進度、分段圖、狀態、錯誤 | 補任務記錄與工具狀態 |
-| 檔案預覽 | 完成項目定位檔案 | 補使用預設檢視器開啟 |
-| 共享下載資訊 | 尚無明確入口 | 複製來源 URL；不自動上傳檔案 |
-| 拖放框 | 浮動精簡視窗 | 主視窗／精簡視窗匯入 torrent/Metalink/URL 清單 |
-| HTTP | 內建 HTTP/HTTPS | 回歸既有 Range、Drive、校驗測試 |
-| FTP | 未支援 | aria2c 外部引擎；curl 站點列表 |
-| RTSP/MMS | 未支援 | FFmpeg 串流擷取；實際來源驗證分開記錄 |
-| 批次下載 | 瀏覽器 IPC 批次 | GUI 多行貼上、去重與整批驗證 |
-| 分段同時下載 | 內建最多 32 連線、動態切段 | 保留 |
-| BitTorrent | 未支援 | aria2c；本專案未使用 libtorrent |
-| Metalink 鏡像 | 未支援 | aria2c 的 Metalink 校驗與鏡像 |
-| 磁力連結 | 未支援 | aria2c 的 magnet 入口 |
-| 網站影音 | 只接收直接影音 URL | 明確選擇影音模式後使用 yt-dlp |
-| 中斷續傳 | 內建持久化分段、ETag/Last-Modified | 內建 HTTP 保留；外部依引擎能力 |
-| 低／中／高流量模式 | 手動全域與單項限速 | 三組可設定模式與實際 limiter 接線 |
-| 剪貼簿匯入 URL 列表 | 單一 URL 監看 | 多行列表與手動貼上 |
-| 瀏覽器整合 | Chrome/Brave/Edge MV3、Cookie 暫存 | 保留擴充功能與 IPC 回歸 |
-| Internet 遠端控制 | 僅本機 Native Messaging IPC | 預設關閉的 token 驗證 HTTP API；跨網路可透過 SSH tunnel |
-| 自訂副檔名資料夾 | 內建類型資料夾 | 自訂副檔名與目的資料夾規則 |
-| 計劃任務開始／停止 | 重複時段排程 | 加入持久化單次開始／停止動作 |
-| 排程啟動程式／關機 | 未支援 | 使用者明確新增的 argv／關機動作；驗收不真的關機 |
-| 站點分析／FTP 客戶端 | 未支援 | FTP 目錄列出並選擇下載 |
-| 站點驗證與連線限制 | 瀏覽器 Cookie、全域佇列 | 精確 host profile、記憶體內密碼、每站併發與連線 |
-| HTML 遞迴擷取 | 目前頁面的全部連結 | 有深度／頁數界限的同源擷取 |
+| 分頁／依類型組織 | 分類側邊欄、詳細資訊、設定與工具分頁 | 保留既有 GUI |
+| 進度、連線、記錄 | 進度／分段圖／狀態與任務記錄 | 記錄上限 100 筆 |
+| 預覽 | 內建 Rust 圖片、文字與目錄清單 | 媒體／PDF／EPUB 僅資訊，無播放／排版 |
+| 共享下載資訊 | 複製來源 URL | 不自動上傳檔案 |
+| 拖放框 | 精簡浮動視窗與 Winit 檔案拖放 | 可匯入 torrent／Metalink／URL 清單 |
+| HTTP／HTTPS | Tokio／reqwest Range 分段引擎 | Google Drive 內容驗證保留 |
+| FTP／FTP 客戶端 | 原生 Tokio FTP、登入、目錄列出、選檔下載 | 無 FTPS；被動傳輸 |
+| RTSP | retina Rust RTSP／RTP over TCP | H.264 Annex B 或音訊獨立串流 PCMU／PCMA 至 PCM16 WAV；無音訊混流；RTCP BYE 完成 |
+| MMS | 原生 MMS-over-HTTP ASF 接收 | 無 MMST；舊伺服器相容性另驗 |
+| 批次下載 | 多行貼上、去重、整批驗證 | GUI／CLI／擴充功能 |
+| 多連線分段 | 既有 HTTP 最多 32 連線、動態切段 | FTP／串流不宣稱 HTTP 式分段 |
+| BitTorrent／magnet | 內嵌 librqbit Rust session、tracker／peer／DHT | 不使用 C++ libtorrent；公開 DHT 另驗 |
+| Metalink | 原生 v3／v4、多檔、多鏡像、checksum | 無分塊鏡像拼接 |
+| 網站影音 | 直接 media／OpenGraph／公開 player URL 與 HLS | 不解密 DRM／JS 簽章；不保證所有 YouTube |
+| 斷點續傳 | HTTP validator、FTP SIZE／MDTM／REST、Torrent piece rehash | Metalink HTTP 半成品重抓；串流重新擷取 |
+| 低／中／高流量 | 可設定模式、全域與單項 limiter | Torrent 取樣式背壓可能短暫超量 |
+| 剪貼簿 URL 列表 | 多行監看與手動貼上 | 可整批加入 |
+| 瀏覽器整合 | Chrome／Brave／Edge MV3、Native Messaging、記憶體 Cookie | 不以瀏覽器登入頁當檔案 |
+| Internet 遠端控制 | 預設關閉、token 驗證 loopback HTTP API／dlxctl | Internet tunnel 需另設；不宣稱已驗證 |
+| 副檔名資料夾 | 類型分類與自訂副檔名路徑規則 | 既有路徑持久化 |
+| 排程開始／停止 | 重複時段與持久化單次動作 | consume-before-execute |
+| 排程執行程式／關機 | 使用者明確設定 argv／系統關機 | 驗收不實際關機；非下載依賴 |
+| 站點驗證／限制 | 精確 origin 帳密、每站併發與連線 | HTTP 子資源不繼承跨來源憑證 |
+| HTML 遞迴擷取 | 同源、有深度與頁數上限 | 不等於 Drive 資料夾列舉 |
 
-驗收狀態隨整合更新於 `fdm-validation.md`；「有入口」不能替代實際下載成功證據。Google Video 與 Flash 是來源文章描述的歷史用途，不聲稱能恢復已停止的服務。站點擷取不等於 Google Drive 資料夾列舉。
+Flash 與 Google Video 是來源文章的歷史用途，不宣稱恢復已停止的服務。原有外部引擎驗收保留為歷史記錄，不代表本次原生引擎通過。實作規格與分工見 [native-rust-plan.md](native-rust-plan.md)；協定詳細限制見 [fdm-tools.zh-TW.md](fdm-tools.zh-TW.md)。

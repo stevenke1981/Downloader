@@ -22,6 +22,8 @@ pub const MIN_SPLIT: u64 = 256 * 1024;
 #[derive(Clone)]
 pub struct Ctx {
     pub client: reqwest::Client,
+    /// Native adapters inspect redirects before forwarding origin-scoped credentials.
+    pub protocol_client: reqwest::Client,
     pub global: Arc<RateLimiter>,
     pub local: Arc<RateLimiter>,
     pub retries: u32,

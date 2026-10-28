@@ -101,7 +101,7 @@ pub struct Task {
     /// Exact-origin HTTP Basic Authorization. Passwords are never persisted.
     #[serde(skip)]
     pub authorization: Option<String>,
-    /// Bounded lifecycle messages. External process output and request headers are excluded.
+    /// Bounded lifecycle messages. Request headers and credentials are excluded.
     pub log: Vec<String>,
     /// Bytes hashed so far while verifying (not persisted).
     #[serde(skip)]

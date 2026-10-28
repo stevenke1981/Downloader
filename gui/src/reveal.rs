@@ -42,11 +42,101 @@ pub enum PreviewError {
     Open(String),
 }
 
-/// Preview media/documents using their registered viewer. Executable content
-/// remains an explicit user action in the file manager.
-pub fn preview(status: Status, path: &Path) -> Result<(), PreviewError> {
+/// Decode a bounded local image/text preview in-process. Other supported documents
+/// and media get metadata; downloaded content is never executed.
+pub struct Preview {
+    pub name: String,
+    pub text: String,
+    pub image: Option<(u32, u32, Vec<u8>)>,
+}
+
+pub fn preview(status: Status, path: &Path) -> Result<Preview, PreviewError> {
+    use std::io::Read;
     let file = preview_file(status, path)?;
-    platform_open(&file).map_err(PreviewError::Open)
+    let name = file
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
+    if file.is_dir() {
+        let mut names = std::fs::read_dir(&file)
+            .map_err(|e| PreviewError::Open(e.to_string()))?
+            .take(201)
+            .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| PreviewError::Open(e.to_string()))?;
+        names.sort();
+        let truncated = names.len() > 200;
+        names.truncate(200);
+        let text = format!(
+            "{}\n\n{}{}",
+            file.display(),
+            names.join("\n"),
+            if truncated { "\n…" } else { "" }
+        );
+        return Ok(Preview {
+            name,
+            text,
+            image: None,
+        });
+    }
+    let meta = std::fs::metadata(&file).map_err(|e| PreviewError::Open(e.to_string()))?;
+    let extension = file
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mut text = format!("{}\n{} bytes\n", file.display(), meta.len());
+    let image = if matches!(
+        extension.as_str(),
+        "png" | "jpg" | "jpeg" | "gif" | "bmp" | "webp"
+    ) {
+        if meta.len() > 32 * 1024 * 1024 {
+            return Err(PreviewError::Open(
+                "Image exceeds 32 MiB preview limit".into(),
+            ));
+        }
+        let mut reader =
+            image::ImageReader::open(&file).map_err(|e| PreviewError::Open(e.to_string()))?;
+        let mut limits = image::Limits::default();
+        limits.max_image_width = Some(8192);
+        limits.max_image_height = Some(8192);
+        limits.max_alloc = Some(64 * 1024 * 1024);
+        reader.limits(limits);
+        let image = reader
+            .decode()
+            .map_err(|e| PreviewError::Open(e.to_string()))?;
+        // A grayscale decode can fit the decoder budget but expand fourfold to RGBA.
+        if u64::from(image.width()) * u64::from(image.height()) > 16 * 1024 * 1024 {
+            return Err(PreviewError::Open(
+                "Image exceeds 16 megapixel preview limit".into(),
+            ));
+        }
+        let image = image.into_rgba8();
+        text.push_str(&format!("{} × {}", image.width(), image.height()));
+        Some((image.width(), image.height(), image.into_raw()))
+    } else if matches!(
+        extension.as_str(),
+        "txt" | "md" | "log" | "json" | "csv" | "xml" | "html" | "htm" | "srt" | "vtt"
+    ) {
+        let mut bytes = Vec::new();
+        std::fs::File::open(&file)
+            .map_err(|e| PreviewError::Open(e.to_string()))?
+            .take(256 * 1024)
+            .read_to_end(&mut bytes)
+            .map_err(|e| PreviewError::Open(e.to_string()))?;
+        text.push_str(&String::from_utf8_lossy(&bytes));
+        if meta.len() > bytes.len() as u64 {
+            text.push_str("\n… (256 KiB preview limit)");
+        }
+        None
+    } else {
+        text.push_str(
+            "Media / document metadata preview. Playback and document rendering are not available.",
+        );
+        None
+    };
+    Ok(Preview { name, text, image })
 }
 
 fn platform_open(path: &Path) -> Result<(), String> {
@@ -125,6 +215,18 @@ fn preview_file(status: Status, path: &Path) -> Result<PathBuf, PreviewError> {
             | "tif"
             | "tiff"
             | "txt"
+            | "md"
+            | "log"
+            | "json"
+            | "csv"
+            | "xml"
+            | "html"
+            | "htm"
+            | "srt"
+            | "vtt"
+            | "h264"
+            | "ts"
+            | "asf"
             | "pdf"
             | "epub"
     ) {
@@ -205,6 +307,35 @@ mod tests {
         assert!(preview_file(Status::Completed, dir.path()).is_ok());
         assert!(preview_file(Status::Paused, &text).is_err());
         assert!(preview_file(Status::Completed, &executable).is_err());
+    }
+    #[test]
+    fn preview_decodes_images_and_bounds_text_without_opening_a_viewer() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("page.html");
+        let bytes = vec![b'x'; 300 * 1024];
+        std::fs::write(&file, bytes).unwrap();
+        let content = preview(Status::Completed, &file).unwrap();
+        assert!(content.image.is_none());
+        assert!(content.text.contains("256 KiB preview limit"));
+        assert!(content.text.len() < 257 * 1024);
+        let file = dir.path().join("image.png");
+        image::RgbaImage::from_pixel(2, 3, image::Rgba([12, 34, 56, 255]))
+            .save(&file)
+            .unwrap();
+        let content = preview(Status::Completed, &file).unwrap();
+        let (width, height, bytes) = content.image.unwrap();
+        assert_eq!((width, height), (2, 3));
+        assert_eq!(bytes, [12, 34, 56, 255].repeat(6));
+        let invalid = dir.path().join("invalid.png");
+        std::fs::write(&invalid, b"not an image").unwrap();
+        assert!(preview(Status::Completed, &invalid).is_err());
+        let large = dir.path().join("large-grayscale.png");
+        image::GrayImage::from_pixel(4097, 4096, image::Luma([0]))
+            .save(&large)
+            .unwrap();
+        assert!(
+            matches!(preview(Status::Completed, &large), Err(PreviewError::Open(message)) if message.contains("16 megapixel"))
+        );
     }
     #[test]
     fn rejects_every_unfinished_state_even_when_file_exists() {
