@@ -49,30 +49,47 @@ struct Probe {
 }
 
 fn hdr(r: &reqwest::Response, h: reqwest::header::HeaderName) -> Option<String> {
-    r.headers().get(h).and_then(|v| v.to_str().ok()).map(str::to_string)
+    r.headers()
+        .get(h)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string)
 }
 
 /// A single satisfied byte range. Keep the inclusive end so u64::MAX cannot wrap.
 fn content_range(value: &str) -> Option<(u64, u64, Option<u64>)> {
     fn number(s: &str) -> Option<u64> {
-        if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) { return None; }
+        if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
         s.parse().ok()
     }
     let (unit, value) = value.trim().split_once(' ')?;
-    if !unit.eq_ignore_ascii_case("bytes") { return None; }
+    if !unit.eq_ignore_ascii_case("bytes") {
+        return None;
+    }
     let (range, total) = value.split_once('/')?;
     let (start, end) = range.split_once('-')?;
     let (start, end) = (number(start)?, number(end)?);
-    let total = if total == "*" { None } else { Some(number(total)?) };
-    if start > end || total.is_some_and(|n| end >= n) { return None; }
+    let total = if total == "*" {
+        None
+    } else {
+        Some(number(total)?)
+    };
+    if start > end || total.is_some_and(|n| end >= n) {
+        return None;
+    }
     Some((start, end, total))
 }
 
 fn response_range(resp: &reqwest::Response) -> Result<(u64, u64, Option<u64>), String> {
     let mut values = resp.headers().get_all(CONTENT_RANGE).iter();
     let value = values.next().and_then(|v| v.to_str().ok());
-    if values.next().is_some() { return Err("invalid Content-Range: multiple fields".into()); }
-    value.and_then(content_range).ok_or_else(|| "invalid or missing Content-Range".into())
+    if values.next().is_some() {
+        return Err("invalid Content-Range: multiple fields".into());
+    }
+    value
+        .and_then(content_range)
+        .ok_or_else(|| "invalid or missing Content-Range".into())
 }
 
 /// HTTP status code from an error string such as "HTTP 404 Not Found".
@@ -88,36 +105,67 @@ fn permanent(code: u16) -> bool {
 /// True when `a` and `b` share scheme, host and port (default ports count as the same). Anything unparseable is not.
 fn same_origin(a: &str, b: &str) -> bool {
     match (reqwest::Url::parse(a), reqwest::Url::parse(b)) {
-        (Ok(x), Ok(y)) => x.scheme() == y.scheme() && x.host_str().is_some() && x.host_str() == y.host_str() && x.port_or_known_default() == y.port_or_known_default(),
+        (Ok(x), Ok(y)) => {
+            x.scheme() == y.scheme()
+                && x.host_str().is_some()
+                && x.host_str() == y.host_str()
+                && x.port_or_known_default() == y.port_or_known_default()
+        }
         _ => false,
     }
 }
 
-const COOKIE_HINT: &str = " — login cookies are not kept after a restart; add the download again from the browser";
+const COOKIE_HINT: &str =
+    " — login cookies are not kept after a restart; add the download again from the browser";
 
 /// Adds a hint to a 401/403 when the login cookie used before a restart is gone (cookies are never persisted).
 fn with_cookie_hint(err: String, lost_cookie: bool) -> String {
-    if lost_cookie && matches!(http_code(&err), Some(401 | 403)) { format!("{err}{COOKIE_HINT}") } else { err }
+    if lost_cookie && matches!(http_code(&err), Some(401 | 403)) {
+        format!("{err}{COOKIE_HINT}")
+    } else {
+        err
+    }
 }
 
-async fn probe(client: &reqwest::Client, url: &str, referer: Option<&str>, cookie: Option<&str>) -> Result<Probe, String> {
+async fn probe(
+    client: &reqwest::Client,
+    url: &str,
+    referer: Option<&str>,
+    cookie: Option<&str>,
+    authorization: Option<&str>,
+) -> Result<Probe, String> {
     let mut target = google_drive::download_url(url)?;
     let mut drive_download = google_drive::is_drive(&target);
     let mut confirmations = 0;
     let resp = loop {
         let mut req = client.get(target.clone()).header(RANGE, "bytes=0-0");
-        if let Some(r) = referer { req = req.header(reqwest::header::REFERER, r); }
+        if let Some(r) = referer {
+            req = req.header(reqwest::header::REFERER, r);
+        }
         // The browser header applies only to its original origin, including when
         // following a confirmation form. Never copy it to another Google host.
-        if let Some(c) = cookie.filter(|_| same_origin(url, target.as_str())) { req = req.header(reqwest::header::COOKIE, c); }
+        if let Some(c) = cookie.filter(|_| same_origin(url, target.as_str())) {
+            req = req.header(reqwest::header::COOKIE, c);
+        }
+        if let Some(value) = authorization.filter(|_| same_origin(url, target.as_str())) {
+            req = req.header(reqwest::header::AUTHORIZATION, value);
+        }
         let resp = req.send().await.map_err(err_str)?;
-        if google_drive::is_sign_in(resp.url()) { return Err(google_drive::SIGN_IN.into()); }
-        if !resp.status().is_success() { return Err(format!("HTTP {}", resp.status())); }
+        if google_drive::is_sign_in(resp.url()) {
+            return Err(google_drive::SIGN_IN.into());
+        }
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {}", resp.status()));
+        }
         drive_download |= google_drive::is_drive(resp.url());
         if drive_download && google_drive::is_html_page(&resp) {
-            if !google_drive::is_drive(resp.url()) || confirmations >= 3 { return Err(google_drive::UNAVAILABLE.into()); }
+            if !google_drive::is_drive(resp.url()) || confirmations >= 3 {
+                return Err(google_drive::UNAVAILABLE.into());
+            }
             let next = google_drive::confirmation_url(resp).await?;
-            if next == target { return Err(google_drive::UNAVAILABLE.into()); }
+            if next == target {
+                return Err(google_drive::UNAVAILABLE.into());
+            }
             target = next;
             confirmations += 1;
             continue;
@@ -186,7 +234,9 @@ fn write_at(f: &File, mut buf: &[u8], mut off: u64) -> std::io::Result<()> {
 pub fn plan_segments(total: u64, conns: u32) -> Vec<Seg> {
     let n = (total / MIN_SPLIT).clamp(1, conns.max(1) as u64);
     let step = total / n;
-    (0..n).map(|i| Seg::new(i * step, if i == n - 1 { total } else { (i + 1) * step })).collect()
+    (0..n)
+        .map(|i| Seg::new(i * step, if i == n - 1 { total } else { (i + 1) * step }))
+        .collect()
 }
 
 /// Pick work for a connection: an idle unfinished segment, or else split the busy
@@ -211,7 +261,12 @@ pub fn claim(segs: &mut Vec<Seg>, can_split: bool) -> Option<usize> {
     let mid = segs[i].pos + rem / 2;
     let end = segs[i].end;
     segs[i].end = mid;
-    segs.push(Seg { start: mid, pos: mid, end, busy: true });
+    segs.push(Seg {
+        start: mid,
+        pos: mid,
+        end,
+        busy: true,
+    });
     Some(segs.len() - 1)
 }
 
@@ -230,6 +285,7 @@ struct Shared {
     etag: Option<String>,
     referer: Option<String>,
     cookie: Option<String>,
+    authorization: Option<String>,
     ctx: Ctx,
 }
 
@@ -254,8 +310,15 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
     if let Some(c) = &sh.cookie {
         req = req.header(reqwest::header::COOKIE, c);
     }
+    if let Some(value) = &sh.authorization {
+        req = req.header(reqwest::header::AUTHORIZATION, value);
+    }
     if sh.range {
-        let r = if end == u64::MAX { format!("bytes={pos}-") } else { format!("bytes={pos}-{}", end - 1) };
+        let r = if end == u64::MAX {
+            format!("bytes={pos}-")
+        } else {
+            format!("bytes={pos}-{}", end - 1)
+        };
         req = req.header(RANGE, r);
         if let Some(e) = &sh.etag {
             req = req.header(IF_RANGE, e);
@@ -269,7 +332,10 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
     google_drive::validate_file_response(&resp, sh.drive_download).map_err(FetchErr::Fatal)?;
     if sh.range && st.as_u16() != 206 {
         return Err(if st.as_u16() == 200 {
-            FetchErr::Fatal("the file changed on the server (range request answered with the whole file)".into())
+            FetchErr::Fatal(
+                "the file changed on the server (range request answered with the whole file)"
+                    .into(),
+            )
         } else if permanent(st.as_u16()) {
             FetchErr::Fatal(format!("HTTP {st}"))
         } else {
@@ -284,18 +350,29 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
         });
     }
     let mut response_remaining = if sh.range {
-        let (actual_start, actual_end, actual_total) = response_range(&resp).map_err(FetchErr::Fatal)?;
-        if actual_start != pos || actual_end >= end || actual_total.is_some_and(|n| Some(n) != total)
-            || resp.content_length().is_some_and(|n| n != actual_end - actual_start + 1)
+        let (actual_start, actual_end, actual_total) =
+            response_range(&resp).map_err(FetchErr::Fatal)?;
+        if actual_start != pos
+            || actual_end >= end
+            || actual_total.is_some_and(|n| Some(n) != total)
+            || resp
+                .content_length()
+                .is_some_and(|n| n != actual_end - actual_start + 1)
         {
-            return Err(FetchErr::Fatal("Content-Range does not match the requested segment or file size".into()));
+            return Err(FetchErr::Fatal(
+                "Content-Range does not match the requested segment or file size".into(),
+            ));
         }
         // RFC 9110 permits a shorter prefix and an unknown complete length (*).
         // A valid prefix advances this segment; the worker requests its remainder.
         Some(actual_end - actual_start + 1)
     } else if st.as_u16() == 206 {
-        return Err(FetchErr::Fatal("unexpected partial response to a full-file request".into()));
-    } else { None };
+        return Err(FetchErr::Fatal(
+            "unexpected partial response to a full-file request".into(),
+        ));
+    } else {
+        None
+    };
     let mut stream = resp.bytes_stream();
     loop {
         let next = tokio::select! {
@@ -312,7 +389,11 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
                     t.total = Some(p);
                     return Ok(());
                 }
-                return if s.done() { Ok(()) } else { Err(FetchErr::Retry("connection closed early".into())) };
+                return if s.done() {
+                    Ok(())
+                } else {
+                    Err(FetchErr::Retry("connection closed early".into()))
+                };
             }
             Some(Err(e)) => return Err(FetchErr::Retry(err_str(e))),
             Some(Ok(c)) => c,
@@ -320,7 +401,9 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
         let n = chunk.len() as u64;
         if let Some(remaining) = &mut response_remaining {
             if n > *remaining {
-                return Err(FetchErr::Fatal("response body exceeds Content-Range".into()));
+                return Err(FetchErr::Fatal(
+                    "response body exceeds Content-Range".into(),
+                ));
             }
             *remaining -= n;
         }
@@ -335,7 +418,8 @@ async fn fetch(sh: &Shared, idx: usize) -> Result<(), FetchErr> {
         let s = &mut t.segments[idx];
         let take = n.min(s.remaining()) as usize;
         if take > 0 {
-            write_at(&sh.file, &chunk[..take], s.pos).map_err(|e| FetchErr::Fatal(format!("write failed: {e}")))?;
+            write_at(&sh.file, &chunk[..take], s.pos)
+                .map_err(|e| FetchErr::Fatal(format!("write failed: {e}")))?;
             s.pos += take as u64;
         }
         if s.done() || response_remaining == Some(0) {
@@ -391,16 +475,28 @@ async fn worker(sh: Arc<Shared>) -> Result<(), String> {
     }
 }
 
-async fn probe_retry(ctx: &Ctx, url: &str, referer: Option<&str>, cookie: Option<&str>) -> Result<Probe, String> {
+async fn probe_retry(
+    ctx: &Ctx,
+    url: &str,
+    referer: Option<&str>,
+    cookie: Option<&str>,
+    authorization: Option<&str>,
+) -> Result<Probe, String> {
     let mut attempt = 0;
     loop {
         let r = tokio::select! {
-            r = probe(&ctx.client, url, referer, cookie) => r,
+            r = probe(&ctx.client, url, referer, cookie, authorization) => r,
             _ = ctx.cancel.cancelled() => return Err(String::new()),
         };
         match r {
             Ok(p) => return Ok(p),
-            Err(e) if attempt >= ctx.retries || http_code(&e).is_some_and(permanent) || e.starts_with("Google Drive:") => return Err(e),
+            Err(e)
+                if attempt >= ctx.retries
+                    || http_code(&e).is_some_and(permanent)
+                    || e.starts_with("Google Drive:") =>
+            {
+                return Err(e);
+            }
             Err(_) => {
                 attempt += 1;
                 tokio::select! {
@@ -416,6 +512,17 @@ async fn probe_retry(ctx: &Ctx, url: &str, referer: Option<&str>, cookie: Option
 /// so the caller can persist it at any time. Does not change `task.status` except to
 /// `Verifying`. On a checksum mismatch the file is downloaded again once.
 pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
+    {
+        let t = task.lock().unwrap();
+        util::validate_source(&t.url)?;
+    }
+    let external = {
+        let t = task.lock().unwrap();
+        crate::external::handles(&t.url, t.kind)
+    };
+    if external {
+        return crate::external::run(task, ctx).await;
+    }
     loop {
         if run_once(task.clone(), ctx.clone()).await? == Outcome::Cancelled {
             return Ok(Outcome::Cancelled);
@@ -440,12 +547,27 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
 }
 
 async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
-    let (url, referer, cookie, had_cookie) = {
-        let t = task.lock().unwrap();
-        (t.url.clone(), t.referer.clone(), t.cookie.clone().filter(|c| !c.trim().is_empty()), t.had_cookie)
+    let (url, referer, cookie, had_cookie, authorization) = {
+        let mut t = task.lock().unwrap();
+        t.append_log("HTTP probe started");
+        (
+            t.url.clone(),
+            t.referer.clone(),
+            t.cookie.clone().filter(|c| !c.trim().is_empty()),
+            t.had_cookie,
+            t.authorization.clone(),
+        )
     };
     let lost_cookie = had_cookie && cookie.is_none();
-    let p = match probe_retry(&ctx, &url, referer.as_deref(), cookie.as_deref()).await {
+    let p = match probe_retry(
+        &ctx,
+        &url,
+        referer.as_deref(),
+        cookie.as_deref(),
+        authorization.as_deref(),
+    )
+    .await
+    {
         Ok(p) => p,
         Err(_) if ctx.cancel.is_cancelled() => return Ok(Outcome::Cancelled),
         Err(e) => return Err(with_cookie_hint(e, lost_cookie)),
@@ -459,19 +581,37 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         }
         c => c,
     };
+    let authorization = authorization.filter(|_| same_origin(&url, &p.url));
 
     let (part, conns) = {
         let mut t = task.lock().unwrap();
         if t.file_name.is_empty() {
-            let suggested = t.suggested_name.as_deref().map(util::sanitize).filter(|n| !n.is_empty())
-                .filter(|n| !p.drive_download || !matches!(n.to_ascii_lowercase().as_str(), "identifier" | "uc" | "download" | "view" | "open"));
-            let name = suggested.or_else(|| p.name.clone()).unwrap_or_else(|| "download".into());
+            let suggested = t
+                .suggested_name
+                .as_deref()
+                .map(util::sanitize)
+                .filter(|n| !n.is_empty())
+                .filter(|n| {
+                    !p.drive_download
+                        || !matches!(
+                            n.to_ascii_lowercase().as_str(),
+                            "identifier" | "uc" | "download" | "view" | "open"
+                        )
+                });
+            let name = suggested
+                .or_else(|| p.name.clone())
+                .unwrap_or_else(|| "download".into());
             t.file_name = util::unique_name(&t.dir, &name);
             t.category = Category::from_name(&t.file_name);
         }
         let changed = (t.etag.is_some() && p.etag.is_some() && t.etag != p.etag)
-            || (t.last_modified.is_some() && p.last_modified.is_some() && t.last_modified != p.last_modified)
-            || (t.total.is_some() && p.total.is_some() && t.total != p.total && t.segments.iter().all(|s| s.end != u64::MAX))
+            || (t.last_modified.is_some()
+                && p.last_modified.is_some()
+                && t.last_modified != p.last_modified)
+            || (t.total.is_some()
+                && p.total.is_some()
+                && t.total != p.total
+                && t.segments.iter().all(|s| s.end != u64::MAX))
             || !p.range
             || !t.part_path().exists();
         if changed && t.downloaded() > 0 {
@@ -495,10 +635,15 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         t.resumable = p.range;
         t.error = None;
         let conns = if p.range { t.connections.max(1) } else { 1 };
+        t.append_log(format!(
+            "HTTP transfer started ({conns} connection(s), ranges: {})",
+            p.range
+        ));
         (t.part_path(), conns)
     };
 
-    std::fs::create_dir_all(part.parent().unwrap()).map_err(|e| format!("cannot create folder: {e}"))?;
+    std::fs::create_dir_all(part.parent().unwrap())
+        .map_err(|e| format!("cannot create folder: {e}"))?;
     let fresh = task.lock().unwrap().downloaded() == 0;
     let file = std::fs::OpenOptions::new()
         .create(true)
@@ -510,7 +655,18 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         let _ = file.set_len(n);
     }
 
-    let sh = Arc::new(Shared { task: task.clone(), file, url: p.url.clone(), drive_download: p.drive_download, range: p.range, etag: p.etag.clone(), referer, cookie, ctx: ctx.clone() });
+    let sh = Arc::new(Shared {
+        task: task.clone(),
+        file,
+        url: p.url.clone(),
+        drive_download: p.drive_download,
+        range: p.range,
+        etag: p.etag.clone(),
+        referer,
+        cookie,
+        authorization,
+        ctx: ctx.clone(),
+    });
     let mut set = tokio::task::JoinSet::new();
     for _ in 0..conns {
         set.spawn(worker(sh.clone()));
@@ -523,6 +679,9 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     }
     drop(sh);
     if ctx.cancel.is_cancelled() {
+        task.lock()
+            .unwrap()
+            .append_log("HTTP transfer stopped; partial data retained");
         return Ok(Outcome::Cancelled);
     }
     let (complete, total, final_path) = {
@@ -532,7 +691,10 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         (complete, total, t.final_path())
     };
     if !complete {
-        return Err(with_cookie_hint(last_err.unwrap_or_else(|| "download incomplete".into()), lost_cookie));
+        return Err(with_cookie_hint(
+            last_err.unwrap_or_else(|| "download incomplete".into()),
+            lost_cookie,
+        ));
     }
     // Every byte of [0, total) must be covered by a finished segment.
     {
@@ -551,7 +713,10 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         }
     }
     {
-        let f = std::fs::OpenOptions::new().write(true).open(&part).map_err(|e| e.to_string())?;
+        let f = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&part)
+            .map_err(|e| e.to_string())?;
         f.set_len(total).map_err(|e| e.to_string())?;
     }
     let final_path = if final_path.exists() {
@@ -564,9 +729,13 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     };
     let len = std::fs::metadata(&part).map_err(|e| e.to_string())?.len();
     if len != total || p.total.is_some_and(|n| n != total) {
-        return Err(format!("size mismatch: file has {len} bytes, server reported {}", p.total.unwrap_or(total)));
+        return Err(format!(
+            "size mismatch: file has {len} bytes, server reported {}",
+            p.total.unwrap_or(total)
+        ));
     }
     std::fs::rename(&part, &final_path).map_err(|e| format!("rename failed: {e}"))?;
+    task.lock().unwrap().append_log("HTTP output published");
     Ok(Outcome::Completed)
 }
 
@@ -577,19 +746,43 @@ mod tests {
     fn validates_content_range_syntax_and_bounds() {
         assert_eq!(content_range("bytes 10-19/100"), Some((10, 19, Some(100))));
         assert_eq!(content_range("BYTES 0-0/*"), Some((0, 0, None)));
-        for bad in ["", "bytes */100", "items 0-0/1", "bytes 1-0/2", "bytes 0-2/2",
-            "bytes 0-0/0", "bytes +0-0/1", "bytes 0-0/1/2", "bytes 0-18446744073709551616/*"] {
+        for bad in [
+            "",
+            "bytes */100",
+            "items 0-0/1",
+            "bytes 1-0/2",
+            "bytes 0-2/2",
+            "bytes 0-0/0",
+            "bytes +0-0/1",
+            "bytes 0-0/1/2",
+            "bytes 0-18446744073709551616/*",
+        ] {
             assert_eq!(content_range(bad), None, "{bad}");
         }
     }
 
     #[test]
     fn same_origin_rules() {
-        assert!(same_origin("https://a.example/x.zip", "https://a.example/y/z.zip?q=1"));
-        assert!(same_origin("https://a.example/x", "https://A.example:443/x"), "default port and host case");
-        assert!(!same_origin("https://a.example/x", "https://cdn.example/x"), "different host");
-        assert!(!same_origin("https://a.example/x", "http://a.example/x"), "scheme downgrade");
-        assert!(!same_origin("https://a.example/x", "https://a.example:8443/x"), "different port");
+        assert!(same_origin(
+            "https://a.example/x.zip",
+            "https://a.example/y/z.zip?q=1"
+        ));
+        assert!(
+            same_origin("https://a.example/x", "https://A.example:443/x"),
+            "default port and host case"
+        );
+        assert!(
+            !same_origin("https://a.example/x", "https://cdn.example/x"),
+            "different host"
+        );
+        assert!(
+            !same_origin("https://a.example/x", "http://a.example/x"),
+            "scheme downgrade"
+        );
+        assert!(
+            !same_origin("https://a.example/x", "https://a.example:8443/x"),
+            "different port"
+        );
         assert!(!same_origin("https://a.example/x", "not a url"));
         assert!(!same_origin("", ""));
     }
@@ -597,12 +790,30 @@ mod tests {
     #[test]
     fn cookie_hint_only_for_auth_errors_after_restart() {
         let h = with_cookie_hint("HTTP 403 Forbidden".into(), true);
-        assert!(h.starts_with("HTTP 403 Forbidden — login cookies are not kept after a restart"), "{h}");
-        assert!(h.ends_with("add the download again from the browser"), "{h}");
-        assert!(with_cookie_hint("HTTP 401 Unauthorized".into(), true).contains("not kept after a restart"));
-        assert_eq!(with_cookie_hint("HTTP 404 Not Found".into(), true), "HTTP 404 Not Found");
-        assert_eq!(with_cookie_hint("HTTP 403 Forbidden".into(), false), "HTTP 403 Forbidden");
-        assert_eq!(with_cookie_hint("connection reset".into(), true), "connection reset");
+        assert!(
+            h.starts_with("HTTP 403 Forbidden — login cookies are not kept after a restart"),
+            "{h}"
+        );
+        assert!(
+            h.ends_with("add the download again from the browser"),
+            "{h}"
+        );
+        assert!(
+            with_cookie_hint("HTTP 401 Unauthorized".into(), true)
+                .contains("not kept after a restart")
+        );
+        assert_eq!(
+            with_cookie_hint("HTTP 404 Not Found".into(), true),
+            "HTTP 404 Not Found"
+        );
+        assert_eq!(
+            with_cookie_hint("HTTP 403 Forbidden".into(), false),
+            "HTTP 403 Forbidden"
+        );
+        assert_eq!(
+            with_cookie_hint("connection reset".into(), true),
+            "connection reset"
+        );
     }
 
     #[test]
@@ -622,7 +833,12 @@ mod tests {
         assert_eq!(s[4].end, 10 << 20);
         assert_eq!(s[3].end, s[4].start);
         assert!(s.iter().all(|x| x.start <= x.end));
-        let small = &mut vec![Seg { start: 0, pos: 0, end: 1000, busy: true }];
+        let small = &mut vec![Seg {
+            start: 0,
+            pos: 0,
+            end: 1000,
+            busy: true,
+        }];
         assert!(claim(small, true).is_none());
     }
 }

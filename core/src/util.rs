@@ -8,18 +8,31 @@ pub fn human_size(n: u64) -> String {
         v /= 1024.0;
         i += 1;
     }
-    if i == 0 { format!("{n} B") } else { format!("{v:.1} {}", U[i]) }
+    if i == 0 {
+        format!("{n} B")
+    } else {
+        format!("{v:.1} {}", U[i])
+    }
 }
 
 pub fn human_eta(secs: u64) -> String {
     let (h, m, s) = (secs / 3600, secs / 60 % 60, secs % 60);
-    if h > 99 { "∞".into() } else if h > 0 { format!("{h}:{m:02}:{s:02}") } else { format!("{m}:{s:02}") }
+    if h > 99 {
+        "∞".into()
+    } else if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
 }
 
 /// Parse "500K", "2M", "1.5MB", "1048576" into bytes (binary units).
 pub fn parse_size(s: &str) -> Option<u64> {
     let s = s.trim().to_ascii_uppercase();
-    let s = s.trim_end_matches("/S").trim_end_matches('B').trim_end_matches('I');
+    let s = s
+        .trim_end_matches("/S")
+        .trim_end_matches('B')
+        .trim_end_matches('I');
     if s.is_empty() {
         return Some(0);
     }
@@ -37,10 +50,22 @@ pub fn parse_size(s: &str) -> Option<u64> {
 pub fn name_from_url(url: &str) -> String {
     let path = url.split(['?', '#']).next().unwrap_or("");
     let path = path.split_once("://").map(|(_, r)| r).unwrap_or(path);
-    let last = path.split_once('/').map(|(_, p)| p).unwrap_or("").rsplit('/').next().unwrap_or("");
-    let dec = percent_encoding::percent_decode_str(last).decode_utf8_lossy().to_string();
+    let last = path
+        .split_once('/')
+        .map(|(_, p)| p)
+        .unwrap_or("")
+        .rsplit('/')
+        .next()
+        .unwrap_or("");
+    let dec = percent_encoding::percent_decode_str(last)
+        .decode_utf8_lossy()
+        .to_string();
     let clean = sanitize(&dec);
-    if clean.is_empty() { "download".into() } else { clean }
+    if clean.is_empty() {
+        "download".into()
+    } else {
+        clean
+    }
 }
 
 /// Parse `filename*=UTF-8''...` or `filename="..."` from Content-Disposition.
@@ -49,7 +74,9 @@ pub fn name_from_disposition(v: &str) -> Option<String> {
         let p = part.trim();
         if let Some(rest) = p.strip_prefix("filename*=") {
             let enc = rest.splitn(3, '\'').nth(2).unwrap_or(rest);
-            let n = percent_encoding::percent_decode_str(enc.trim_matches('"')).decode_utf8_lossy().to_string();
+            let n = percent_encoding::percent_decode_str(enc.trim_matches('"'))
+                .decode_utf8_lossy()
+                .to_string();
             let n = sanitize(&n);
             if !n.is_empty() {
                 return Some(n);
@@ -69,17 +96,29 @@ pub fn name_from_disposition(v: &str) -> Option<String> {
 
 /// Windows device names; they are unusable as file stems in any case and with any extension.
 const WIN_RESERVED: [&str; 22] = [
-    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+    "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 ];
 const MAX_NAME_BYTES: usize = 200;
 
 pub fn sanitize(name: &str) -> String {
     let n: String = name
         .chars()
-        .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() { '_' } else { c })
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') || c.is_control() {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
     let mut n = n.trim().trim_matches('.').to_string();
-    let stem = n.split('.').next().unwrap_or("").trim_end_matches(' ').to_ascii_uppercase();
+    let stem = n
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .trim_end_matches(' ')
+        .to_ascii_uppercase();
     if WIN_RESERVED.contains(&stem.as_str()) {
         n.insert(0, '_');
     }
@@ -113,17 +152,76 @@ pub fn unique_name(dir: &Path, name: &str) -> String {
         Some((s, e)) if !s.is_empty() => (s.to_string(), format!(".{e}")),
         _ => (name.to_string(), String::new()),
     };
-    (1..).map(|i| format!("{stem} ({i}){ext}")).find(|n| !taken(n)).unwrap()
+    (1..)
+        .map(|i| format!("{stem} ({i}){ext}"))
+        .find(|n| !taken(n))
+        .unwrap()
 }
 
 pub fn default_download_dir() -> PathBuf {
-    dirs::download_dir().or_else(dirs::home_dir).unwrap_or_else(|| PathBuf::from("."))
+    dirs::download_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(|| PathBuf::from("."))
 }
 
 pub fn looks_like_url(s: &str) -> bool {
-    let s = s.trim();
-    // FTP is not supported; only web URLs are accepted.
-    (s.starts_with("http://") || s.starts_with("https://")) && !s.contains(char::is_whitespace) && s.len() > 10
+    validate_source(s).is_ok()
+}
+
+/// Validate the public source boundary without probing the network or executing tools.
+pub fn validate_source(source: &str) -> Result<(), String> {
+    let source = source.trim();
+    if source.is_empty() {
+        return Err("download source is empty".into());
+    }
+    let local = descriptor_path(source);
+    if let Some(path) = local {
+        return if path.is_file() {
+            Ok(())
+        } else {
+            Err("local torrent/Metalink file does not exist".into())
+        };
+    }
+    let url = reqwest::Url::parse(source)
+        .map_err(|_| "enter a supported URL or an existing .torrent/.metalink/.meta4 file")?;
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(
+            "credentials in URLs are not saved; use a site profile or the FTP browser login".into(),
+        );
+    }
+    if source.contains(char::is_whitespace) {
+        return Err("URL contains whitespace; encode spaces as %20".into());
+    }
+    match url.scheme() {
+        "http" | "https" | "ftp" | "rtsp" | "mms" | "mmsh" | "mmst" if url.host_str().is_some() => {
+            Ok(())
+        }
+        "magnet"
+            if url.query_pairs().any(|(key, value)| {
+                key == "xt" && (value.starts_with("urn:btih:") || value.starts_with("urn:btmh:"))
+            }) =>
+        {
+            Ok(())
+        }
+        _ => Err(
+            "unsupported download source (HTTP, FTP, torrent, Metalink, RTSP or MMS required)"
+                .into(),
+        ),
+    }
+}
+
+/// Local descriptors only; arbitrary local files never become download sources.
+pub fn descriptor_path(source: &str) -> Option<PathBuf> {
+    let path = if source.starts_with("file:") {
+        reqwest::Url::parse(source).ok()?.to_file_path().ok()?
+    } else {
+        if source.contains("://") || source.starts_with("magnet:") {
+            return None;
+        }
+        PathBuf::from(source)
+    };
+    let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+    matches!(ext.as_str(), "torrent" | "metalink" | "meta4").then_some(path)
 }
 
 #[cfg(test)]
@@ -133,8 +231,14 @@ mod tests {
     fn names() {
         assert_eq!(name_from_url("https://x.org/a/b%20c.zip?x=1"), "b c.zip");
         assert_eq!(name_from_url("https://x.org/"), "download");
-        assert_eq!(name_from_disposition("attachment; filename=\"r.pdf\"").unwrap(), "r.pdf");
-        assert_eq!(name_from_disposition("attachment; filename*=UTF-8''%E4%B8%AD.txt").unwrap(), "中.txt");
+        assert_eq!(
+            name_from_disposition("attachment; filename=\"r.pdf\"").unwrap(),
+            "r.pdf"
+        );
+        assert_eq!(
+            name_from_disposition("attachment; filename*=UTF-8''%E4%B8%AD.txt").unwrap(),
+            "中.txt"
+        );
     }
     #[test]
     fn sizes() {
@@ -170,14 +274,23 @@ mod tests {
         let s = sanitize(&format!("{}.txt", "中".repeat(100)));
         assert!(s.len() <= 200 && s.len() > 190 && s.ends_with(".txt") && s.starts_with('中'));
         // Extension longer than 16 bytes is not kept specially.
-        assert_eq!(sanitize(&format!("{}.{}", "b".repeat(250), "x".repeat(20))), "b".repeat(200));
+        assert_eq!(
+            sanitize(&format!("{}.{}", "b".repeat(250), "x".repeat(20))),
+            "b".repeat(200)
+        );
         assert_eq!(sanitize("short.tar.gz"), "short.tar.gz");
     }
     #[test]
     fn url_scheme_gate() {
         assert!(looks_like_url("https://example.com/a.zip"));
         assert!(looks_like_url("  http://example.com/a.zip  "));
-        assert!(!looks_like_url("ftp://example.com/a.zip"));
+        assert!(looks_like_url("ftp://example.com/a.zip"));
+        assert!(looks_like_url("rtsp://example.com/live"));
+        assert!(looks_like_url(
+            "magnet:?xt=urn:btih:0123456789012345678901234567890123456789"
+        ));
+        assert!(!looks_like_url("https://user:secret@example.com/file"));
+        assert!(!looks_like_url("magnet:?dn=missing-hash"));
         assert!(!looks_like_url("javascript:alert(1)"));
         assert!(!looks_like_url("https://exa mple.com/a"));
         assert!(!looks_like_url("https://"));

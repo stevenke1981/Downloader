@@ -4,6 +4,13 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DownloadKind {
+    #[default]
+    Auto,
+    Video,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Status {
     #[default]
     Queued,
@@ -33,7 +40,12 @@ pub struct Seg {
 
 impl Seg {
     pub fn new(start: u64, end: u64) -> Seg {
-        Seg { start, pos: start, end, busy: false }
+        Seg {
+            start,
+            pos: start,
+            end,
+            busy: false,
+        }
     }
     pub fn done(&self) -> bool {
         self.pos >= self.end
@@ -48,6 +60,7 @@ impl Seg {
 pub struct Task {
     pub id: u64,
     pub url: String,
+    pub kind: DownloadKind,
     pub dir: PathBuf,
     /// Final file name (empty until the server has been probed).
     pub file_name: String,
@@ -85,6 +98,11 @@ pub struct Task {
     /// `Cookie` header sent with every request. Never persisted.
     #[serde(skip)]
     pub cookie: Option<String>,
+    /// Exact-origin HTTP Basic Authorization. Passwords are never persisted.
+    #[serde(skip)]
+    pub authorization: Option<String>,
+    /// Bounded lifecycle messages. External process output and request headers are excluded.
+    pub log: Vec<String>,
     /// Bytes hashed so far while verifying (not persisted).
     #[serde(skip)]
     pub verify_done: std::sync::Arc<std::sync::atomic::AtomicU64>,
@@ -116,14 +134,30 @@ pub struct Verification {
 }
 
 impl Task {
+    pub fn append_log(&mut self, message: impl Into<String>) {
+        const MAX_LOG: usize = 100;
+        if self.log.len() >= MAX_LOG {
+            self.log.drain(..self.log.len() - MAX_LOG + 1);
+        }
+        self.log.push(message.into());
+    }
     pub fn downloaded(&self) -> u64 {
         if self.status == Status::Completed {
-            return self.total.unwrap_or_else(|| self.segments.iter().map(|s| s.pos - s.start).sum());
+            return self
+                .total
+                .unwrap_or_else(|| self.segments.iter().map(|s| s.pos - s.start).sum());
         }
-        self.segments.iter().map(|s| s.pos.saturating_sub(s.start)).sum()
+        self.segments
+            .iter()
+            .map(|s| s.pos.saturating_sub(s.start))
+            .sum()
     }
     pub fn display_name(&self) -> String {
-        if self.file_name.is_empty() { crate::util::name_from_url(&self.url) } else { self.file_name.clone() }
+        if self.file_name.is_empty() {
+            crate::util::name_from_url(&self.url)
+        } else {
+            self.file_name.clone()
+        }
     }
     pub fn final_path(&self) -> PathBuf {
         self.dir.join(&self.file_name)

@@ -1,5 +1,6 @@
 //! dlx - headless multi-connection downloader.
 use clap::Parser;
+use dlcore::task::DownloadKind;
 use dlcore::{Checksum, Ctx, Outcome, RateLimiter, Settings, Status, Task, engine, util};
 use std::io::Write;
 use std::path::PathBuf;
@@ -8,11 +9,21 @@ use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Parser)]
-#[command(name = "dlx", version, about = "Multi-connection HTTP(S) downloader (resumable)")]
+#[command(
+    name = "dlx",
+    version,
+    about = "Resumable HTTP, FTP, torrent, Metalink and media downloader"
+)]
 struct Args {
-    /// URL(s) to download
-    #[arg(required = true)]
+    /// URL(s), local .torrent/.metalink/.meta4 descriptor(s)
+    #[arg(required_unless_present = "tools")]
     urls: Vec<String>,
+    /// Extract a website video using optional yt-dlp (explicit opt-in)
+    #[arg(long)]
+    video: bool,
+    /// Show available optional protocol engines
+    #[arg(long)]
+    tools: bool,
     /// Output directory
     #[arg(short = 'o', long, default_value = ".")]
     dir: PathBuf,
@@ -43,13 +54,40 @@ struct Args {
 
 fn state_path(dir: &std::path::Path, url: &str) -> PathBuf {
     // FNV-1a of the URL keeps one resume file per URL.
-    let h = url.bytes().fold(0xcbf29ce484222325u64, |h, b| (h ^ b as u64).wrapping_mul(0x100000001b3));
+    let h = url.bytes().fold(0xcbf29ce484222325u64, |h, b| {
+        (h ^ b as u64).wrapping_mul(0x100000001b3)
+    });
     dir.join(format!(".dlx-{h:016x}.json"))
 }
 
 #[tokio::main]
 async fn main() {
     let a = Args::parse();
+    if a.tools {
+        for tool in dlcore::external::capabilities() {
+            println!(
+                "{}: {}",
+                tool.name,
+                tool.path
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "unavailable".into())
+            );
+        }
+        if a.urls.is_empty() {
+            return;
+        }
+    }
+    for (index, url) in a.urls.iter().enumerate() {
+        if let Err(error) = util::validate_source(url) {
+            eprintln!("source {}: {error}", index + 1);
+            std::process::exit(2);
+        }
+    }
+    let kind = if a.video {
+        DownloadKind::Video
+    } else {
+        DownloadKind::Auto
+    };
     let limit = util::parse_size(&a.limit).unwrap_or_else(|| {
         eprintln!("invalid --limit");
         std::process::exit(2)
@@ -64,7 +102,10 @@ async fn main() {
             std::process::exit(2)
         }))
     };
-    let settings = Settings { proxy: a.proxy.clone(), ..Default::default() };
+    let settings = Settings {
+        proxy: a.proxy.clone(),
+        ..Default::default()
+    };
     let client = settings.build_client().unwrap_or_else(|e| {
         eprintln!("{e}");
         std::process::exit(2)
@@ -84,8 +125,17 @@ async fn main() {
         let task = std::fs::read(&sp)
             .ok()
             .and_then(|b| serde_json::from_slice::<Task>(&b).ok())
-            .filter(|t| t.url == *url && t.part_path().exists())
-            .unwrap_or_else(|| Task { url: url.clone(), dir: a.dir.clone(), ..Default::default() });
+            .filter(|t| {
+                t.url == *url
+                    && t.kind == kind
+                    && (t.part_path().exists() || dlcore::external::staging_path(t).exists())
+            })
+            .unwrap_or_else(|| Task {
+                url: url.trim().into(),
+                kind,
+                dir: a.dir.clone(),
+                ..Default::default()
+            });
         let resumed = task.downloaded();
         let task = Arc::new(Mutex::new(Task {
             connections: a.connections.clamp(1, 32),
@@ -119,7 +169,10 @@ async fn main() {
                 let d = t.downloaded();
                 let el = start.elapsed().as_secs_f64().max(0.01);
                 let sp = (d.saturating_sub(resumed)) as f64 / el;
-                let pct = t.total.map(|n| format!("{:5.1}%", d as f64 * 100.0 / n.max(1) as f64)).unwrap_or_default();
+                let pct = t
+                    .total
+                    .map(|n| format!("{:5.1}%", d as f64 * 100.0 / n.max(1) as f64))
+                    .unwrap_or_default();
                 let conns = t.segments.iter().filter(|s| s.busy).count();
                 eprint!(
                     "\r{} {pct} {} / {}  {}/s  [{conns} conn]   ",
@@ -188,7 +241,10 @@ fn report_verification(t: &Task) {
     let algo = v.algo.map(|a| a.name()).unwrap_or("");
     match v.state {
         Verified => eprintln!("verified: {algo} {} (from {})", v.actual, v.source),
-        Failed => eprintln!("VERIFICATION FAILED: {algo} expected {} got {} (from {})", v.expected, v.actual, v.source),
+        Failed => eprintln!(
+            "VERIFICATION FAILED: {algo} expected {} got {} (from {})",
+            v.expected, v.actual, v.source
+        ),
         NoChecksum => eprintln!("no checksum found; integrity not verified (size check passed)"),
         Unverified => eprintln!("not verified: {}", v.note),
         Verifying => {}
