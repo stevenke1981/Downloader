@@ -198,7 +198,19 @@ pub fn validate_source(source: &str) -> Result<(), String> {
         }
         "magnet"
             if url.query_pairs().any(|(key, value)| {
-                key == "xt" && (value.starts_with("urn:btih:") || value.starts_with("urn:btmh:"))
+                if key != "xt" {
+                    return false;
+                }
+                if let Some(hash) = value.strip_prefix("urn:btih:") {
+                    return (hash.len() == 40 && hash.bytes().all(|b| b.is_ascii_hexdigit()))
+                        || (hash.len() == 32
+                            && hash
+                                .bytes()
+                                .all(|b| b.is_ascii_alphabetic() || matches!(b, b'2'..=b'7')));
+                }
+                value.strip_prefix("urn:btmh:1220").is_some_and(|hash| {
+                    hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit())
+                })
             }) =>
         {
             Ok(())
@@ -291,6 +303,8 @@ mod tests {
         ));
         assert!(!looks_like_url("https://user:secret@example.com/file"));
         assert!(!looks_like_url("magnet:?dn=missing-hash"));
+        assert!(!looks_like_url("magnet:?xt=urn:btih:"));
+        assert!(!looks_like_url("magnet:?xt=urn:btih:short"));
         assert!(!looks_like_url("javascript:alert(1)"));
         assert!(!looks_like_url("https://exa mple.com/a"));
         assert!(!looks_like_url("https://"));

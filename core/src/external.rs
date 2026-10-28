@@ -119,7 +119,7 @@ pub fn staging_path(task: &Task) -> PathBuf {
         .join(format!(".dlx-external-{:016x}-{hash:016x}", task.id))
 }
 
-fn outputs(directory: &Path) -> Result<Vec<(PathBuf, u64)>, String> {
+fn outputs(directory: &Path, partial: bool) -> Result<Vec<(PathBuf, u64)>, String> {
     let mut files = Vec::new();
     let mut pending = vec![directory.to_path_buf()];
     while let Some(directory) = pending.pop() {
@@ -137,9 +137,11 @@ fn outputs(directory: &Path) -> Result<Vec<(PathBuf, u64)>, String> {
             if kind.is_file() {
                 let name = entry.file_name();
                 let name = name.to_string_lossy();
-                if [".aria2", ".part", ".ytdl", ".tmp"]
-                    .iter()
-                    .any(|ext| name.ends_with(ext))
+                if name.ends_with(".aria2")
+                    || (!partial
+                        && [".part", ".ytdl", ".tmp"]
+                            .iter()
+                            .any(|ext| name.ends_with(ext)))
                 {
                     continue;
                 }
@@ -331,7 +333,7 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
                 return Ok(Outcome::Cancelled);
             }
             _ = tokio::time::sleep(Duration::from_millis(500)) => {
-                if let Ok(files) = outputs(&stage) {
+                if let Ok(files) = outputs(&stage, true) {
                     task.lock().unwrap().segments[0].pos = files.iter().map(|(_, size)| size).sum();
                 }
             }
@@ -349,7 +351,7 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
             tool.names().0
         ));
     }
-    let files = outputs(&stage)?;
+    let files = outputs(&stage, false)?;
     if files.is_empty() {
         return Err(format!(
             "{} exited successfully but produced no completed output",
