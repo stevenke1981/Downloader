@@ -549,3 +549,104 @@ fn authenticated_remote_routes_and_raii_stop() {
     wait_until(|| std::net::TcpStream::connect(address).is_err());
     manager.shutdown();
 }
+
+#[test]
+fn remove_cleans_external_directories_and_staging_only_when_requested() {
+    let state = tempfile::tempdir().unwrap();
+    let output = state.path().join("downloads");
+    let outside = state.path().join("outside");
+    std::fs::create_dir_all(&output).unwrap();
+    std::fs::create_dir_all(&outside).unwrap();
+    std::fs::write(output.join("unrelated.txt"), b"keep root").unwrap();
+    std::fs::write(outside.join("unrelated.txt"), b"keep outside").unwrap();
+    let mut tasks: Vec<_> = (1..=7)
+        .map(|id| dlcore::Task {
+            id,
+            url: format!("ftp://example.invalid/task-{id}"),
+            dir: output.clone(),
+            status: Status::Paused,
+            ..Default::default()
+        })
+        .collect();
+    tasks[0].status = Status::Completed;
+    tasks[0].file_name = "keep-published".into();
+    tasks[1].status = Status::Completed;
+    tasks[1].file_name = "delete-published".into();
+    tasks[3].status = Status::Error;
+    tasks[5].status = Status::Completed;
+    tasks[5].file_name = ".".into();
+    tasks[6].status = Status::Completed;
+    tasks[6].file_name = outside.to_string_lossy().into_owned();
+    for task in &tasks[..2] {
+        std::fs::create_dir_all(task.final_path().join("nested")).unwrap();
+        std::fs::write(task.final_path().join("first.bin"), b"first").unwrap();
+        std::fs::write(task.final_path().join("nested/second.bin"), b"second").unwrap();
+    }
+    for task in &tasks[1..6] {
+        let stage = dlcore::external::staging_path(task);
+        std::fs::create_dir_all(stage.join("partial")).unwrap();
+        std::fs::write(stage.join("partial/payload.part"), b"partial").unwrap();
+    }
+    let native = dlcore::Task {
+        id: 8,
+        url: "https://example.invalid/keep.bin".into(),
+        dir: output.clone(),
+        file_name: "keep.bin".into(),
+        status: Status::Completed,
+        ..Default::default()
+    };
+    std::fs::write(native.final_path(), b"keep native final").unwrap();
+    std::fs::write(native.part_path(), b"old partial").unwrap();
+    tasks.push(native.clone());
+    std::fs::write(
+        state.path().join("downloads.json"),
+        serde_json::to_vec(&tasks).unwrap(),
+    )
+    .unwrap();
+    let manager = Manager::new(state.path());
+    for (id, delete) in [
+        (1, false),
+        (2, true),
+        (3, true),
+        (4, true),
+        (5, false),
+        (6, true),
+        (7, true),
+        (8, false),
+    ] {
+        manager.remove(id, delete);
+    }
+    wait_until(|| {
+        !tasks[1].final_path().exists()
+            && [1, 2, 3, 5]
+                .iter()
+                .all(|index| !dlcore::external::staging_path(&tasks[*index]).exists())
+            && !native.part_path().exists()
+    });
+    manager
+        .runtime()
+        .block_on(async { tokio::time::sleep(Duration::from_millis(50)).await });
+    assert!(manager.snapshots().is_empty());
+    assert_eq!(
+        std::fs::read(tasks[0].final_path().join("nested/second.bin")).unwrap(),
+        b"second"
+    );
+    assert_eq!(
+        std::fs::read(dlcore::external::staging_path(&tasks[4]).join("partial/payload.part"))
+            .unwrap(),
+        b"partial"
+    );
+    assert_eq!(
+        std::fs::read(native.final_path()).unwrap(),
+        b"keep native final"
+    );
+    assert_eq!(
+        std::fs::read(output.join("unrelated.txt")).unwrap(),
+        b"keep root"
+    );
+    assert_eq!(
+        std::fs::read(outside.join("unrelated.txt")).unwrap(),
+        b"keep outside"
+    );
+    manager.shutdown();
+}

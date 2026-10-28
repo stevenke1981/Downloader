@@ -452,16 +452,44 @@ impl Manager {
         if let Some(c) = &entry.cancel {
             c.cancel();
         }
-        let t = entry.task.lock().unwrap().clone();
+        let task = entry.task;
         let handle = entry.handle;
         self.rt.spawn(async move {
             if let Some(h) = handle {
                 let _ = h.await;
             }
+            // Publication can finish while cancellation is being handled; inspect the
+            // final task path only once the worker (and its child process) has exited.
+            let t = task.lock().unwrap().clone();
+            let Ok(root) = std::fs::canonicalize(&t.dir) else {
+                return;
+            };
+            let owned_path = |path: PathBuf| {
+                std::fs::canonicalize(path)
+                    .ok()
+                    .filter(|path| path != &root && path.starts_with(&root))
+            };
+            let external = crate::external::handles(&t.url, t.kind);
             if !t.file_name.is_empty() {
-                let _ = std::fs::remove_file(t.part_path());
-                if delete_file {
-                    let _ = std::fs::remove_file(t.final_path());
+                if let Some(path) = owned_path(t.part_path()) {
+                    let _ = std::fs::remove_file(path);
+                }
+                if delete_file && let Some(path) = owned_path(t.final_path()) {
+                    if external && path.is_dir() {
+                        let _ = std::fs::remove_dir_all(path);
+                    } else {
+                        let _ = std::fs::remove_file(path);
+                    }
+                }
+            }
+            if delete_file
+                && external
+                && let Some(path) = owned_path(crate::external::staging_path(&t))
+            {
+                if path.is_dir() {
+                    let _ = std::fs::remove_dir_all(path);
+                } else {
+                    let _ = std::fs::remove_file(path);
                 }
             }
         });
@@ -917,6 +945,57 @@ fn usable_cookie(c: &str) -> bool {
 mod tests {
     use super::*;
     use std::io::{Error, ErrorKind};
+
+    #[test]
+    fn remove_waits_for_worker_publication_before_resolving_output() {
+        let state = tempfile::tempdir().unwrap();
+        let output = state.path().join("downloads");
+        std::fs::create_dir_all(&output).unwrap();
+        let manager = Manager::new(state.path());
+        let cancel = CancellationToken::new();
+        let task = Arc::new(Mutex::new(Task {
+            id: 1,
+            url: "ftp://example.invalid/multi".into(),
+            dir: output.clone(),
+            status: Status::Downloading,
+            ..Default::default()
+        }));
+        let worker_task = task.clone();
+        let worker_cancel = cancel.clone();
+        let published = output.join("late-publication");
+        let worker_output = published.clone();
+        let handle = manager.rt.spawn(async move {
+            worker_cancel.cancelled().await;
+            std::fs::create_dir_all(worker_output.join("nested")).unwrap();
+            std::fs::write(worker_output.join("nested/file.bin"), b"output").unwrap();
+            worker_task.lock().unwrap().file_name = "late-publication".into();
+        });
+        let staging = crate::external::staging_path(&task.lock().unwrap());
+        std::fs::create_dir_all(&staging).unwrap();
+        manager.inner.entries.lock().unwrap().push(Entry {
+            task,
+            limiter: Arc::new(RateLimiter::new(0)),
+            cancel: Some(cancel),
+            handle: Some(handle),
+            speed: 0.0,
+            last_bytes: 0,
+        });
+        manager.remove(1, true);
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while staging.exists() {
+            assert!(Instant::now() < deadline, "removal did not finish");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            !published.exists(),
+            "delete must inspect the task after its worker exits"
+        );
+        assert!(
+            output.exists(),
+            "empty pre-cancellation filename must not delete the root"
+        );
+        manager.shutdown();
+    }
 
     #[test]
     fn usable_cookie_rules() {
