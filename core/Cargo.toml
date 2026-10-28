@@ -16,6 +16,10 @@ path = "src/bin/dlx.rs"
 name = "downloader-host"
 path = "src/bin/host.rs"
 
+[[bin]]
+name = "dlxctl"
+path = "src/bin/dlxctl.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "signal", "fs"] }
 tokio-util = "0.7"
