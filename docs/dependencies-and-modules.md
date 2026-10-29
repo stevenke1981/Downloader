@@ -6,7 +6,10 @@ Download protocols run in-process in Rust. Downloading does not require aria2, F
 
 | Module | Responsibility |
 |---|---|
-| `core/src/engine.rs` | Segmented HTTP(S), resume and download lifecycle |
+| `core/src/engine.rs` | HTTP(S) download lifecycle and verification |
+| `core/src/engine/http.rs` | HTTP probing, origin checks and range validation |
+| `core/src/engine/segments.rs` | Segment planning and work allocation |
+| `core/src/engine/worker.rs` | Concurrent segment transfers and retry handling |
 | `core/src/manager.rs` | Download manager API and shared state |
 | `core/src/manager/models.rs` | Public download requests and snapshots |
 | `core/src/manager/scheduler.rs` | Queue dispatch and progress updates |
@@ -14,8 +17,13 @@ Download protocols run in-process in Rust. Downloading does not require aria2, F
 | `core/src/manager/persistence.rs` | State loading and atomic saves |
 | `core/src/protocols/mod.rs` | Protocol dispatch, staging, integrity verification and completed-file publication |
 | `core/src/protocols/ftp.rs` | FTP transfer and directory listing |
+| `core/src/protocols/ftp/connection.rs` | FTP control and passive connections |
 | `core/src/protocols/metalink.rs` | Metalink parsing, mirrors and advertised hashes |
-| `core/src/protocols/torrent.rs` | BitTorrent / magnet through the Rust librqbit library |
+| `core/src/protocols/metalink/descriptor.rs` | Metalink descriptor parsing |
+| `core/src/protocols/metalink/http.rs` | Origin-scoped Metalink HTTP requests |
+| `core/src/protocols/torrent.rs` | BitTorrent / magnet lifecycle through the Rust librqbit library |
+| `core/src/protocols/torrent/source.rs` | Torrent source retrieval and validation |
+| `core/src/protocols/torrent/tests.rs`, `core/src/protocols/torrent/tests/fixture.rs` | Torrent regressions and shared swarm fixture |
 | `core/src/protocols/media.rs` | Shared media transfer state, HTTP and protocol dispatch |
 | `core/src/protocols/media/hls.rs` | HLS transfer |
 | `core/src/protocols/media/rtsp.rs` | RTSP capture and G.711 audio conversion |
@@ -25,8 +33,10 @@ Download protocols run in-process in Rust. Downloading does not require aria2, F
 | `core/src/protocols/media/parse/discovery.rs` | Webpage media discovery |
 | `core/src/protocols/media/tests.rs` | Media protocol regression fixtures and tests |
 | `core/src/browser.rs`, `core/src/native.rs`, `core/src/bin/host.rs` | Browser registration, Native Messaging and application startup |
+| `core/src/browser/registration.rs` | Browser host registration and status |
 | `core/src/automation.rs` | Explicitly configured scheduled programs and shutdown |
 | `gui/src/browser_setup.rs`, `gui/src/reveal.rs` | Browser launch, file location and preview |
+| `gui/src/view.rs`, `gui/src/tools/ftp.rs` | Window models and FTP tool input handling |
 
 The public `dlcore::external` API remains a compatibility alias for `dlcore::protocols`. Existing `.dlx-external-*` staging names remain unchanged to preserve paused downloads. Task and settings formats are unchanged.
 

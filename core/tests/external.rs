@@ -71,10 +71,17 @@ fn protocols_are_embedded_and_never_spawn_external_engines() {
     );
     for source in [
         include_str!("../src/engine.rs"),
+        include_str!("../src/engine/http.rs"),
+        include_str!("../src/engine/segments.rs"),
+        include_str!("../src/engine/worker.rs"),
         include_str!("../src/protocols/mod.rs"),
         include_str!("../src/protocols/ftp.rs"),
+        include_str!("../src/protocols/ftp/connection.rs"),
         include_str!("../src/protocols/metalink.rs"),
+        include_str!("../src/protocols/metalink/descriptor.rs"),
+        include_str!("../src/protocols/metalink/http.rs"),
         include_str!("../src/protocols/torrent.rs"),
+        include_str!("../src/protocols/torrent/source.rs"),
         include_str!("../src/protocols/media.rs"),
         include_str!("../src/protocols/media/hls.rs"),
         include_str!("../src/protocols/media/mmsh.rs"),
