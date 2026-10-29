@@ -7,11 +7,19 @@ Download protocols run in-process in Rust. Downloading does not require aria2, F
 | Module | Responsibility |
 |---|---|
 | `core/src/engine.rs` | Segmented HTTP(S), resume and download lifecycle |
+| `core/src/manager.rs` | Download manager API and shared state |
+| `core/src/manager/models.rs` | Public download requests and snapshots |
+| `core/src/manager/scheduler.rs` | Queue dispatch and progress updates |
+| `core/src/manager/automation.rs` | Scheduled actions |
+| `core/src/manager/persistence.rs` | State loading and atomic saves |
 | `core/src/protocols/mod.rs` | Protocol dispatch, staging, integrity verification and completed-file publication |
 | `core/src/protocols/ftp.rs` | FTP transfer and directory listing |
 | `core/src/protocols/metalink.rs` | Metalink parsing, mirrors and advertised hashes |
 | `core/src/protocols/torrent.rs` | BitTorrent / magnet through the Rust librqbit library |
-| `core/src/protocols/media.rs` | HLS, static-page media, RTSP and MMS-over-HTTP |
+| `core/src/protocols/media.rs` | Shared media transfer state, HTTP and protocol dispatch |
+| `core/src/protocols/media/hls.rs` | HLS transfer |
+| `core/src/protocols/media/rtsp.rs` | RTSP capture and G.711 audio conversion |
+| `core/src/protocols/media/mmsh.rs` | MMS-over-HTTP capture and ASF packet handling |
 | `core/src/protocols/media/parse.rs` | Shared media URL validation and parsing facade |
 | `core/src/protocols/media/parse/playlist.rs` | HLS playlist parsing |
 | `core/src/protocols/media/parse/discovery.rs` | Webpage media discovery |
