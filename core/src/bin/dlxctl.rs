@@ -185,7 +185,7 @@ fn run(args: Args) -> Result<(), String> {
                 .transpose()?
                 .unwrap_or_default();
             let runtime = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-            for entry in runtime.block_on(dlcore::external::list_ftp(&url, &username, &password))? {
+            for entry in runtime.block_on(dlcore::protocols::list_ftp(&url, &username, &password))? {
                 println!("{entry}");
             }
         }

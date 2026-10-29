@@ -64,7 +64,7 @@ fn state_path(dir: &std::path::Path, url: &str) -> PathBuf {
 async fn main() {
     let a = Args::parse();
     if a.tools {
-        for tool in dlcore::external::capabilities() {
+        for tool in dlcore::protocols::capabilities() {
             println!(
                 "{}: {}",
                 tool.name,
@@ -134,7 +134,7 @@ async fn main() {
             .filter(|t| {
                 t.url == *url
                     && t.kind == kind
-                    && (t.part_path().exists() || dlcore::external::staging_path(t).exists())
+                    && (t.part_path().exists() || dlcore::protocols::staging_path(t).exists())
             })
             .unwrap_or_else(|| Task {
                 url: url.trim().into(),

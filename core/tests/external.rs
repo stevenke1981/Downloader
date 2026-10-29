@@ -70,11 +70,15 @@ fn protocols_are_embedded_and_never_spawn_external_engines() {
             .all(|c| c.available && c.path.is_none())
     );
     for source in [
-        include_str!("../src/external.rs"),
-        include_str!("../src/native_ftp.rs"),
-        include_str!("../src/native_metalink.rs"),
-        include_str!("../src/native_torrent.rs"),
-        include_str!("../src/native_media.rs"),
+        include_str!("../src/engine.rs"),
+        include_str!("../src/protocols/mod.rs"),
+        include_str!("../src/protocols/ftp.rs"),
+        include_str!("../src/protocols/metalink.rs"),
+        include_str!("../src/protocols/torrent.rs"),
+        include_str!("../src/protocols/media.rs"),
+        include_str!("../src/protocols/media/parse.rs"),
+        include_str!("../src/protocols/media/parse/playlist.rs"),
+        include_str!("../src/protocols/media/parse/discovery.rs"),
     ] {
         assert!(!source.contains("process::Command"));
         assert!(!source.contains("Command::new"));

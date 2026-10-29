@@ -637,7 +637,7 @@ mod tests {
             connections: 4,
             ..Default::default()
         }));
-        let stage = crate::external::staging_path(&task.lock().unwrap());
+        let stage = crate::protocols::staging_path(&task.lock().unwrap());
         tokio::fs::create_dir_all(stage.join("state"))
             .await
             .unwrap();
@@ -657,7 +657,7 @@ mod tests {
         assert_eq!(
             tokio::time::timeout(
                 Duration::from_secs(30),
-                crate::external::run(task.clone(), ctx)
+                crate::protocols::run(task.clone(), ctx)
             )
             .await
             .unwrap()

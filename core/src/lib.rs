@@ -3,7 +3,9 @@ pub mod category;
 pub mod checksum;
 pub mod browser;
 pub mod engine;
-pub mod external;
+pub mod protocols;
+/// Compatibility alias for the former external-engine facade.
+pub use protocols as external;
 pub mod site;
 pub mod grabber;
 pub mod remote;
@@ -25,8 +27,3 @@ pub use limiter::RateLimiter;
 pub use manager::{Manager, NewDownload, Snapshot};
 pub use settings::{Schedule, Settings};
 pub use task::{Seg, Status, Task, Verification, VerifyState};
-
-mod native_ftp;
-mod native_metalink;
-mod native_torrent;
-mod native_media;

@@ -476,7 +476,7 @@ impl Manager {
                     .ok()
                     .filter(|path| path != &root && path.starts_with(&root))
             };
-            let external = crate::external::handles(&t.url, t.kind);
+            let external = crate::protocols::handles(&t.url, t.kind);
             if !t.file_name.is_empty() {
                 if let Some(path) = owned_path(t.part_path()) {
                     let _ = std::fs::remove_file(path);
@@ -491,7 +491,7 @@ impl Manager {
             }
             if delete_file
                 && external
-                && let Some(path) = owned_path(crate::external::staging_path(&t))
+                && let Some(path) = owned_path(crate::protocols::staging_path(&t))
             {
                 if path.is_dir() {
                     let _ = std::fs::remove_dir_all(path);
@@ -978,7 +978,7 @@ mod tests {
             std::fs::write(worker_output.join("nested/file.bin"), b"output").unwrap();
             worker_task.lock().unwrap().file_name = "late-publication".into();
         });
-        let staging = crate::external::staging_path(&task.lock().unwrap());
+        let staging = crate::protocols::staging_path(&task.lock().unwrap());
         std::fs::create_dir_all(&staging).unwrap();
         manager.inner.entries.lock().unwrap().push(Entry {
             task,

@@ -520,10 +520,10 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     }
     let external = {
         let t = task.lock().unwrap();
-        crate::external::handles(&t.url, t.kind)
+        crate::protocols::handles(&t.url, t.kind)
     };
     if external {
-        return crate::external::run(task, ctx).await;
+        return crate::protocols::run(task, ctx).await;
     }
     loop {
         if run_once(task.clone(), ctx.clone()).await? == Outcome::Cancelled {

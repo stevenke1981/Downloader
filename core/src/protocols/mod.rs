@@ -1,5 +1,9 @@
 //! In-process Rust protocol adapters and verified publication.
-//! The module name is retained for persisted task/API compatibility.
+//! Adapters own protocol I/O; this facade owns dispatch, staging and publication.
+mod ftp;
+mod metalink;
+mod torrent;
+mod media;
 use crate::engine::{Ctx, Outcome};
 use crate::task::{DownloadKind, Seg, Status, Task, Verification, VerifyState};
 use crate::{checksum, util};
@@ -135,10 +139,10 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     let verify = ctx.verify;
     let cancel = ctx.cancel.clone();
     let result = match protocol {
-        Protocol::Ftp => crate::native_ftp::download(task.clone(), ctx, &stage).await,
-        Protocol::Metalink => crate::native_metalink::download(task.clone(), ctx, &stage).await,
-        Protocol::Torrent => crate::native_torrent::download(task.clone(), ctx, &stage).await,
-        Protocol::Media => crate::native_media::download(task.clone(), ctx, &stage).await,
+        Protocol::Ftp => crate::protocols::ftp::download(task.clone(), ctx, &stage).await,
+        Protocol::Metalink => crate::protocols::metalink::download(task.clone(), ctx, &stage).await,
+        Protocol::Torrent => crate::protocols::torrent::download(task.clone(), ctx, &stage).await,
+        Protocol::Media => crate::protocols::media::download(task.clone(), ctx, &stage).await,
     }?;
     if result == Outcome::Cancelled || cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
@@ -254,5 +258,5 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
 /// List one FTP directory in process. Credentials are never persisted.
 pub async fn list_ftp(url: &str, username: &str, password: &str) -> Result<Vec<String>, String> {
     util::validate_source(url)?;
-    crate::native_ftp::list(url, username, password).await
+    crate::protocols::ftp::list(url, username, password).await
 }

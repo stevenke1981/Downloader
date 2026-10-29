@@ -324,7 +324,7 @@ async fn transfer(task: Arc<Mutex<Task>>, ctx: &Ctx, stage: &Path) -> Result<(),
                         ..Task::default()
                     }));
                     let transfer =
-                        crate::native_ftp::download(child.clone(), ctx.clone(), &ftp_stage);
+                        crate::protocols::ftp::download(child.clone(), ctx.clone(), &ftp_stage);
                     tokio::pin!(transfer);
                     let outcome = loop {
                         tokio::select! {
@@ -659,7 +659,7 @@ mod tests {
     }
     #[tokio::test]
     async fn native_metalink_ftp_mirror_and_changed_descriptor_invalidation() {
-        let (url, _, server) = crate::native_ftp::tests::spawn_server(b"hello", false, false).await;
+        let (url, _, server) = crate::protocols::ftp::tests::spawn_server(b"hello", false, false).await;
         let dir = tempfile::tempdir().unwrap();
         let descriptor = dir.path().join("ftp.meta4");
         let stage = dir.path().join("stage");

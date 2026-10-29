@@ -174,7 +174,7 @@ fn restart_remote(context: &Context, settings: RemoteSettings) -> Result<(), Str
 fn refresh_capabilities(ui: &ToolsWindow) {
     let weak = ui.as_weak();
     std::thread::spawn(move || {
-        let capabilities = dlcore::external::capabilities();
+        let capabilities = dlcore::protocols::capabilities();
         let _ = weak.upgrade_in_event_loop(move |ui| {
             let tr = ui.global::<ToolTr>();
             ui.set_capabilities(
@@ -430,7 +430,7 @@ pub fn bind(main: &AppWindow, app: &Rc<RefCell<App>>) -> Result<Controller, slin
                         &password,
                     )?;
                 }
-                let names = manager.runtime().block_on(dlcore::external::list_ftp(
+                let names = manager.runtime().block_on(dlcore::protocols::list_ftp(
                     directory.as_str(),
                     &username,
                     &password,

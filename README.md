@@ -1,5 +1,7 @@
 # Downloader
 
+Download-engine dependencies and OS integration boundaries: [Dependencies and modules](docs/dependencies-and-modules.md).
+
 桌面控制：完成項目雙擊定位、Windows 系統匣、浮動精簡視窗。詳見 [繁中使用說明](docs/desktop-controls.zh-TW.md)。
 
 [![CI](https://github.com/stevenke1981/Downloader/actions/workflows/ci.yml/badge.svg)](https://github.com/stevenke1981/Downloader/actions/workflows/ci.yml)
