@@ -6,7 +6,10 @@ Set-Location $root
 
 $candidates = @(
     (Join-Path $env:ProgramFiles 'Inno Setup 7\ISCC.exe'),
-    (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe')
+    (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+    # Per-user installs (e.g. winget --scope user) need no administrator rights.
+    (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe')
 )
 $iscc = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 if (-not $iscc -and $env:GITHUB_ACTIONS -eq 'true') {

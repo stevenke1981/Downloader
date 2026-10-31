@@ -44,9 +44,10 @@ jobs:
           cp docs/fdm-*.md docs/native-rust-plan.md dist/$N/docs/
           cp docs/desktop-controls.zh-TW.md dist/$N/
           cp docs/browser-setup.zh-TW.md dist/$N/
+          cp docs/usability.zh-TW.md dist/$N/
           cp docs/fdm-tools.zh-TW.md docs/fdm-feature-matrix.zh-TW.md dist/$N/
           cp docs/ui-0.5.2-settings-*.png docs/dispatch-plan.md dist/$N/
-          cp docs/validation-0.5.2.md docs/small-window-validation.zh-TW.md dist/$N/
+          cp docs/validation-0.6.0.md docs/small-window-validation.zh-TW.md dist/$N/
           cp -r extension dist/$N/extension
           if [ "$RUNNER_OS" = "Windows" ]; then
             cp target/release/downloader.exe target/release/dlx.exe target/release/dlxctl.exe target/release/downloader-host.exe dist/$N/

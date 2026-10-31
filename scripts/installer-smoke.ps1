@@ -51,7 +51,7 @@ $hostVer = & (Join-Path $dir 'downloader-host.exe') --version
 Check ($LASTEXITCODE -eq 0 -and $hostVer.Trim() -eq "downloader-host $expectedVersion") 'installed host version matches manifest'
 Check ((Get-Item (Join-Path $dir 'downloader.exe')).VersionInfo.FileVersionRaw -eq [version]"$expectedVersion.0") 'installed GUI version matches manifest'
 Check ((Get-Content (Join-Path $dir 'extension\manifest.json') -Raw | ConvertFrom-Json).version -eq $expectedVersion) 'installed extension version matches manifest'
-foreach ($document in 'desktop-controls.zh-TW.md', "validation-$expectedVersion.md", 'small-window-validation.zh-TW.md') {
+foreach ($document in 'desktop-controls.zh-TW.md', 'usability.zh-TW.md', "validation-$expectedVersion.md", 'small-window-validation.zh-TW.md') {
     Check ((Get-FileHash (Join-Path $dir $document)).Hash -eq (Get-FileHash (Join-Path $root "docs\$document")).Hash) "installed documentation matches source: $document"
 }
 $tmp = Join-Path $env:RUNNER_TEMP 'smoke'
