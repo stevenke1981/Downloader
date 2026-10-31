@@ -4,3 +4,4 @@ dist/
 installer/ChineseTraditional.isl
 __pycache__/
 *.pyc
+.sites-runtime/

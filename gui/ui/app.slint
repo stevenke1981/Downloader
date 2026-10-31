@@ -399,6 +399,19 @@ export component AppWindow inherits Window {
     callback detail-apply();
     callback open-folder();
 
+    // ---------- usability contract (v0.6.0) ----------
+    // Notice severity: true renders the banner as an error, false as neutral info.
+    in property <bool> notice-is-error;
+    // Live list search (name or URL, case-insensitive). Rust filters on change.
+    in-out property <string> search;
+    callback search-changed(string);
+    // Remove every completed download from the list (files stay on disk).
+    callback clear-completed();
+    // Open the selected completed file with the system default application.
+    callback open-file();
+    // Move the selection up (-1) or down (+1) inside the visible list.
+    callback select-relative(int);
+
     keyboard-guard := FocusScope {
     capture-key-pressed(event) => {
         if root.exit-open {
