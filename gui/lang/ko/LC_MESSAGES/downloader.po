@@ -3,6 +3,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: ko\n"
 
+msgid "#{} {} — finished"
+msgstr "#{} {} — 완료됨"
+
+msgid "#{} {} — in {} min"
+msgstr "#{} {} — {}분 후"
+
 msgid "1. Register the native host"
 msgstr "1. 네이티브 호스트 등록"
 
@@ -11,6 +17,24 @@ msgstr "2. 확장 프로그램을 열고 개발자 모드를 켠 다음 압축 �
 
 msgid "3. Select this folder. In the extension options, choose Check connection."
 msgstr "3. 아래 폴더를 선택하고 확장 프로그램 옵션에서 연결 확인을 누르세요."
+
+msgid "A checksum can only be used with one download."
+msgstr "체크섬은 다운로드 하나에만 사용할 수 있습니다."
+
+msgid "Access token"
+msgstr "액세스 토큰"
+
+msgid "Access token copied."
+msgstr "액세스 토큰을 복사했습니다."
+
+msgid "Action"
+msgstr "작업"
+
+msgid "Action log"
+msgstr "작업 로그"
+
+msgid "Actions"
+msgstr "예약 작업"
 
 msgid "Active"
 msgstr "진행 중"
@@ -24,11 +48,23 @@ msgstr "추가"
 msgid "Add a link, or connect your browser to send downloads here."
 msgstr "링크를 추가하거나 브라우저를 연결해 다운로드를 보내세요."
 
+msgid "Add at most 1000 links at a time."
+msgstr "한 번에 최대 1000개의 링크를 추가할 수 있습니다."
+
+msgid "Add collected links"
+msgstr "수집된 링크 추가"
+
 msgid "Add download"
 msgstr "다운로드 추가"
 
+msgid "Added {} downloads."
+msgstr "다운로드 {}개를 추가했습니다."
+
 msgid "All downloads"
 msgstr "모든 다운로드"
+
+msgid "All protocol engines run inside Downloader using Rust libraries."
+msgstr "모든 프로토콜 엔진은 Rust 라이브러리를 사용해 Downloader 안에서 실행됩니다."
 
 msgid "Also delete the file from disk"
 msgstr "디스크에서 파일도 삭제"
@@ -39,8 +75,23 @@ msgstr "항상 위에 표시"
 msgid "Apply"
 msgstr "적용"
 
+msgid "Apply remote API"
+msgstr "원격 API 적용"
+
+msgid "Apply traffic limits"
+msgstr "트래픽 제한 적용"
+
 msgid "Archives"
 msgstr "압축 파일"
+
+msgid "Arguments (one per line)"
+msgstr "인수(한 줄에 하나)"
+
+msgid "Automatic"
+msgstr "자동"
+
+msgid "Available"
+msgstr "사용 가능"
 
 msgid "Browser"
 msgstr "브라우저"
@@ -57,6 +108,12 @@ msgstr "브라우저 설정 작업은 즉시 적용됩니다. 저장은 앱 환�
 msgid "Browse…"
 msgstr "찾아보기…"
 
+msgid "Built-in Rust"
+msgstr "내장 Rust"
+
+msgid "Built-in protocols"
+msgstr "내장 프로토콜"
+
 msgid "Cancel"
 msgstr "취소"
 
@@ -69,14 +126,38 @@ msgstr "체크섬 (MD5 / SHA-1 / SHA-256 / SHA-512, 선택)"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "체크섬은 32, 40, 64, 128자 16진수여야 합니다 (BLAKE2b는 b2: 접두사)."
 
+msgid "Choose a traffic mode. Limits are KB/s; 0 means unlimited."
+msgstr "트래픽 모드를 선택하세요. 제한은 KB/s 단위이며 0은 무제한입니다."
+
 msgid "Choose another category or return to all downloads."
 msgstr "다른 분류를 선택하거나 모든 다운로드로 돌아가세요."
 
 msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
 msgstr "아직 Chrome 웹 스토어에 등록되지 않았습니다. 함께 제공된 확장 프로그램을 수동으로 설치하세요."
 
+msgid "Clear completed"
+msgstr "완료된 항목 지우기"
+
+msgid "Clear search"
+msgstr "검색 지우기"
+
+msgid "Clipboard is unavailable."
+msgstr "클립보드를 사용할 수 없습니다."
+
+msgid "Close"
+msgstr "닫기"
+
 msgid "Closing this window restores the main window."
 msgstr "이 창을 닫으면 기본 창이 복원됩니다. 다운로드는 계속됩니다."
+
+msgid "Collect links"
+msgstr "링크 수집"
+
+msgid "Collect links from a website"
+msgstr "웹사이트에서 링크 수집"
+
+msgid "Collected links"
+msgstr "수집된 링크"
 
 msgid "Compact window"
 msgstr "간략 창"
@@ -84,26 +165,47 @@ msgstr "간략 창"
 msgid "Completed"
 msgstr "완료"
 
+msgid "Completed downloads removed from the list: {}. Files stay on disk."
+msgstr "목록에서 제거된 완료된 다운로드: {}개. 파일은 디스크에 그대로 남아 있습니다."
+
+msgid "Concurrent downloads"
+msgstr "동시 다운로드"
+
 msgid "Connect browser"
 msgstr "브라우저 연결"
 
 msgid "Connect your browser"
 msgstr "브라우저 연결하기"
 
+msgid "Connection / status log"
+msgstr "연결 / 상태 로그"
+
 msgid "Connections"
 msgstr "연결 수"
+
+msgid "Connections (0 = automatic / site default)"
+msgstr "연결 수(0 = 자동 / 사이트 기본값)"
 
 msgid "Connections per download"
 msgstr "다운로드당 연결 수"
 
+msgid "Copy URL"
+msgstr "URL 복사"
+
 msgid "Copy path"
 msgstr "경로 복사"
+
+msgid "Copy token"
+msgstr "토큰 복사"
 
 msgid "Could not check browser setup:"
 msgstr "브라우저 설정을 확인할 수 없습니다:"
 
 msgid "Could not copy the extension path:"
 msgstr "확장 프로그램 경로를 복사할 수 없습니다:"
+
+msgid "Could not load the built-in preview:"
+msgstr "내장 미리보기를 불러올 수 없습니다:"
 
 msgid "Could not open the file location:"
 msgstr "파일 위치를 열 수 없습니다:"
@@ -117,17 +219,35 @@ msgstr "네이티브 호스트를 등록할 수 없습니다:"
 msgid "Ctrl+Tab switches sections · Esc cancels"
 msgstr "Ctrl+Tab으로 탭 전환 · Esc로 취소"
 
+msgid "Custom"
+msgstr "사용자 지정"
+
+msgid "Custom folder rules (first match wins)"
+msgstr "사용자 지정 폴더 규칙(처음 일치하는 규칙 적용)"
+
+msgid "Custom limit"
+msgstr "사용자 지정 제한"
+
 msgid "Default folder for the file type"
 msgstr "파일 형식별 기본 폴더"
 
 msgid "Default limit per download (KB/s)"
 msgstr "다운로드당 기본 제한 (KB/s)"
 
+msgid "Delay (minutes)"
+msgstr "지연 시간(분)"
+
 msgid "Delete"
 msgstr "삭제"
 
 msgid "Delete download"
 msgstr "다운로드 삭제"
+
+msgid "Delete…"
+msgstr "삭제…"
+
+msgid "Depth"
+msgstr "깊이"
 
 msgid "Dismiss"
 msgstr "닫기"
@@ -138,8 +258,20 @@ msgstr "문서"
 msgid "Double-click a completed download to locate its file."
 msgstr "완료된 다운로드를 더블 클릭하면 파일 위치를 엽니다."
 
+msgid "Download URLs"
+msgstr "다운로드 URL"
+
 msgid "Download folder"
 msgstr "다운로드 폴더"
+
+msgid "Download mode"
+msgstr "다운로드 모드"
+
+msgid "Download preview"
+msgstr "다운로드 미리보기"
+
+msgid "Downloader tools"
+msgstr "Downloader 도구"
 
 msgid "Downloader — compact"
 msgstr "Downloader — 간략 창"
@@ -152,6 +284,18 @@ msgstr "다운로드"
 
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "대기, 다운로드 또는 확인 중인 항목이 있습니다. 종료하고 일시 중지할까요? Downloader를 다시 열면 재개할 수 있습니다."
+
+msgid "Drop torrent / Metalink files here to add downloads."
+msgstr "torrent / Metalink 파일을 여기에 놓으면 다운로드가 추가됩니다."
+
+msgid "Enable remote API"
+msgstr "원격 API 사용"
+
+msgid "Enter a valid non-negative number."
+msgstr "0 이상의 올바른 숫자를 입력하세요."
+
+msgid "Enter at least one download link."
+msgstr "다운로드 링크를 하나 이상 입력하세요."
 
 msgid "Error"
 msgstr "오류"
@@ -174,8 +318,20 @@ msgstr "확장 프로그램 폴더 없음"
 msgid "Extension path copied."
 msgstr "확장 프로그램 경로를 복사했습니다."
 
+msgid "Extensions (comma separated)"
+msgstr "확장자(쉼표로 구분)"
+
+msgid "FTP URL"
+msgstr "FTP URL"
+
+msgid "FTP directory"
+msgstr "FTP 디렉터리"
+
 msgid "General"
 msgstr "일반"
+
+msgid "Generate token"
+msgstr "토큰 생성"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "전체 속도 제한 (KB/s, 0 = 무제한)"
@@ -183,8 +339,14 @@ msgstr "전체 속도 제한 (KB/s, 0 = 무제한)"
 msgid "High"
 msgstr "높음"
 
+msgid "High limit"
+msgstr "높음 제한"
+
 msgid "Images"
 msgstr "이미지"
+
+msgid "Import torrent / Metalink…"
+msgstr "torrent / Metalink 가져오기…"
 
 msgid "Integrity"
 msgstr "무결성"
@@ -195,14 +357,35 @@ msgstr "언어"
 msgid "Language and behavior"
 msgstr "언어 및 동작"
 
+msgid "Line {}: {}"
+msgstr "{}행: {}"
+
+msgid "List FTP directory"
+msgstr "FTP 디렉터리 목록 보기"
+
+msgid "Listen address"
+msgstr "수신 주소"
+
 msgid "Low"
 msgstr "낮음"
+
+msgid "Low limit"
+msgstr "낮음 제한"
 
 msgid "Make Downloader work the way you do."
 msgstr "다운로드 환경설정과 브라우저 연결을 조정하세요."
 
 msgid "Max simultaneous downloads"
 msgstr "최대 동시 다운로드"
+
+msgid "Maximum pages"
+msgstr "최대 페이지 수"
+
+msgid "Medium"
+msgstr "보통"
+
+msgid "Medium limit"
+msgstr "보통 제한"
 
 msgid "Minimize to tray"
 msgstr "트레이로 최소화"
@@ -228,6 +411,12 @@ msgstr "네이티브 호스트를 등록했습니다. 아래 확장 프로그램
 msgid "Network and schedule"
 msgstr "네트워크 및 일정"
 
+msgid "New profile"
+msgstr "새 프로필"
+
+msgid "New rule"
+msgstr "새 규칙"
+
 msgid "No"
 msgstr "아니요"
 
@@ -242,6 +431,9 @@ msgstr "보통"
 
 msgid "Not checked yet."
 msgstr "아직 확인하지 않았습니다."
+
+msgid "Not installed"
+msgstr "설치되지 않음"
 
 msgid "Not verified"
 msgstr "검증 안 됨"
@@ -258,6 +450,9 @@ msgstr "확장 프로그램 폴더 열기"
 msgid "Open extensions"
 msgstr "확장 프로그램 열기"
 
+msgid "Open file"
+msgstr "파일 열기"
+
 msgid "Open folder"
 msgstr "폴더 열기"
 
@@ -269,6 +464,15 @@ msgstr "확장 프로그램 폴더를 열었습니다."
 
 msgid "Other"
 msgstr "기타"
+
+msgid "Page URL"
+msgstr "페이지 URL"
+
+msgid "Passwords stay in memory for this session. Include http:// or a port when needed."
+msgstr "비밀번호는 이 세션 동안만 메모리에 보관됩니다. 필요하면 http:// 또는 포트를 포함하세요."
+
+msgid "Paste links"
+msgstr "링크 붙여넣기"
 
 msgid "Pause"
 msgstr "일시 중지"
@@ -288,8 +492,17 @@ msgstr "올바른 http(s) URL을 입력하세요."
 msgid "Please enter valid numbers and times (HH:MM)."
 msgstr "올바른 숫자와 시간(HH:MM)을 입력하세요."
 
+msgid "Preview"
+msgstr "미리보기"
+
+msgid "Preview supports images and text, plus media and document metadata. Use Open folder for other file types."
+msgstr "이미지와 텍스트 미리보기, 미디어 및 문서 정보를 지원합니다. 다른 파일 형식은 '폴더 열기'를 사용하세요."
+
 msgid "Priority"
 msgstr "우선순위"
+
+msgid "Program path"
+msgstr "프로그램 경로"
 
 msgid "Programs"
 msgstr "프로그램"
@@ -312,6 +525,27 @@ msgstr "등록 / 복구"
 msgid "Registering the native host…"
 msgstr "네이티브 호스트 등록 중…"
 
+msgid "Remote API"
+msgstr "원격 API"
+
+msgid "Remote API is listening on {}."
+msgstr "원격 API가 {}에서 연결을 기다리고 있습니다."
+
+msgid "Remote API is stopped."
+msgstr "원격 API가 중지되었습니다."
+
+msgid "Remote control is off by default. Every request requires the token."
+msgstr "원격 제어는 기본적으로 꺼져 있습니다. 모든 요청에는 토큰이 필요합니다."
+
+msgid "Remove folder rule"
+msgstr "폴더 규칙 삭제"
+
+msgid "Remove scheduled action"
+msgstr "예약 작업 삭제"
+
+msgid "Remove site profile"
+msgstr "사이트 프로필 삭제"
+
 msgid "Remove the selected download from the list?"
 msgstr "선택한 다운로드를 목록에서 제거할까요?"
 
@@ -324,8 +558,20 @@ msgstr "이어받기 지원"
 msgid "Retries"
 msgstr "재시도 횟수"
 
+msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
+msgstr "추가하기 전에 아래 링크를 확인하세요. 인증이 필요한 다운로드는 '사이트 / 폴더'에 세션 자격 증명을 저장하세요."
+
+msgid "Run a program"
+msgstr "프로그램 실행"
+
 msgid "Save"
 msgstr "저장"
+
+msgid "Save folder rule"
+msgstr "폴더 규칙 저장"
+
+msgid "Save site profile"
+msgstr "사이트 프로필 저장"
 
 msgid "Save to"
 msgstr "저장 위치"
@@ -333,8 +579,23 @@ msgstr "저장 위치"
 msgid "Saved to"
 msgstr "저장 위치"
 
+msgid "Saved."
+msgstr "저장했습니다."
+
+msgid "Schedule a one-time action"
+msgstr "일회성 작업 예약"
+
+msgid "Schedule action"
+msgstr "작업 예약 추가"
+
+msgid "Search downloads (name or URL)"
+msgstr "다운로드 검색(이름 또는 URL)"
+
 msgid "Segments"
 msgstr "세그먼트"
+
+msgid "Session password"
+msgstr "세션 비밀번호"
 
 msgid "Set up each browser profile once. Native host registration does not install the extension."
 msgstr "브라우저 프로필마다 한 번씩 설정하세요. 네이티브 호스트 등록 후에도 확장 프로그램은 별도로 설치해야 합니다."
@@ -342,8 +603,20 @@ msgstr "브라우저 프로필마다 한 번씩 설정하세요. 네이티브 �
 msgid "Settings"
 msgstr "설정"
 
+msgid "Shut down computer"
+msgstr "컴퓨터 종료"
+
 msgid "Signature available (not verified)"
 msgstr "서명 있음 (검증 안 함)"
+
+msgid "Site origin"
+msgstr "사이트 출처"
+
+msgid "Site profiles"
+msgstr "사이트 프로필"
+
+msgid "Sites / folders"
+msgstr "사이트 / 폴더"
 
 msgid "Size"
 msgstr "크기"
@@ -362,6 +635,9 @@ msgstr "속도 제한 (KB/s, 0 = 무제한)"
 
 msgid "Start"
 msgstr "시작"
+
+msgid "Start / Resume"
+msgstr "시작 / 재개"
 
 msgid "Start all"
 msgstr "모두 시작"
@@ -393,8 +669,14 @@ msgstr "파일이 이동되었거나 삭제되었습니다. 저장된 위치를 
 msgid "The system tray is unavailable. The main window has been restored."
 msgstr "시스템 트레이를 사용할 수 없습니다. 기본 창을 복원했습니다."
 
+msgid "This action will run once at the scheduled time, even if downloads are still active."
+msgstr "이 작업은 다운로드가 아직 진행 중이어도 예약된 시간에 한 번 실행됩니다."
+
 msgid "This download is not complete. Wait for completion before locating the file."
 msgstr "이 다운로드는 아직 완료되지 않았습니다. 완료된 후 파일 위치를 찾으세요."
+
+msgid "This file type is shown in its folder instead of being opened."
+msgstr "이 파일 형식은 열지 않고 해당 폴더에 표시됩니다."
 
 msgid "Time left"
 msgstr "남은 시간"
@@ -402,14 +684,41 @@ msgstr "남은 시간"
 msgid "Time range (HH:MM)"
 msgstr "시간 범위 (HH:MM)"
 
+msgid "Tip: Ctrl+N adds a download, Ctrl+V pastes links, right-click a download for more actions."
+msgstr "팁: Ctrl+N으로 다운로드를 추가하고, Ctrl+V로 링크를 붙여넣을 수 있으며, 다운로드 항목을 마우스 오른쪽 버튼으로 클릭하면 더 많은 작업을 할 수 있습니다."
+
+msgid "Tools"
+msgstr "도구"
+
+msgid "Traffic"
+msgstr "트래픽"
+
+msgid "Traffic mode"
+msgstr "트래픽 모드"
+
 msgid "Transfers"
 msgstr "전송 설정"
 
-msgid "URL"
-msgstr "URL"
+msgid "Try another search, or return to all downloads."
+msgstr "다른 검색어를 입력하거나 모든 다운로드로 돌아가세요."
+
+msgid "URL copied."
+msgstr "URL을 복사했습니다."
+
+msgid "URLs (one per line, duplicates are ignored)"
+msgstr "URL(한 줄에 하나, 중복은 무시됨)"
+
+msgid "Unavailable"
+msgstr "사용 불가"
 
 msgid "Unknown"
 msgstr "알 수 없음"
+
+msgid "Use a loopback address for access from this computer only. A network address makes the API reachable from other computers."
+msgstr "이 컴퓨터에서만 접근하려면 루프백 주소를 사용하세요. 네트워크 주소를 사용하면 다른 컴퓨터에서도 API에 접근할 수 있습니다."
+
+msgid "Username"
+msgstr "사용자 이름"
 
 msgid "Verification failed"
 msgstr "검증 실패"
@@ -429,6 +738,15 @@ msgstr "동영상"
 msgid "Watch the clipboard for download links"
 msgstr "클립보드의 다운로드 링크 감시"
 
+msgid "Web / FTP"
+msgstr "웹 / FTP"
+
+msgid "Webpage media (Rust)"
+msgstr "웹페이지 미디어(Rust)"
+
+msgid "Working…"
+msgstr "작업 중…"
+
 msgid "Yes"
 msgstr "예"
 
@@ -437,3 +755,6 @@ msgstr "여기에서 다운로드를 시작하세요"
 
 msgid "{0} downloads, {1} active"
 msgstr "다운로드 {0}개, 진행 중 {1}개"
+
+msgid "URL"
+msgstr "URL"

@@ -3,6 +3,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: es\n"
 
+msgid "#{} {} — finished"
+msgstr "#{} {} — terminado"
+
+msgid "#{} {} — in {} min"
+msgstr "#{} {} — en {} min"
+
 msgid "1. Register the native host"
 msgstr "1. Registrar el host nativo"
 
@@ -11,6 +17,24 @@ msgstr "2. Abre extensiones, activa el modo de desarrollador y elige Cargar desc
 
 msgid "3. Select this folder. In the extension options, choose Check connection."
 msgstr "3. Selecciona esta carpeta. En las opciones de la extensión, elige Comprobar conexión."
+
+msgid "A checksum can only be used with one download."
+msgstr "Una suma de verificación solo puede usarse con una descarga."
+
+msgid "Access token"
+msgstr "Token de acceso"
+
+msgid "Access token copied."
+msgstr "Token de acceso copiado."
+
+msgid "Action"
+msgstr "Acción"
+
+msgid "Action log"
+msgstr "Registro de acciones"
+
+msgid "Actions"
+msgstr "Acciones programadas"
 
 msgid "Active"
 msgstr "Activas"
@@ -24,11 +48,23 @@ msgstr "Añadir"
 msgid "Add a link, or connect your browser to send downloads here."
 msgstr "Añade un enlace o conecta tu navegador para enviar descargas aquí."
 
+msgid "Add at most 1000 links at a time."
+msgstr "Añade como máximo 1000 enlaces a la vez."
+
+msgid "Add collected links"
+msgstr "Añadir enlaces recopilados"
+
 msgid "Add download"
 msgstr "Añadir descarga"
 
+msgid "Added {} downloads."
+msgstr "Se añadieron {} descargas."
+
 msgid "All downloads"
 msgstr "Todas"
+
+msgid "All protocol engines run inside Downloader using Rust libraries."
+msgstr "Todos los motores de protocolo se ejecutan dentro de Downloader con bibliotecas de Rust."
 
 msgid "Also delete the file from disk"
 msgstr "Eliminar también el archivo del disco"
@@ -39,8 +75,23 @@ msgstr "Siempre encima"
 msgid "Apply"
 msgstr "Aplicar"
 
+msgid "Apply remote API"
+msgstr "Aplicar API remota"
+
+msgid "Apply traffic limits"
+msgstr "Aplicar límites de tráfico"
+
 msgid "Archives"
 msgstr "Comprimidos"
+
+msgid "Arguments (one per line)"
+msgstr "Argumentos (uno por línea)"
+
+msgid "Automatic"
+msgstr "Automático"
+
+msgid "Available"
+msgstr "Disponible"
 
 msgid "Browser"
 msgstr "Navegador"
@@ -57,6 +108,12 @@ msgstr "Las acciones del navegador se aplican de inmediato. Guardar solo afecta 
 msgid "Browse…"
 msgstr "Examinar…"
 
+msgid "Built-in Rust"
+msgstr "Rust integrado"
+
+msgid "Built-in protocols"
+msgstr "Protocolos integrados"
+
 msgid "Cancel"
 msgstr "Cancelar"
 
@@ -69,14 +126,38 @@ msgstr "Suma de verificación (MD5 / SHA-1 / SHA-256 / SHA-512, opcional)"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "La suma debe tener 32, 40, 64 o 128 caracteres hex (prefijo b2: para BLAKE2b)."
 
+msgid "Choose a traffic mode. Limits are KB/s; 0 means unlimited."
+msgstr "Elige un modo de tráfico. Los límites son en KB/s; 0 significa sin límite."
+
 msgid "Choose another category or return to all downloads."
 msgstr "Elige otra categoría o vuelve a todas las descargas."
 
 msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
 msgstr "Aún no está en Chrome Web Store. Instala manualmente la extensión incluida."
 
+msgid "Clear completed"
+msgstr "Quitar completadas"
+
+msgid "Clear search"
+msgstr "Borrar búsqueda"
+
+msgid "Clipboard is unavailable."
+msgstr "El portapapeles no está disponible."
+
+msgid "Close"
+msgstr "Cerrar"
+
 msgid "Closing this window restores the main window."
 msgstr "Cerrar esta ventana restaura la ventana principal. Las descargas continúan."
+
+msgid "Collect links"
+msgstr "Recopilar enlaces"
+
+msgid "Collect links from a website"
+msgstr "Recopilar enlaces de un sitio web"
+
+msgid "Collected links"
+msgstr "Enlaces recopilados"
 
 msgid "Compact window"
 msgstr "Ventana compacta"
@@ -84,26 +165,47 @@ msgstr "Ventana compacta"
 msgid "Completed"
 msgstr "Completadas"
 
+msgid "Completed downloads removed from the list: {}. Files stay on disk."
+msgstr "Descargas completadas quitadas de la lista: {}. Los archivos siguen en el disco."
+
+msgid "Concurrent downloads"
+msgstr "Descargas simultáneas"
+
 msgid "Connect browser"
 msgstr "Conectar navegador"
 
 msgid "Connect your browser"
 msgstr "Conecta tu navegador"
 
+msgid "Connection / status log"
+msgstr "Registro de conexión / estado"
+
 msgid "Connections"
 msgstr "Conexiones"
+
+msgid "Connections (0 = automatic / site default)"
+msgstr "Conexiones (0 = automático / predeterminado del sitio)"
 
 msgid "Connections per download"
 msgstr "Conexiones por descarga"
 
+msgid "Copy URL"
+msgstr "Copiar URL"
+
 msgid "Copy path"
 msgstr "Copiar ruta"
+
+msgid "Copy token"
+msgstr "Copiar token"
 
 msgid "Could not check browser setup:"
 msgstr "No se pudo comprobar la configuración del navegador:"
 
 msgid "Could not copy the extension path:"
 msgstr "No se pudo copiar la ruta de la extensión:"
+
+msgid "Could not load the built-in preview:"
+msgstr "No se pudo cargar la vista previa integrada:"
 
 msgid "Could not open the file location:"
 msgstr "No se pudo abrir la ubicación del archivo:"
@@ -117,17 +219,35 @@ msgstr "No se pudo registrar el host nativo:"
 msgid "Ctrl+Tab switches sections · Esc cancels"
 msgstr "Ctrl+Tab cambia de sección · Esc cancela"
 
+msgid "Custom"
+msgstr "Personalizado"
+
+msgid "Custom folder rules (first match wins)"
+msgstr "Reglas de carpeta personalizadas (gana la primera coincidencia)"
+
+msgid "Custom limit"
+msgstr "Límite personalizado"
+
 msgid "Default folder for the file type"
 msgstr "Carpeta predeterminada según el tipo"
 
 msgid "Default limit per download (KB/s)"
 msgstr "Límite predeterminado por descarga (KB/s)"
 
+msgid "Delay (minutes)"
+msgstr "Retraso (minutos)"
+
 msgid "Delete"
 msgstr "Eliminar"
 
 msgid "Delete download"
 msgstr "Eliminar descarga"
+
+msgid "Delete…"
+msgstr "Eliminar…"
+
+msgid "Depth"
+msgstr "Profundidad"
 
 msgid "Dismiss"
 msgstr "Cerrar"
@@ -138,8 +258,20 @@ msgstr "Documentos"
 msgid "Double-click a completed download to locate its file."
 msgstr "Haz doble clic en una descarga completada para localizar su archivo."
 
+msgid "Download URLs"
+msgstr "URL de descarga"
+
 msgid "Download folder"
 msgstr "Carpeta de descargas"
+
+msgid "Download mode"
+msgstr "Modo de descarga"
+
+msgid "Download preview"
+msgstr "Vista previa de descarga"
+
+msgid "Downloader tools"
+msgstr "Herramientas de Downloader"
 
 msgid "Downloader — compact"
 msgstr "Downloader — compacta"
@@ -152,6 +284,18 @@ msgstr "Descargas"
 
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "Aún hay descargas en cola, en curso o verificándose. ¿Salir y pausarlas? Podrás reanudarlas al volver a abrir Downloader."
+
+msgid "Drop torrent / Metalink files here to add downloads."
+msgstr "Arrastra aquí archivos torrent / Metalink para añadir descargas."
+
+msgid "Enable remote API"
+msgstr "Activar API remota"
+
+msgid "Enter a valid non-negative number."
+msgstr "Introduce un número válido no negativo."
+
+msgid "Enter at least one download link."
+msgstr "Introduce al menos un enlace de descarga."
 
 msgid "Error"
 msgstr "Error"
@@ -174,8 +318,20 @@ msgstr "Carpeta de extensión no disponible"
 msgid "Extension path copied."
 msgstr "Ruta de la extensión copiada."
 
+msgid "Extensions (comma separated)"
+msgstr "Extensiones (separadas por comas)"
+
+msgid "FTP URL"
+msgstr "URL de FTP"
+
+msgid "FTP directory"
+msgstr "Directorio FTP"
+
 msgid "General"
 msgstr "General"
+
+msgid "Generate token"
+msgstr "Generar token"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "Límite global (KB/s, 0 = sin límite)"
@@ -183,8 +339,14 @@ msgstr "Límite global (KB/s, 0 = sin límite)"
 msgid "High"
 msgstr "Alta"
 
+msgid "High limit"
+msgstr "Límite alto"
+
 msgid "Images"
 msgstr "Imágenes"
+
+msgid "Import torrent / Metalink…"
+msgstr "Importar torrent / Metalink…"
 
 msgid "Integrity"
 msgstr "Integridad"
@@ -195,14 +357,35 @@ msgstr "Idioma"
 msgid "Language and behavior"
 msgstr "Idioma y comportamiento"
 
+msgid "Line {}: {}"
+msgstr "Línea {}: {}"
+
+msgid "List FTP directory"
+msgstr "Listar directorio FTP"
+
+msgid "Listen address"
+msgstr "Dirección de escucha"
+
 msgid "Low"
 msgstr "Baja"
+
+msgid "Low limit"
+msgstr "Límite bajo"
 
 msgid "Make Downloader work the way you do."
 msgstr "Ajusta las descargas y conecta tu navegador."
 
 msgid "Max simultaneous downloads"
 msgstr "Descargas simultáneas máximas"
+
+msgid "Maximum pages"
+msgstr "Páginas máximas"
+
+msgid "Medium"
+msgstr "Media"
+
+msgid "Medium limit"
+msgstr "Límite medio"
 
 msgid "Minimize to tray"
 msgstr "Minimizar a la bandeja"
@@ -228,6 +411,12 @@ msgstr "Host nativo registrado. Continúa con los pasos de la extensión."
 msgid "Network and schedule"
 msgstr "Red y horario"
 
+msgid "New profile"
+msgstr "Nuevo perfil"
+
+msgid "New rule"
+msgstr "Nueva regla"
+
 msgid "No"
 msgstr "No"
 
@@ -242,6 +431,9 @@ msgstr "Normal"
 
 msgid "Not checked yet."
 msgstr "Aún no se ha comprobado."
+
+msgid "Not installed"
+msgstr "No instalado"
 
 msgid "Not verified"
 msgstr "No verificado"
@@ -258,6 +450,9 @@ msgstr "Abrir carpeta de extensión"
 msgid "Open extensions"
 msgstr "Abrir extensiones"
 
+msgid "Open file"
+msgstr "Abrir archivo"
+
 msgid "Open folder"
 msgstr "Abrir carpeta"
 
@@ -269,6 +464,15 @@ msgstr "Carpeta de la extensión abierta."
 
 msgid "Other"
 msgstr "Otros"
+
+msgid "Page URL"
+msgstr "URL de la página"
+
+msgid "Passwords stay in memory for this session. Include http:// or a port when needed."
+msgstr "Las contraseñas solo se guardan en memoria durante esta sesión. Incluye http:// o un puerto cuando sea necesario."
+
+msgid "Paste links"
+msgstr "Pegar enlaces"
 
 msgid "Pause"
 msgstr "Pausar"
@@ -288,8 +492,17 @@ msgstr "Introduce una URL http(s) válida."
 msgid "Please enter valid numbers and times (HH:MM)."
 msgstr "Introduce números y horas válidos (HH:MM)."
 
+msgid "Preview"
+msgstr "Vista previa"
+
+msgid "Preview supports images and text, plus media and document metadata. Use Open folder for other file types."
+msgstr "La vista previa admite imágenes y texto, además de metadatos de multimedia y documentos. Para otros tipos de archivo, usa Abrir carpeta."
+
 msgid "Priority"
 msgstr "Prioridad"
+
+msgid "Program path"
+msgstr "Ruta del programa"
 
 msgid "Programs"
 msgstr "Programas"
@@ -312,6 +525,27 @@ msgstr "Registrar / reparar"
 msgid "Registering the native host…"
 msgstr "Registrando el host nativo…"
 
+msgid "Remote API"
+msgstr "API remota"
+
+msgid "Remote API is listening on {}."
+msgstr "La API remota está escuchando en {}."
+
+msgid "Remote API is stopped."
+msgstr "La API remota está detenida."
+
+msgid "Remote control is off by default. Every request requires the token."
+msgstr "El control remoto está desactivado por defecto. Cada solicitud requiere el token."
+
+msgid "Remove folder rule"
+msgstr "Quitar regla de carpeta"
+
+msgid "Remove scheduled action"
+msgstr "Quitar acción programada"
+
+msgid "Remove site profile"
+msgstr "Quitar perfil de sitio"
+
 msgid "Remove the selected download from the list?"
 msgstr "¿Quitar la descarga seleccionada de la lista?"
 
@@ -324,8 +558,20 @@ msgstr "Reanudable"
 msgid "Retries"
 msgstr "Reintentos"
 
+msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
+msgstr "Revisa los enlaces de abajo antes de añadirlos. Para descargas con autenticación, guarda las credenciales de sesión en Sitios / carpetas."
+
+msgid "Run a program"
+msgstr "Ejecutar un programa"
+
 msgid "Save"
 msgstr "Guardar"
+
+msgid "Save folder rule"
+msgstr "Guardar regla de carpeta"
+
+msgid "Save site profile"
+msgstr "Guardar perfil de sitio"
 
 msgid "Save to"
 msgstr "Guardar en"
@@ -333,8 +579,23 @@ msgstr "Guardar en"
 msgid "Saved to"
 msgstr "Guardado en"
 
+msgid "Saved."
+msgstr "Guardado."
+
+msgid "Schedule a one-time action"
+msgstr "Programar una acción única"
+
+msgid "Schedule action"
+msgstr "Programar acción"
+
+msgid "Search downloads (name or URL)"
+msgstr "Buscar descargas (nombre o URL)"
+
 msgid "Segments"
 msgstr "Segmentos"
+
+msgid "Session password"
+msgstr "Contraseña de la sesión"
 
 msgid "Set up each browser profile once. Native host registration does not install the extension."
 msgstr "Configura cada perfil del navegador una vez. Registrar el host nativo no instala la extensión."
@@ -342,8 +603,20 @@ msgstr "Configura cada perfil del navegador una vez. Registrar el host nativo no
 msgid "Settings"
 msgstr "Ajustes"
 
+msgid "Shut down computer"
+msgstr "Apagar el equipo"
+
 msgid "Signature available (not verified)"
 msgstr "Firma disponible (no verificada)"
+
+msgid "Site origin"
+msgstr "Origen del sitio"
+
+msgid "Site profiles"
+msgstr "Perfiles de sitio"
+
+msgid "Sites / folders"
+msgstr "Sitios / carpetas"
 
 msgid "Size"
 msgstr "Tamaño"
@@ -362,6 +635,9 @@ msgstr "Límite (KB/s, 0 = sin límite)"
 
 msgid "Start"
 msgstr "Iniciar"
+
+msgid "Start / Resume"
+msgstr "Iniciar / Reanudar"
 
 msgid "Start all"
 msgstr "Iniciar todo"
@@ -393,8 +669,14 @@ msgstr "El archivo se movió o se eliminó. Su ubicación guardada ya no está d
 msgid "The system tray is unavailable. The main window has been restored."
 msgstr "La bandeja del sistema no está disponible. Se ha restaurado la ventana principal."
 
+msgid "This action will run once at the scheduled time, even if downloads are still active."
+msgstr "Esta acción se ejecutará una vez a la hora programada, aunque haya descargas activas."
+
 msgid "This download is not complete. Wait for completion before locating the file."
 msgstr "Esta descarga no está completa. Espera a que termine antes de localizar el archivo."
+
+msgid "This file type is shown in its folder instead of being opened."
+msgstr "Este tipo de archivo se muestra en su carpeta en lugar de abrirse."
 
 msgid "Time left"
 msgstr "Restante"
@@ -402,14 +684,41 @@ msgstr "Restante"
 msgid "Time range (HH:MM)"
 msgstr "Horario (HH:MM)"
 
+msgid "Tip: Ctrl+N adds a download, Ctrl+V pastes links, right-click a download for more actions."
+msgstr "Consejo: Ctrl+N añade una descarga, Ctrl+V pega enlaces y haz clic derecho en una descarga para ver más acciones."
+
+msgid "Tools"
+msgstr "Herramientas"
+
+msgid "Traffic"
+msgstr "Tráfico"
+
+msgid "Traffic mode"
+msgstr "Modo de tráfico"
+
 msgid "Transfers"
 msgstr "Transferencias"
 
-msgid "URL"
-msgstr "URL"
+msgid "Try another search, or return to all downloads."
+msgstr "Prueba otra búsqueda o vuelve a todas las descargas."
+
+msgid "URL copied."
+msgstr "URL copiada."
+
+msgid "URLs (one per line, duplicates are ignored)"
+msgstr "URL (una por línea; los duplicados se ignoran)"
+
+msgid "Unavailable"
+msgstr "No disponible"
 
 msgid "Unknown"
 msgstr "Desconocido"
+
+msgid "Use a loopback address for access from this computer only. A network address makes the API reachable from other computers."
+msgstr "Usa una dirección de bucle local para acceder solo desde este equipo. Una dirección de red permite acceder a la API desde otros equipos."
+
+msgid "Username"
+msgstr "Nombre de usuario"
 
 msgid "Verification failed"
 msgstr "Verificación fallida"
@@ -429,6 +738,15 @@ msgstr "Vídeo"
 msgid "Watch the clipboard for download links"
 msgstr "Vigilar el portapapeles en busca de enlaces"
 
+msgid "Web / FTP"
+msgstr "Web / FTP"
+
+msgid "Webpage media (Rust)"
+msgstr "Multimedia web (Rust)"
+
+msgid "Working…"
+msgstr "Procesando…"
+
 msgid "Yes"
 msgstr "Sí"
 
@@ -437,3 +755,6 @@ msgstr "Tus descargas empiezan aquí"
 
 msgid "{0} downloads, {1} active"
 msgstr "{0} descargas, {1} activas"
+
+msgid "URL"
+msgstr "URL"

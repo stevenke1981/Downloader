@@ -3,6 +3,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Language: ja\n"
 
+msgid "#{} {} — finished"
+msgstr "#{} {} — 実行済み"
+
+msgid "#{} {} — in {} min"
+msgstr "#{} {} — {} 分後"
+
 msgid "1. Register the native host"
 msgstr "1. ネイティブホストを登録"
 
@@ -11,6 +17,24 @@ msgstr "2. 拡張機能を開き、デベロッパーモードを有効にして
 
 msgid "3. Select this folder. In the extension options, choose Check connection."
 msgstr "3. 下のフォルダーを選び、拡張機能のオプションで「接続を確認」を選びます。"
+
+msgid "A checksum can only be used with one download."
+msgstr "チェックサムは 1 件のダウンロードにのみ指定できます。"
+
+msgid "Access token"
+msgstr "アクセストークン"
+
+msgid "Access token copied."
+msgstr "アクセストークンをコピーしました。"
+
+msgid "Action"
+msgstr "動作"
+
+msgid "Action log"
+msgstr "動作ログ"
+
+msgid "Actions"
+msgstr "動作"
 
 msgid "Active"
 msgstr "アクティブ"
@@ -24,11 +48,23 @@ msgstr "追加"
 msgid "Add a link, or connect your browser to send downloads here."
 msgstr "リンクを追加するか、ブラウザーを連携してダウンロードを送信できます。"
 
+msgid "Add at most 1000 links at a time."
+msgstr "一度に追加できるリンクは 1000 件までです。"
+
+msgid "Add collected links"
+msgstr "収集したリンクを追加"
+
 msgid "Add download"
 msgstr "ダウンロードを追加"
 
+msgid "Added {} downloads."
+msgstr "{} 件のダウンロードを追加しました。"
+
 msgid "All downloads"
 msgstr "すべて"
+
+msgid "All protocol engines run inside Downloader using Rust libraries."
+msgstr "すべてのプロトコルエンジンは Rust ライブラリを使い、Downloader 内で動作します。"
 
 msgid "Also delete the file from disk"
 msgstr "ディスクからファイルも削除する"
@@ -39,8 +75,23 @@ msgstr "常に手前に表示"
 msgid "Apply"
 msgstr "適用"
 
+msgid "Apply remote API"
+msgstr "リモート API を適用"
+
+msgid "Apply traffic limits"
+msgstr "通信制限を適用"
+
 msgid "Archives"
 msgstr "圧縮ファイル"
+
+msgid "Arguments (one per line)"
+msgstr "引数（1 行に 1 つ）"
+
+msgid "Automatic"
+msgstr "自動"
+
+msgid "Available"
+msgstr "利用可能"
 
 msgid "Browser"
 msgstr "ブラウザー"
@@ -57,6 +108,12 @@ msgstr "ブラウザー設定の操作はすぐに反映されます。保存は
 msgid "Browse…"
 msgstr "参照…"
 
+msgid "Built-in Rust"
+msgstr "内蔵 Rust"
+
+msgid "Built-in protocols"
+msgstr "内蔵プロトコル"
+
 msgid "Cancel"
 msgstr "キャンセル"
 
@@ -69,14 +126,38 @@ msgstr "チェックサム（MD5 / SHA-1 / SHA-256 / SHA-512、任意）"
 msgid "Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."
 msgstr "チェックサムは 32・40・64・128 文字の16進数で入力してください（BLAKE2b は b2: を付ける）。"
 
+msgid "Choose a traffic mode. Limits are KB/s; 0 means unlimited."
+msgstr "通信モードを選択してください。上限は KB/s 単位で、0 は無制限を意味します。"
+
 msgid "Choose another category or return to all downloads."
 msgstr "別のカテゴリを選ぶか、すべてのダウンロードに戻ってください。"
 
 msgid "Chrome Web Store listing is not available yet. Install the bundled extension manually."
 msgstr "Chrome ウェブストアではまだ公開されていません。同梱の拡張機能を手動でインストールしてください。"
 
+msgid "Clear completed"
+msgstr "完了済みを消去"
+
+msgid "Clear search"
+msgstr "検索をクリア"
+
+msgid "Clipboard is unavailable."
+msgstr "クリップボードを利用できません。"
+
+msgid "Close"
+msgstr "閉じる"
+
 msgid "Closing this window restores the main window."
 msgstr "このウィンドウを閉じるとメインウィンドウが復元されます。ダウンロードは続行されます。"
+
+msgid "Collect links"
+msgstr "リンクを収集"
+
+msgid "Collect links from a website"
+msgstr "Web サイトからリンクを収集"
+
+msgid "Collected links"
+msgstr "収集したリンク"
 
 msgid "Compact window"
 msgstr "コンパクトウィンドウ"
@@ -84,26 +165,47 @@ msgstr "コンパクトウィンドウ"
 msgid "Completed"
 msgstr "完了"
 
+msgid "Completed downloads removed from the list: {}. Files stay on disk."
+msgstr "リストから削除した完了済みダウンロード：{}。ファイルはディスクに残ります。"
+
+msgid "Concurrent downloads"
+msgstr "同時ダウンロード数"
+
 msgid "Connect browser"
 msgstr "ブラウザーを連携"
 
 msgid "Connect your browser"
 msgstr "ブラウザーを連携する"
 
+msgid "Connection / status log"
+msgstr "接続／ステータスログ"
+
 msgid "Connections"
 msgstr "接続数"
+
+msgid "Connections (0 = automatic / site default)"
+msgstr "接続数（0 = 自動／サイトの既定値）"
 
 msgid "Connections per download"
 msgstr "ダウンロードごとの接続数"
 
+msgid "Copy URL"
+msgstr "URL をコピー"
+
 msgid "Copy path"
 msgstr "パスをコピー"
+
+msgid "Copy token"
+msgstr "トークンをコピー"
 
 msgid "Could not check browser setup:"
 msgstr "ブラウザー設定を確認できませんでした:"
 
 msgid "Could not copy the extension path:"
 msgstr "拡張機能のパスをコピーできませんでした:"
+
+msgid "Could not load the built-in preview:"
+msgstr "内蔵プレビューを読み込めませんでした："
 
 msgid "Could not open the file location:"
 msgstr "ファイルの場所を開けませんでした:"
@@ -117,17 +219,35 @@ msgstr "ネイティブホストを登録できませんでした:"
 msgid "Ctrl+Tab switches sections · Esc cancels"
 msgstr "Ctrl+Tab でタブ切替 · Esc でキャンセル"
 
+msgid "Custom"
+msgstr "カスタム"
+
+msgid "Custom folder rules (first match wins)"
+msgstr "カスタムフォルダールール（先に一致したものを使用）"
+
+msgid "Custom limit"
+msgstr "カスタムの上限"
+
 msgid "Default folder for the file type"
 msgstr "ファイル種類ごとの既定フォルダー"
 
 msgid "Default limit per download (KB/s)"
 msgstr "ダウンロードごとの既定の制限（KB/s）"
 
+msgid "Delay (minutes)"
+msgstr "遅延（分）"
+
 msgid "Delete"
 msgstr "削除"
 
 msgid "Delete download"
 msgstr "ダウンロードを削除"
+
+msgid "Delete…"
+msgstr "削除…"
+
+msgid "Depth"
+msgstr "深さ"
 
 msgid "Dismiss"
 msgstr "閉じる"
@@ -138,8 +258,20 @@ msgstr "ドキュメント"
 msgid "Double-click a completed download to locate its file."
 msgstr "完了したダウンロードをダブルクリックすると、ファイルの場所を開きます。"
 
+msgid "Download URLs"
+msgstr "ダウンロード URL"
+
 msgid "Download folder"
 msgstr "ダウンロードフォルダー"
+
+msgid "Download mode"
+msgstr "ダウンロードモード"
+
+msgid "Download preview"
+msgstr "ダウンロードのプレビュー"
+
+msgid "Downloader tools"
+msgstr "Downloader ツール"
 
 msgid "Downloader — compact"
 msgstr "Downloader — コンパクト"
@@ -152,6 +284,18 @@ msgstr "ダウンロード"
 
 msgid "Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."
 msgstr "待機中、ダウンロード中、または検証中の項目があります。終了して一時停止しますか？次回 Downloader を開いたときに再開できます。"
+
+msgid "Drop torrent / Metalink files here to add downloads."
+msgstr "torrent／Metalink ファイルをここにドロップするとダウンロードを追加します。"
+
+msgid "Enable remote API"
+msgstr "リモート API を有効にする"
+
+msgid "Enter a valid non-negative number."
+msgstr "有効な 0 以上の数値を入力してください。"
+
+msgid "Enter at least one download link."
+msgstr "ダウンロードリンクを 1 つ以上入力してください。"
 
 msgid "Error"
 msgstr "エラー"
@@ -174,8 +318,20 @@ msgstr "拡張機能フォルダーがありません"
 msgid "Extension path copied."
 msgstr "拡張機能のパスをコピーしました。"
 
+msgid "Extensions (comma separated)"
+msgstr "拡張子（カンマ区切り）"
+
+msgid "FTP URL"
+msgstr "FTP URL"
+
+msgid "FTP directory"
+msgstr "FTP ディレクトリー"
+
 msgid "General"
 msgstr "一般"
+
+msgid "Generate token"
+msgstr "トークンを生成"
 
 msgid "Global speed limit (KB/s, 0 = unlimited)"
 msgstr "全体の速度制限（KB/s、0 = 無制限）"
@@ -183,8 +339,14 @@ msgstr "全体の速度制限（KB/s、0 = 無制限）"
 msgid "High"
 msgstr "高"
 
+msgid "High limit"
+msgstr "高速の上限"
+
 msgid "Images"
 msgstr "画像"
+
+msgid "Import torrent / Metalink…"
+msgstr "torrent／Metalink を読み込む…"
 
 msgid "Integrity"
 msgstr "整合性"
@@ -195,14 +357,35 @@ msgstr "言語"
 msgid "Language and behavior"
 msgstr "言語と動作"
 
+msgid "Line {}: {}"
+msgstr "{} 行目：{}"
+
+msgid "List FTP directory"
+msgstr "FTP ディレクトリーを一覧表示"
+
+msgid "Listen address"
+msgstr "待ち受けアドレス"
+
 msgid "Low"
 msgstr "低"
+
+msgid "Low limit"
+msgstr "低速の上限"
 
 msgid "Make Downloader work the way you do."
 msgstr "ダウンロードの設定やブラウザー連携を調整できます。"
 
 msgid "Max simultaneous downloads"
 msgstr "同時ダウンロード数"
+
+msgid "Maximum pages"
+msgstr "最大ページ数"
+
+msgid "Medium"
+msgstr "中"
+
+msgid "Medium limit"
+msgstr "中速の上限"
 
 msgid "Minimize to tray"
 msgstr "トレイに最小化"
@@ -228,6 +411,12 @@ msgstr "ネイティブホストを登録しました。下の手順で拡張機
 msgid "Network and schedule"
 msgstr "ネットワークとスケジュール"
 
+msgid "New profile"
+msgstr "新しいプロファイル"
+
+msgid "New rule"
+msgstr "新しいルール"
+
 msgid "No"
 msgstr "いいえ"
 
@@ -242,6 +431,9 @@ msgstr "標準"
 
 msgid "Not checked yet."
 msgstr "未確認です。"
+
+msgid "Not installed"
+msgstr "未インストール"
 
 msgid "Not verified"
 msgstr "未検証"
@@ -258,6 +450,9 @@ msgstr "拡張機能フォルダーを開く"
 msgid "Open extensions"
 msgstr "拡張機能を開く"
 
+msgid "Open file"
+msgstr "ファイルを開く"
+
 msgid "Open folder"
 msgstr "フォルダーを開く"
 
@@ -269,6 +464,15 @@ msgstr "拡張機能フォルダーを開きました。"
 
 msgid "Other"
 msgstr "その他"
+
+msgid "Page URL"
+msgstr "ページの URL"
+
+msgid "Passwords stay in memory for this session. Include http:// or a port when needed."
+msgstr "パスワードはこのセッション中のみメモリに保持されます。必要に応じて http:// またはポート番号を含めてください。"
+
+msgid "Paste links"
+msgstr "リンクを貼り付け"
 
 msgid "Pause"
 msgstr "一時停止"
@@ -288,8 +492,17 @@ msgstr "有効な http(s) URL を入力してください。"
 msgid "Please enter valid numbers and times (HH:MM)."
 msgstr "正しい数値と時刻（HH:MM）を入力してください。"
 
+msgid "Preview"
+msgstr "プレビュー"
+
+msgid "Preview supports images and text, plus media and document metadata. Use Open folder for other file types."
+msgstr "画像とテキストのプレビューに加え、メディアとドキュメントのメタデータを表示できます。その他のファイルは「フォルダーを開く」を使用してください。"
+
 msgid "Priority"
 msgstr "優先度"
+
+msgid "Program path"
+msgstr "プログラムのパス"
 
 msgid "Programs"
 msgstr "プログラム"
@@ -312,6 +525,27 @@ msgstr "登録／修復"
 msgid "Registering the native host…"
 msgstr "ネイティブホストを登録中…"
 
+msgid "Remote API"
+msgstr "リモート API"
+
+msgid "Remote API is listening on {}."
+msgstr "リモート API は {} で待ち受けています。"
+
+msgid "Remote API is stopped."
+msgstr "リモート API は停止しています。"
+
+msgid "Remote control is off by default. Every request requires the token."
+msgstr "リモート操作は既定で無効です。すべてのリクエストにトークンが必要です。"
+
+msgid "Remove folder rule"
+msgstr "フォルダールールを削除"
+
+msgid "Remove scheduled action"
+msgstr "予約した動作を削除"
+
+msgid "Remove site profile"
+msgstr "サイトプロファイルを削除"
+
 msgid "Remove the selected download from the list?"
 msgstr "選択したダウンロードを一覧から削除しますか？"
 
@@ -324,8 +558,20 @@ msgstr "レジューム対応"
 msgid "Retries"
 msgstr "再試行回数"
 
+msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
+msgstr "追加する前に下のリンクを確認してください。認証が必要なダウンロードは、「サイト／フォルダー」にセッションの認証情報を保存してください。"
+
+msgid "Run a program"
+msgstr "プログラムを実行"
+
 msgid "Save"
 msgstr "保存"
+
+msgid "Save folder rule"
+msgstr "フォルダールールを保存"
+
+msgid "Save site profile"
+msgstr "サイトプロファイルを保存"
 
 msgid "Save to"
 msgstr "保存先"
@@ -333,8 +579,23 @@ msgstr "保存先"
 msgid "Saved to"
 msgstr "保存先"
 
+msgid "Saved."
+msgstr "保存しました。"
+
+msgid "Schedule a one-time action"
+msgstr "1 回限りの動作を予約"
+
+msgid "Schedule action"
+msgstr "動作を予約"
+
+msgid "Search downloads (name or URL)"
+msgstr "ダウンロードを検索（名前または URL）"
+
 msgid "Segments"
 msgstr "セグメント"
+
+msgid "Session password"
+msgstr "セッションのパスワード"
 
 msgid "Set up each browser profile once. Native host registration does not install the extension."
 msgstr "ブラウザープロファイルごとに設定が必要です。ネイティブホストの登録後も、拡張機能は別途インストールしてください。"
@@ -342,8 +603,20 @@ msgstr "ブラウザープロファイルごとに設定が必要です。ネイ
 msgid "Settings"
 msgstr "設定"
 
+msgid "Shut down computer"
+msgstr "コンピューターをシャットダウン"
+
 msgid "Signature available (not verified)"
 msgstr "署名あり（未検証）"
+
+msgid "Site origin"
+msgstr "サイトのオリジン"
+
+msgid "Site profiles"
+msgstr "サイトプロファイル"
+
+msgid "Sites / folders"
+msgstr "サイト／フォルダー"
 
 msgid "Size"
 msgstr "サイズ"
@@ -362,6 +635,9 @@ msgstr "速度制限（KB/s、0 = 無制限）"
 
 msgid "Start"
 msgstr "開始"
+
+msgid "Start / Resume"
+msgstr "開始／再開"
 
 msgid "Start all"
 msgstr "すべて開始"
@@ -393,8 +669,14 @@ msgstr "ファイルが移動または削除されました。保存先は利用
 msgid "The system tray is unavailable. The main window has been restored."
 msgstr "システムトレイを利用できません。メインウィンドウを復元しました。"
 
+msgid "This action will run once at the scheduled time, even if downloads are still active."
+msgstr "この動作は、ダウンロードがまだ進行中であっても、予定時刻に 1 回実行されます。"
+
 msgid "This download is not complete. Wait for completion before locating the file."
 msgstr "このダウンロードはまだ完了していません。完了してからファイルの場所を確認してください。"
+
+msgid "This file type is shown in its folder instead of being opened."
+msgstr "このファイル形式は開かずに、フォルダー内に表示されます。"
 
 msgid "Time left"
 msgstr "残り時間"
@@ -402,14 +684,41 @@ msgstr "残り時間"
 msgid "Time range (HH:MM)"
 msgstr "時間帯（HH:MM）"
 
+msgid "Tip: Ctrl+N adds a download, Ctrl+V pastes links, right-click a download for more actions."
+msgstr "ヒント：Ctrl+N でダウンロードを追加、Ctrl+V でリンクを貼り付け、ダウンロード項目を右クリックするとその他の操作を利用できます。"
+
+msgid "Tools"
+msgstr "ツール"
+
+msgid "Traffic"
+msgstr "通信量"
+
+msgid "Traffic mode"
+msgstr "通信モード"
+
 msgid "Transfers"
 msgstr "転送設定"
 
-msgid "URL"
-msgstr "URL"
+msgid "Try another search, or return to all downloads."
+msgstr "別の検索語を試すか、すべてのダウンロードに戻ってください。"
+
+msgid "URL copied."
+msgstr "URL をコピーしました。"
+
+msgid "URLs (one per line, duplicates are ignored)"
+msgstr "URL（1 行に 1 つ。重複は無視されます）"
+
+msgid "Unavailable"
+msgstr "利用できません"
 
 msgid "Unknown"
 msgstr "不明"
+
+msgid "Use a loopback address for access from this computer only. A network address makes the API reachable from other computers."
+msgstr "このコンピューターからのみアクセスする場合はループバックアドレスを使用してください。ネットワークアドレスを指定すると、他のコンピューターからも接続できるようになります。"
+
+msgid "Username"
+msgstr "ユーザー名"
 
 msgid "Verification failed"
 msgstr "検証失敗"
@@ -429,6 +738,15 @@ msgstr "動画"
 msgid "Watch the clipboard for download links"
 msgstr "クリップボードのダウンロードリンクを監視"
 
+msgid "Web / FTP"
+msgstr "Web／FTP"
+
+msgid "Webpage media (Rust)"
+msgstr "Web ページのメディア（Rust）"
+
+msgid "Working…"
+msgstr "処理中…"
+
 msgid "Yes"
 msgstr "はい"
 
@@ -437,3 +755,6 @@ msgstr "ここからダウンロードを開始"
 
 msgid "{0} downloads, {1} active"
 msgstr "ダウンロード {0} 件、実行中 {1} 件"
+
+msgid "URL"
+msgstr "URL"
