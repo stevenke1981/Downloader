@@ -4,6 +4,8 @@ Download-engine dependencies and OS integration boundaries: [Dependencies and mo
 
 桌面控制：完成項目雙擊定位、Windows 系統匣、浮動精簡視窗。詳見 [繁中使用說明](docs/desktop-controls.zh-TW.md)。
 
+易用性（0.6.0）：搜尋框、右鍵選單、快捷鍵、清除已完成、狀態列按鈕。詳見 [易用性說明](docs/usability.zh-TW.md)。
+
 [![CI](https://github.com/stevenke1981/Downloader/actions/workflows/ci.yml/badge.svg)](https://github.com/stevenke1981/Downloader/actions/workflows/ci.yml)
 
 **[繁體中文](#繁體中文) | [English](#english)**
@@ -28,6 +30,7 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 - **自動驗證完整性**（預設開啟，可在設定關閉）：下載完一定會檢查大小和每一段是否完整；接著在同一個遠端資料夾找校驗檔（`檔名.sha256/.sha512/.b2/.sha1/.md5`、`sha256sums.txt`、`SHA256SUMS`、`b2sums.txt`、`md5sums.txt`、`CHECKSUMS` 等，支援 GNU 和 BSD 格式），也會用伺服器的 `Digest`、`Repr-Digest`、`Content-MD5`、`x-goog-hash` 標頭；ETag 剛好是 MD5 時只當參考。支援 SHA-256、SHA-512、SHA-1、MD5、BLAKE2b-512。比對不符時自動重新下載一次，還是不符就標成「驗證失敗」。清單有「完整性」欄，詳細資料顯示演算法、預期值、實際值和來源。有 `.sig`/`.asc` 時會顯示「有簽章檔」，但目前不驗證 OpenPGP 簽章。也可以在新增下載時貼上雜湊值（依長度判斷演算法，BLAKE2b 請加 `b2:`）。
 - **分類**：依副檔名自動分成影片、音樂、壓縮檔、文件、程式、圖片、其他，可選擇存到各分類的子資料夾。
 - **介面**：工具列、側邊欄篩選（全部／進行中／已完成／分類）、下載清單（名稱、大小、進度、速度、剩餘時間、狀態）、詳細資料區（每一段的進度圖、連線數、限速、優先順序）。
+- **易用性（0.6.0）**：依名稱或網址搜尋、右鍵選單、常用快捷鍵（Ctrl+N／Ctrl+V／Ctrl+F／Space／Delete），以及只清除清單、保留檔案的「清除已完成」。詳見 [易用性說明](docs/usability.zh-TW.md)。
 - **剪貼簿監看**（可選）：複製下載連結時自動跳出新增視窗。
 - **多國語言**：繁體中文、簡體中文、English、日本語、한국어、Español、Deutsch、Français，在設定裡切換立即生效。系統語言是中文時預設繁體中文（簡體中文系統預設簡體）。
 - **命令列工具 `dlx`**：不需要介面的下載，可續傳。
@@ -111,6 +114,7 @@ The **Tools** window adds configurable traffic presets, site/folder rules, bound
 - **Clipboard watching** (optional) opens the add dialog when you copy a link.
 - **8 languages** switchable at runtime: 繁體中文, 简体中文, English, 日本語, 한국어, Español, Deutsch, Français. Traditional Chinese is the default on Chinese systems (Simplified on zh-CN/zh-SG).
 - **`dlx` CLI** for headless, resumable downloads.
+- **Usability (0.6.0)**: search by name or URL, right-click menu, common shortcuts, and "Clear completed" that removes list entries but keeps files. Guide (in Traditional Chinese): [usability guide](docs/usability.zh-TW.md).
 
 ### Browser extension (Chrome / Brave / Edge)
 `extension/` is a Manifest V3 extension for Chrome, Edge and Brave: context-menu items for links, images, video/audio, the page and "download all links"; automatic interception of browser downloads (the site's cookies are forwarded to the app by default so downloads that need a login work — sent only over the local connection, kept in memory, never written to disk; can be turned off); options for enabling interception, minimum size, include/exclude file types, Alt+click bypass and falling back to the browser when the app can't be reached. Localized in the same 8 languages.

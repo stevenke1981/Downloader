@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 — 2026-10-31
+
+### Usability
+- Live search above the download list filters by file name or URL; sidebar counts stay unfiltered.
+- Right-click a download for Start/Resume, Pause, Open file, Open folder, Copy URL and Delete.
+- New toolbar action **Clear completed** removes the completed downloads currently shown (filter and search apply) from the list; files stay on disk.
+- **Open file** opens common media, document, image, archive and text files with the default app. Programs, scripts, shortcuts, macro documents and unknown types are shown in their folder instead of being run.
+- Keyboard shortcuts: Ctrl+N add, Ctrl+V add with clipboard links, Ctrl+F search, Ctrl+, settings, Delete, Space start/pause, ↑/↓ move selection (scrolls into view), Enter open completed file, Esc clears search or closes dialogs, Ctrl+Enter submits the add dialog.
+- The Add dialog pre-fills download links found on the clipboard and focuses the URL box.
+- Compact window, Minimize to tray and Exit moved from a separate top row into the status bar; notices are neutral for information and red only for errors; the delete dialog names the download.
+- All 251 UI strings are now translated in every language (previously ~100 newer strings were English outside 繁體中文). `scripts/gen_po.py` scans every `.slint` file and merges instead of overwriting.
+- Guide: [docs/usability.zh-TW.md](docs/usability.zh-TW.md).
+
+### Changed
+- `gui/ui/app.slint` split into `tr.slint` (strings, row types), `widgets.slint` (shared controls) and `compact.slint`.
 
 ### Added
 - Align the FDM feature checklist with in-process Rust FTP/listing, BitTorrent/magnet, Metalink, HLS/webpage-media, RTSP H.264/G.711 and MMS-over-HTTP engines. External aria2, FFmpeg, yt-dlp and curl launchers have been removed.
