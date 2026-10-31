@@ -1,0 +1,98 @@
+// Translatable strings shared by Rust and every window.
+
+export struct Row {
+    id: int,
+    name: string,
+    size: string,
+    progress: float,
+    progress-text: string,
+    speed: string,
+    eta: string,
+    // 0 queued, 1 downloading, 2 paused, 3 verifying, 4 completed, 5 error
+    status: int,
+    category: int,
+    selected: bool,
+    // -1 off, 0 verifying, 1 verified, 2 failed, 3 no checksum, 4 not verified
+    verify: int,
+    verify-progress: float,
+}
+
+export struct SegBar {
+    x: float,
+    w: float,
+    done: float,
+}
+
+export global Tr {
+    pure public function preview-unsupported() -> string { return @tr("Preview supports images and text, plus media and document metadata. Use Open folder for other file types."); }
+    pure public function preview-failed() -> string { return @tr("Could not load the built-in preview:"); }
+
+    pure public function batch-line(line: int, reason: string) -> string { return @tr("Line {}: {}", line, reason); }
+    pure public function batch-empty() -> string { return @tr("Enter at least one download link."); }
+    pure public function batch-limit() -> string { return @tr("Add at most 1000 links at a time."); }
+    pure public function batch-checksum() -> string { return @tr("A checksum can only be used with one download."); }
+    pure public function saved() -> string { return @tr("Saved."); }
+    pure public function working() -> string { return @tr("Working…"); }
+    pure public function copied() -> string { return @tr("URL copied."); }
+    pure public function missing-tool() -> string { return @tr("Not installed"); }
+    pure public function ready-tool() -> string { return @tr("Available"); }
+    pure public function remote-off() -> string { return @tr("Remote API is stopped."); }
+    pure public function remote-on(address: string) -> string { return @tr("Remote API is listening on {}.", address); }
+    pure public function cleared(count: int) -> string { return @tr("Completed downloads removed from the list: {}. Files stay on disk.", count); }
+    pure public function program-revealed() -> string { return @tr("This file type is shown in its folder instead of being opened."); }
+    pure public function links-added(count: int) -> string { return @tr("Added {} downloads.", count); }
+
+    pure public function browser-unchecked() -> string { return @tr("Not checked yet."); }
+    pure public function browser-host-ready() -> string { return @tr("Native host is ready. Finish installing the extension in your browser profile."); }
+    pure public function browser-host-missing() -> string { return @tr("Native host needs registration or repair."); }
+    pure public function browser-unavailable() -> string { return @tr("Browser not found. Install it, then refresh."); }
+    pure public function browser-check-failed() -> string { return @tr("Could not check browser setup:"); }
+    pure public function browser-registering() -> string { return @tr("Registering the native host…"); }
+    pure public function browser-registered() -> string { return @tr("Native host registered. Continue with the extension steps below."); }
+    pure public function browser-register-failed() -> string { return @tr("Could not register the native host:"); }
+    pure public function browser-opened() -> string { return @tr("Opened the browser extension manager."); }
+    pure public function browser-open-failed() -> string { return @tr("Could not open:"); }
+    pure public function browser-folder-opened() -> string { return @tr("Opened the extension folder."); }
+    pure public function browser-path-copied() -> string { return @tr("Extension path copied."); }
+    pure public function browser-path-missing() -> string { return @tr("The bundled extension folder is missing. Repair or reinstall Downloader."); }
+    pure public function browser-copy-failed() -> string { return @tr("Could not copy the extension path:"); }
+    pure public function tray-unavailable() -> string { return @tr("The system tray is unavailable. The main window has been restored."); }
+    pure public function unfinished() -> string { return @tr("This download is not complete. Wait for completion before locating the file."); }
+    pure public function missing-file() -> string { return @tr("The file was moved or deleted. Its saved location is no longer available."); }
+    pure public function reveal-failed() -> string { return @tr("Could not open the file location:"); }
+    pure public function exit-title() -> string { return @tr("Exit Downloader?"); }
+    pure public function exit-warning() -> string { return @tr("Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."); }
+    pure public function status(s: int) -> string {
+        if (s == 0) { return @tr("Queued"); }
+        if (s == 1) { return @tr("Downloading"); }
+        if (s == 2) { return @tr("Paused"); }
+        if (s == 3) { return @tr("Verifying"); }
+        if (s == 4) { return @tr("Completed"); }
+        return @tr("Error");
+    }
+    pure public function category(c: int) -> string {
+        if (c == 0) { return @tr("Video"); }
+        if (c == 1) { return @tr("Music"); }
+        if (c == 2) { return @tr("Archives"); }
+        if (c == 3) { return @tr("Documents"); }
+        if (c == 4) { return @tr("Programs"); }
+        if (c == 5) { return @tr("Images"); }
+        return @tr("Other");
+    }
+    pure public function verify(v: int, p: float) -> string {
+        if (v == 0) { return @tr("Verifying") + " " + round(p * 100) + "%"; }
+        if (v == 1) { return "✓ " + @tr("Verified"); }
+        if (v == 2) { return "✗ " + @tr("Verification failed"); }
+        if (v == 3) { return @tr("No checksum"); }
+        if (v == 4) { return @tr("Not verified"); }
+        return "";
+    }
+    pure public function yes-no(b: bool) -> string { return b ? @tr("Yes") : @tr("No"); }
+    pure public function status-line(total: int, active: int) -> string { return @tr("{0} downloads, {1} active", total, active); }
+    pure public function invalid-url() -> string { return @tr("Please enter a valid http(s) URL."); }
+    pure public function invalid-checksum() -> string { return @tr("Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."); }
+    pure public function invalid-number() -> string { return @tr("Please enter valid numbers and times (HH:MM)."); }
+    pure public function invalid-folder() -> string { return @tr("Please choose a download folder."); }
+    pure public function system-default() -> string { return @tr("System default"); }
+    pure public function unknown() -> string { return @tr("Unknown"); }
+}

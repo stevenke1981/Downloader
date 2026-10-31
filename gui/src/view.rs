@@ -75,6 +75,17 @@ fn matches_filter(s: &Snapshot, f: i32) -> bool {
     }
 }
 
+/// Case-insensitive substring match on the file name or the URL. A blank query
+/// matches every download.
+pub(super) fn matches_search(s: &Snapshot, query: &str) -> bool {
+    let needle = query.trim();
+    if needle.is_empty() {
+        return true;
+    }
+    let needle = needle.to_lowercase();
+    s.name.to_lowercase().contains(&needle) || s.url.to_lowercase().contains(&needle)
+}
+
 pub(super) fn kbs(bps: u64) -> String {
     (bps / 1024).to_string()
 }
@@ -163,9 +174,10 @@ pub(super) fn refresh(ui: &AppWindow, app: &mut App, snaps: &[Snapshot]) {
     }
     sync_model(&app.models.counts, counts.clone());
 
+    // Sidebar counts above stay unfiltered; only the list follows the search.
     let visible: Vec<&Snapshot> = snaps
         .iter()
-        .filter(|s| matches_filter(s, app.filter))
+        .filter(|s| matches_filter(s, app.filter) && matches_search(s, &app.search))
         .collect();
     if app
         .selected
@@ -174,6 +186,10 @@ pub(super) fn refresh(ui: &AppWindow, app: &mut App, snaps: &[Snapshot]) {
         app.selected = None;
     }
     app.visible = visible.iter().map(|s| s.id).collect();
+    // A selection hidden by the filter or search must not stay actionable.
+    if app.selected.is_some_and(|id| !app.visible.contains(&id)) {
+        app.selected = None;
+    }
     sync_model(
         &app.models.rows,
         rows_for(visible.iter().copied(), app.selected),
@@ -187,6 +203,11 @@ pub(super) fn refresh(ui: &AppWindow, app: &mut App, snaps: &[Snapshot]) {
         .selected
         .and_then(|id| snaps.iter().find(|s| s.id == id));
     ui.set_has_selection(sel.is_some());
+    let selected_row = app
+        .selected
+        .and_then(|id| app.visible.iter().position(|&v| v == id))
+        .map_or(-1, |i| i as i32);
+    ui.set_selected_row(selected_row);
     ui.set_sel_can_start(sel.is_some_and(|s| matches!(s.status, Status::Paused | Status::Error)));
     ui.set_sel_can_pause(
         sel.is_some_and(|s| matches!(s.status, Status::Downloading | Status::Queued)),

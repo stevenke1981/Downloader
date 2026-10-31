@@ -12,6 +12,7 @@ use std::time::Duration;
 mod window_placement;
 
 slint::include_modules!();
+mod actions;
 mod batch;
 mod browser_controller;
 mod browser_setup;
@@ -21,6 +22,7 @@ mod tools;
 mod tray;
 mod view;
 
+use actions::{reveal_download, show_notice};
 #[cfg(test)]
 use view::sync_model;
 use view::{Models, kbs, open_compact, parse_kbs, refresh, refresh_now, sync_compact};
@@ -84,7 +86,7 @@ fn minimize_to_tray(ui: &AppWindow, compact: &CompactWindow, available: bool) {
         let _ = ui.hide();
     } else {
         restore_main(ui, compact);
-        ui.set_notice(ui.global::<Tr>().invoke_tray_unavailable());
+        show_notice(ui, ui.global::<Tr>().invoke_tray_unavailable(), true);
     }
 }
 
@@ -101,34 +103,6 @@ fn request_exit(ui: &AppWindow, compact: &CompactWindow, app: &Rc<RefCell<App>>)
         return;
     }
     let _ = slint::quit_event_loop();
-}
-
-fn reveal_download(ui: &AppWindow, app: &App, id: u64) {
-    if ui.get_reveal_busy() {
-        return;
-    }
-    if let Some(s) = app.mgr().snapshots().into_iter().find(|s| s.id == id) {
-        ui.set_reveal_busy(true);
-        let weak = ui.as_weak();
-        std::thread::spawn(move || {
-            let result = reveal::reveal(s.status, &s.path);
-            let _ = weak.upgrade_in_event_loop(move |ui| {
-                let tr = ui.global::<Tr>();
-                let notice = match result {
-                    Ok(()) => SharedString::default(),
-                    Err(reveal::RevealError::NotCompleted) => tr.invoke_unfinished(),
-                    Err(reveal::RevealError::Missing | reveal::RevealError::NotFile) => {
-                        tr.invoke_missing_file()
-                    }
-                    Err(reveal::RevealError::Io(e)) => {
-                        format!("{} {e}", tr.invoke_reveal_failed()).into()
-                    }
-                };
-                ui.set_notice(notice);
-                ui.set_reveal_busy(false);
-            });
-        });
-    }
 }
 
 /// (gettext folder, native name). "en" is the source language.
@@ -217,6 +191,8 @@ struct App {
     filter: i32,
     selected: Option<u64>,
     visible: Vec<u64>,
+    /// Lowercase, trimmed list search; empty shows every download.
+    search: String,
     detail_for: Option<u64>,
     last_clip: String,
     clipboard: Option<arboard::Clipboard>,
@@ -338,6 +314,7 @@ fn main() -> Result<(), slint::PlatformError> {
         filter: 0,
         selected: None,
         visible: vec![],
+        search: String::new(),
         detail_for: None,
         last_clip,
         clipboard,
@@ -347,6 +324,7 @@ fn main() -> Result<(), slint::PlatformError> {
     browser_controller::bind(&ui, &app);
     let desktop = desktop::bind(&ui, &compact, &app)?;
     let tools = tools::bind(&ui, &app)?;
+    actions::bind(&ui, &app);
 
     refresh_now(&ui, &mut app.borrow_mut());
 
@@ -506,14 +484,6 @@ fn main() -> Result<(), slint::PlatformError> {
         }};
     }
 
-    {
-        let weak = ui.as_weak();
-        ui.on_add_clicked(move || {
-            if let Some(ui) = weak.upgrade() {
-                open_add(&ui, "");
-            }
-        });
-    }
     on!(ui, app, on_start_clicked, || {
         if let Some(id) = app.selected {
             app.mgr().start(id);
@@ -572,7 +542,7 @@ fn main() -> Result<(), slint::PlatformError> {
     on!(ui, app, on_detail_apply, || {
         if let Some(id) = app.selected {
             let Some(v) = parse_kbs(&ui.get_d_limit()) else {
-                ui.set_notice(ui.global::<Tr>().invoke_invalid_number());
+                show_notice(&ui, ui.global::<Tr>().invoke_invalid_number(), true);
                 return;
             };
             app.mgr().set_speed_limit(id, v);

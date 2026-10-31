@@ -1,269 +1,11 @@
 export { ToolsWindow, ToolTr, LogWindow, PreviewWindow } from "tools.slint";
 import { Button, ComboBox, LineEdit, TextEdit, CheckBox, SpinBox, ListView, ScrollView } from "std-widgets.slint";
+import { Palette, ToolButton, SideItem, HeaderCell, Bar, Dialog, Field } from "widgets.slint";
+import { Row, SegBar, Tr } from "tr.slint";
+export { Row, SegBar, Tr }
+export { CompactWindow } from "compact.slint";
 
-export struct Row {
-    id: int,
-    name: string,
-    size: string,
-    progress: float,
-    progress-text: string,
-    speed: string,
-    eta: string,
-    // 0 queued, 1 downloading, 2 paused, 3 verifying, 4 completed, 5 error
-    status: int,
-    category: int,
-    selected: bool,
-    // -1 off, 0 verifying, 1 verified, 2 failed, 3 no checksum, 4 not verified
-    verify: int,
-    verify-progress: float,
-}
 
-export struct SegBar {
-    x: float,
-    w: float,
-    done: float,
-}
-
-export global Tr {
-    pure public function preview-unsupported() -> string { return @tr("Preview supports images and text, plus media and document metadata. Use Open folder for other file types."); }
-    pure public function preview-failed() -> string { return @tr("Could not load the built-in preview:"); }
-
-    pure public function batch-line(line: int, reason: string) -> string { return @tr("Line {}: {}", line, reason); }
-    pure public function batch-empty() -> string { return @tr("Enter at least one download link."); }
-    pure public function batch-limit() -> string { return @tr("Add at most 1000 links at a time."); }
-    pure public function batch-checksum() -> string { return @tr("A checksum can only be used with one download."); }
-    pure public function saved() -> string { return @tr("Saved."); }
-    pure public function working() -> string { return @tr("Working…"); }
-    pure public function copied() -> string { return @tr("URL copied."); }
-    pure public function missing-tool() -> string { return @tr("Not installed"); }
-    pure public function ready-tool() -> string { return @tr("Available"); }
-    pure public function remote-off() -> string { return @tr("Remote API is stopped."); }
-    pure public function remote-on(address: string) -> string { return @tr("Remote API is listening on {}.", address); }
-    pure public function links-added(count: int) -> string { return @tr("Added {} downloads.", count); }
-
-    pure public function browser-unchecked() -> string { return @tr("Not checked yet."); }
-    pure public function browser-host-ready() -> string { return @tr("Native host is ready. Finish installing the extension in your browser profile."); }
-    pure public function browser-host-missing() -> string { return @tr("Native host needs registration or repair."); }
-    pure public function browser-unavailable() -> string { return @tr("Browser not found. Install it, then refresh."); }
-    pure public function browser-check-failed() -> string { return @tr("Could not check browser setup:"); }
-    pure public function browser-registering() -> string { return @tr("Registering the native host…"); }
-    pure public function browser-registered() -> string { return @tr("Native host registered. Continue with the extension steps below."); }
-    pure public function browser-register-failed() -> string { return @tr("Could not register the native host:"); }
-    pure public function browser-opened() -> string { return @tr("Opened the browser extension manager."); }
-    pure public function browser-open-failed() -> string { return @tr("Could not open:"); }
-    pure public function browser-folder-opened() -> string { return @tr("Opened the extension folder."); }
-    pure public function browser-path-copied() -> string { return @tr("Extension path copied."); }
-    pure public function browser-path-missing() -> string { return @tr("The bundled extension folder is missing. Repair or reinstall Downloader."); }
-    pure public function browser-copy-failed() -> string { return @tr("Could not copy the extension path:"); }
-    pure public function tray-unavailable() -> string { return @tr("The system tray is unavailable. The main window has been restored."); }
-    pure public function unfinished() -> string { return @tr("This download is not complete. Wait for completion before locating the file."); }
-    pure public function missing-file() -> string { return @tr("The file was moved or deleted. Its saved location is no longer available."); }
-    pure public function reveal-failed() -> string { return @tr("Could not open the file location:"); }
-    pure public function exit-title() -> string { return @tr("Exit Downloader?"); }
-    pure public function exit-warning() -> string { return @tr("Downloads are still queued, running or verifying. Exit and pause them? You can resume them when Downloader opens again."); }
-    pure public function status(s: int) -> string {
-        if (s == 0) { return @tr("Queued"); }
-        if (s == 1) { return @tr("Downloading"); }
-        if (s == 2) { return @tr("Paused"); }
-        if (s == 3) { return @tr("Verifying"); }
-        if (s == 4) { return @tr("Completed"); }
-        return @tr("Error");
-    }
-    pure public function category(c: int) -> string {
-        if (c == 0) { return @tr("Video"); }
-        if (c == 1) { return @tr("Music"); }
-        if (c == 2) { return @tr("Archives"); }
-        if (c == 3) { return @tr("Documents"); }
-        if (c == 4) { return @tr("Programs"); }
-        if (c == 5) { return @tr("Images"); }
-        return @tr("Other");
-    }
-    pure public function verify(v: int, p: float) -> string {
-        if (v == 0) { return @tr("Verifying") + " " + round(p * 100) + "%"; }
-        if (v == 1) { return "✓ " + @tr("Verified"); }
-        if (v == 2) { return "✗ " + @tr("Verification failed"); }
-        if (v == 3) { return @tr("No checksum"); }
-        if (v == 4) { return @tr("Not verified"); }
-        return "";
-    }
-    pure public function yes-no(b: bool) -> string { return b ? @tr("Yes") : @tr("No"); }
-    pure public function status-line(total: int, active: int) -> string { return @tr("{0} downloads, {1} active", total, active); }
-    pure public function invalid-url() -> string { return @tr("Please enter a valid http(s) URL."); }
-    pure public function invalid-checksum() -> string { return @tr("Checksum must be 32, 40, 64 or 128 hex characters (prefix b2: for BLAKE2b)."); }
-    pure public function invalid-number() -> string { return @tr("Please enter valid numbers and times (HH:MM)."); }
-    pure public function invalid-folder() -> string { return @tr("Please choose a download folder."); }
-    pure public function system-default() -> string { return @tr("System default"); }
-    pure public function unknown() -> string { return @tr("Unknown"); }
-}
-
-global Palette {
-    out property <color> surface: white;
-    out property <color> subtle: #f6f8fb;
-    out property <color> text: #202d3b;
-    out property <color> muted: #556575;
-    out property <color> accent: #1565c0;
-    out property <color> border: #dce3eb;
-    out property <color> error: #b3261e;
-}
-
-component ToolButton inherits Rectangle {
-    in property <image> icon;
-    in property <string> label;
-    in property <bool> enabled: true;
-    callback clicked;
-    min-width: 64px;
-    height: 58px;
-    border-radius: 6px;
-    border-width: focus-scope.has-focus ? 2px : 0px;
-    border-color: Palette.accent;
-    forward-focus: focus-scope;
-    accessible-role: button;
-    accessible-label: root.label;
-    accessible-enabled: root.enabled;
-    accessible-action-default => { if root.enabled { root.clicked(); } }
-    background: ta.has-hover && root.enabled ? (ta.pressed ? #d6e9fb : #eaf4fd) : transparent;
-    VerticalLayout {
-        padding: 4px;
-        padding-left: 8px;
-        padding-right: 8px;
-        spacing: 3px;
-        alignment: center;
-        HorizontalLayout {
-            alignment: center;
-            Image {
-                source: root.icon;
-                width: 28px;
-                height: 28px;
-                opacity: root.enabled ? 1.0 : 0.35;
-            }
-        }
-        Text {
-            text: root.label;
-            horizontal-alignment: center;
-            font-size: 12px;
-            color: root.enabled ? #2b2b2b : #9a9a9a;
-        }
-    }
-    ta := TouchArea {
-        enabled: root.enabled;
-        clicked => { focus-scope.focus(); root.clicked(); }
-    }
-    focus-scope := FocusScope {
-        width: 0px;
-        enabled: root.enabled;
-        key-pressed(event) => {
-            if event.text == Key.Return || event.text == Key.Space {
-                root.clicked();
-                return accept;
-            }
-            return reject;
-        }
-    }
-}
-
-component SideItem inherits Rectangle {
-    in property <string> label;
-    in property <string> count;
-    in property <bool> active;
-    in property <bool> enabled: true;
-    in property <color> dot: #1e88e5;
-    callback clicked;
-    height: 32px;
-    border-radius: 6px;
-    border-width: focus-scope.has-focus ? 2px : 0px;
-    border-color: Palette.accent;
-    forward-focus: focus-scope;
-    accessible-role: button;
-    accessible-label: root.label;
-    accessible-enabled: root.enabled;
-    accessible-checkable: true;
-    accessible-checked: root.active;
-    accessible-action-default => { if root.enabled { root.clicked(); } }
-    background: active ? #dcebfb : (ta.has-hover ? #edf3fa : transparent);
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 8px;
-        Rectangle {
-            width: 9px;
-            VerticalLayout {
-                alignment: center;
-                Rectangle { width: 9px; height: 9px; border-radius: 4.5px; background: root.dot; }
-            }
-        }
-        Text { text: root.label; vertical-alignment: center; font-size: 13px; color: active ? #0b5cad : #333; font-weight: active ? 600 : 400; }
-        Text { text: root.count; vertical-alignment: center; horizontal-alignment: right; font-size: 12px; color: #888; }
-    }
-    ta := TouchArea { enabled: root.enabled; clicked => { focus-scope.focus(); root.clicked(); } }
-    focus-scope := FocusScope {
-        width: 0px;
-        enabled: root.enabled;
-        key-pressed(event) => {
-            if event.text == Key.Return || event.text == Key.Space {
-                root.clicked();
-                return accept;
-            }
-            return reject;
-        }
-    }
-}
-
-component HeaderCell inherits Text {
-    vertical-alignment: center;
-    font-size: 12px;
-    color: #555;
-    overflow: elide;
-}
-
-component Bar inherits Rectangle {
-    in property <float> value;
-    in property <int> status;
-    height: 14px;
-    border-radius: 7px;
-    background: #e6e9ee;
-    clip: true;
-    Rectangle {
-        x: 0;
-        width: parent.width * clamp(root.value, 0, 1);
-        border-radius: 7px;
-        background: root.status == 4 ? #2eaa5c : (root.status == 5 ? #e5484d : (root.status == 2 ? #f0a830 : #1e88e5));
-    }
-}
-
-component Dialog inherits Rectangle {
-    in property <string> title;
-    in property <length> dialog-width: 520px;
-    callback close;
-    background: #00000060;
-    TouchArea { }
-    Rectangle {
-        width: min(root.dialog-width, parent.width - 24px);
-        height: min(content.preferred-height, parent.height - 24px);
-        x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
-        background: white;
-        border-radius: 10px;
-        drop-shadow-blur: 18px;
-        drop-shadow-color: #00000050;
-        ScrollView {
-        content-width: self.width;
-        horizontal-scrollbar-policy: always-off;
-        content := VerticalLayout {
-            padding: 18px;
-            spacing: 10px;
-            Text { text: root.title; font-size: 17px; font-weight: 700; color: #1d1d1d; }
-            @children
-        }
-        }
-    }
-}
-
-component Field inherits HorizontalLayout {
-    in property <string> label;
-    spacing: 10px;
-    Text { text: root.label; width: 150px; vertical-alignment: center; font-size: 13px; color: #333; wrap: word-wrap; }
-    @children
-}
 
 export component AppWindow inherits Window {
     title: "Downloader";
@@ -411,8 +153,24 @@ export component AppWindow inherits Window {
     callback open-file();
     // Move the selection up (-1) or down (+1) inside the visible list.
     callback select-relative(int);
+    // Closing a dialog destroys its focused element; hand focus back so shortcuts keep working.
+    changed add-open => { if !root.add-open { keyboard-guard.focus(); } }
+    changed del-open => { if !root.del-open { keyboard-guard.focus(); } }
+    // Visible index of the selected row (-1 none); keeps keyboard selection in view.
+    in property <int> selected-row: -1;
+    changed selected-row => {
+        if root.selected-row >= 0 {
+            let top = root.selected-row * 40px;
+            if top < -list-view.content-y {
+                list-view.content-y = -top;
+            } else if top + 40px > -list-view.content-y + list-view.visible-height {
+                list-view.content-y = -(top + 40px - list-view.visible-height);
+            }
+        }
+    }
 
     keyboard-guard := FocusScope {
+    init => { keyboard-guard.focus(); }
     capture-key-pressed(event) => {
         if root.exit-open {
             root.exit-key-held = true;
@@ -439,6 +197,45 @@ export component AppWindow inherits Window {
                 return accept;
             }
         }
+        // Ctrl+Return submits the add form even while the URL box has focus; plain Return still adds a line.
+        if root.add-open && !root.add-busy {
+            if event.text == Key.Escape { root.add-open = false; return accept; }
+            if event.text == Key.Return && event.modifiers.control { root.add-ok(); return accept; }
+        }
+        if root.del-open && event.text == Key.Escape { root.del-open = false; return accept; }
+        return reject;
+    }
+    // Non-capture: focused text inputs and buttons consume their own keys first.
+    key-pressed(event) => {
+        if root.add-open || root.del-open || root.set-open || root.exit-open { return reject; }
+        if event.modifiers.control {
+            if event.text == "n" || event.text == "N" { root.add-clicked(); return accept; }
+            // Rust prefills the add dialog from clipboard links.
+            if event.text == "v" || event.text == "V" { root.add-clicked(); return accept; }
+            if (event.text == "f" || event.text == "F") && root.counts[0] > 0 { search-box.focus(); return accept; }
+            if event.text == "," { root.settings-clicked(); return accept; }
+            return reject;
+        }
+        if event.text == Key.Escape && root.search != "" {
+            root.search = "";
+            root.search-changed("");
+            return accept;
+        }
+        if event.text == Key.UpArrow { root.select-relative(-1); return accept; }
+        if event.text == Key.DownArrow { root.select-relative(1); return accept; }
+        // Keys below are for the list, not for typing in the search box.
+        if search-box.has-focus { return reject; }
+        if event.text == Key.Delete && root.has-selection {
+            root.del-file = false;
+            root.del-open = true;
+            return accept;
+        }
+        if event.text == Key.Space {
+            if root.sel-can-start { root.start-clicked(); return accept; }
+            if root.sel-can-pause { root.pause-clicked(); return accept; }
+            return reject;
+        }
+        if event.text == Key.Return && root.d-completed { root.open-file(); return accept; }
         return reject;
     }
     capture-key-released(event) => {
@@ -446,18 +243,22 @@ export component AppWindow inherits Window {
         return root.exit-open ? accept : reject;
     }
     VerticalLayout {
-        HorizontalLayout {
-            padding: 6px;
-            spacing: 8px;
-            Text { text: @tr("Double-click a completed download to locate its file."); vertical-alignment: center; horizontal-stretch: 1; min-width: 0px; wrap: word-wrap; }
-            Button { text: @tr("Compact window"); clicked => { root.compact-clicked(); } }
-            Button { text: @tr("Minimize to tray"); enabled: root.tray-available; clicked => { root.tray-clicked(); } }
-            Button { text: @tr("Exit"); clicked => { root.exit-clicked(); } }
-        }
-        if root.notice != "": HorizontalLayout {
-            padding: 8px;
-            Text { text: root.notice; color: #a03020; wrap: word-wrap; horizontal-stretch: 1; }
-            Button { text: @tr("Dismiss"); clicked => { root.notice = ""; } }
+        if root.notice != "": Rectangle {
+            // Only errors get the red surface; other notices stay neutral.
+            background: root.notice-is-error ? #fdecea : #e8f1fb;
+            height: notice-row.preferred-height;
+            notice-row := HorizontalLayout {
+                padding: 8px;
+                spacing: 8px;
+                Text {
+                    text: root.notice;
+                    color: root.notice-is-error ? #a03020 : Palette.accent;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Button { text: @tr("Dismiss"); clicked => { root.notice = ""; } }
+            }
         }
         // ---------- toolbar ----------
         Rectangle {
@@ -471,6 +272,7 @@ export component AppWindow inherits Window {
                 ToolButton { icon: @image-url("icons/start.svg"); label: @tr("Start"); enabled: root.sel-can-start; clicked => { root.start-clicked(); } }
                 ToolButton { icon: @image-url("icons/pause.svg"); label: @tr("Pause"); enabled: root.sel-can-pause; clicked => { root.pause-clicked(); } }
                 ToolButton { icon: @image-url("icons/delete.svg"); label: @tr("Delete"); enabled: root.has-selection; clicked => { root.del-file = false; root.del-open = true; } }
+                ToolButton { icon: @image-url("icons/clear.svg"); label: @tr("Clear completed"); enabled: root.counts[2] > 0; clicked => { root.clear-completed(); } }
                 Rectangle { width: 1px; background: #e3e6ea; }
                 ToolButton { icon: @image-url("icons/startall.svg"); label: @tr("Start all"); clicked => { root.start-all(); } }
                 ToolButton { icon: @image-url("icons/pauseall.svg"); label: @tr("Pause all"); clicked => { root.pause-all(); } }
@@ -481,7 +283,7 @@ export component AppWindow inherits Window {
                 VerticalLayout {
                     alignment: center;
                     padding-right: 16px;
-                    Text { text: "↓ " + root.total-speed; font-size: 18px; color: #1565c0; font-weight: 600; horizontal-alignment: right; }
+                    speed-text := Text { text: "↓ " + root.total-speed; font-size: 18px; color: #1565c0; font-weight: 600; horizontal-alignment: right; }
                 }
             }
             Rectangle { y: parent.height - 1px; height: 1px; background: #e3e6ea; }
@@ -518,6 +320,26 @@ export component AppWindow inherits Window {
 
             VerticalLayout {
                 horizontal-stretch: 1;
+                // ---------- search ----------
+                // Fixed height (0 when there is nothing to search) keeps the list position stable.
+                HorizontalLayout {
+                    height: root.counts[0] > 0 ? 42px : 0px;
+                    visible: root.counts[0] > 0;
+                    padding: 8px;
+                    spacing: 6px;
+                    search-box := LineEdit {
+                        text <=> root.search;
+                        placeholder-text: @tr("Search downloads (name or URL)");
+                        accessible-label: @tr("Search downloads (name or URL)");
+                        horizontal-stretch: 1;
+                        edited(text) => { root.search-changed(text); }
+                    }
+                    if root.search != "": Button {
+                        text: "×";
+                        accessible-label: @tr("Clear search");
+                        clicked => { root.search = ""; root.search-changed(""); }
+                    }
+                }
                 // One horizontal owner keeps fixed-width headers and rows aligned.
                 // The ListView inside owns only vertical scrolling.
                 table-scroll := ScrollView {
@@ -549,13 +371,34 @@ export component AppWindow inherits Window {
                 Rectangle {
                     vertical-stretch: 1;
                     background: white;
-                    ListView {
+                    list-view := ListView {
                         for r[i] in root.rows: Rectangle {
                             height: 40px;
                             background: r.selected ? #dcebfb : (rta.has-hover ? #f3f8fd : (mod(i, 2) == 1 ? #fbfcfe : white));
+                            // ContextMenuArea never receives the right press because rta grabs it;
+                            // rta selects the row and opens this menu through show(); items act on that
+                            // selected id, so a list refresh while the menu is open cannot retarget them.
+                            row-menu := ContextMenuArea {
+                                Menu {
+                                    MenuItem { title: @tr("Start / Resume"); enabled: r.status == 2 || r.status == 5; activated => { root.start-clicked(); } }
+                                    MenuItem { title: @tr("Pause"); enabled: r.status == 0 || r.status == 1; activated => { root.pause-clicked(); } }
+                                    MenuSeparator { }
+                                    MenuItem { title: @tr("Open file"); enabled: r.status == 4; activated => { root.open-file(); } }
+                                    MenuItem { title: @tr("Open folder"); enabled: r.status == 4; activated => { root.open-folder(); } }
+                                    MenuItem { title: @tr("Copy URL"); activated => { root.copy-url(); } }
+                                    MenuSeparator { }
+                                    MenuItem { title: @tr("Delete…"); activated => { root.del-file = false; root.del-open = true; } }
+                                }
+                            }
                             rta := TouchArea {
                                 clicked => { root.row-clicked(i); }
                                 double-clicked => { root.row-double-clicked(i); }
+                                pointer-event(event) => {
+                                    if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {
+                                        root.row-clicked(i);
+                                        row-menu.show({ x: self.mouse-x, y: self.mouse-y });
+                                    }
+                                }
                             }
                             HorizontalLayout {
                                 padding-left: 12px;
@@ -614,7 +457,7 @@ export component AppWindow inherits Window {
                             wrap: word-wrap;
                         }
                         Text {
-                            text: root.counts[0] == 0 ? @tr("Add a link, or connect your browser to send downloads here.") : @tr("Choose another category or return to all downloads.");
+                            text: root.counts[0] == 0 ? @tr("Add a link, or connect your browser to send downloads here.") : (root.search != "" ? @tr("Try another search, or return to all downloads.") : @tr("Choose another category or return to all downloads."));
                             color: Palette.muted;
                             horizontal-alignment: center;
                             wrap: word-wrap;
@@ -624,7 +467,18 @@ export component AppWindow inherits Window {
                             spacing: 8px;
                             if root.counts[0] == 0: Button { text: @tr("Add download"); primary: true; clicked => { root.add-clicked(); } }
                             if root.counts[0] == 0: Button { text: @tr("Connect browser"); clicked => { root.settings-clicked(); root.select-settings-tab(2); } }
-                            if root.counts[0] > 0: Button { text: @tr("All downloads"); clicked => { root.filter-clicked(0); } }
+                            if root.counts[0] > 0: Button {
+                                text: @tr("All downloads");
+                                // Returning to all downloads also clears any search, so the list is not left filtered.
+                                clicked => { root.search = ""; root.search-changed(""); root.filter-clicked(0); }
+                            }
+                        }
+                        if root.counts[0] == 0: Text {
+                            text: @tr("Tip: Ctrl+N adds a download, Ctrl+V pastes links, right-click a download for more actions.");
+                            color: Palette.muted;
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                            wrap: word-wrap;
                         }
                     }
                 }
@@ -714,11 +568,29 @@ export component AppWindow inherits Window {
         }
         // ---------- status bar ----------
         Rectangle {
-            height: 26px;
+            height: 34px;
             background: #eef1f5;
             HorizontalLayout {
                 padding-left: 12px;
+                padding-right: 6px;
+                // Buttons are 32px tall; 1px top and bottom keeps them inside a 34px bar.
+                padding-top: 1px;
+                padding-bottom: 1px;
+                spacing: 8px;
                 Text { text: root.status-line; vertical-alignment: center; font-size: 12px; color: #555; }
+                Text {
+                    text: @tr("Double-click a completed download to locate its file.");
+                    vertical-alignment: center;
+                    horizontal-alignment: right;
+                    horizontal-stretch: 1;
+                    min-width: 0px;
+                    font-size: 11px;
+                    color: Palette.muted;
+                    overflow: elide;
+                }
+                Button { text: @tr("Compact window"); clicked => { root.compact-clicked(); } }
+                Button { text: @tr("Minimize to tray"); enabled: root.tray-available; clicked => { root.tray-clicked(); } }
+                Button { text: @tr("Exit"); clicked => { root.exit-clicked(); } }
             }
         }
     }
@@ -727,7 +599,7 @@ export component AppWindow inherits Window {
     if root.add-open: Dialog {
         title: @tr("Add download");
         Text { text: @tr("URLs (one per line, duplicates are ignored)"); }
-        TextEdit { text <=> root.add-url; preferred-height: 110px; accessible-label: @tr("Download URLs"); }
+        add-urls := TextEdit { init => { self.focus(); } text <=> root.add-url; preferred-height: 110px; accessible-label: @tr("Download URLs"); }
         HorizontalLayout {
             Button { text: @tr("Paste links"); enabled: !root.add-busy; clicked => { root.paste-links(); } }
             Button { text: @tr("Import torrent / Metalink…"); enabled: !root.add-busy; clicked => { root.import-files(); } }
@@ -754,6 +626,15 @@ export component AppWindow inherits Window {
     if root.del-open: Dialog {
         title: @tr("Delete download");
         dialog-width: 420px;
+        // Names the target so a right-click or Delete key on the wrong row is visible before confirming.
+        Text {
+            text: root.d-name;
+            accessible-label: root.d-name;
+            font-size: 14px;
+            font-weight: 700;
+            color: Palette.text;
+            overflow: elide;
+        }
         Text { text: @tr("Remove the selected download from the list?"); wrap: word-wrap; }
         CheckBox { text: @tr("Also delete the file from disk"); checked <=> root.del-file; }
         HorizontalLayout {
@@ -936,40 +817,5 @@ export component AppWindow inherits Window {
             Button { text: @tr("Exit"); primary: root.exit-choice; clicked => { root.exit-confirmed(); } }
         }
     }
-    }
-}
-
-export component CompactWindow inherits Window {
-    title: @tr("Downloader — compact");
-    icon: @image-url("icons/app.svg");
-    preferred-width: 400px;
-    preferred-height: 300px;
-    min-width: 340px;
-    min-height: 240px;
-    background: #f6f8fb;
-    in-out property <bool> pinned: false;
-    always-on-top: root.pinned;
-    in property <[Row]> rows;
-    in property <string> status-line;
-    in property <string> total-speed;
-    callback restore();
-    VerticalLayout {
-        padding: 12px;
-        spacing: 8px;
-        Text { text: root.total-speed; font-size: 22px; font-weight: 600; color: #1565c0; }
-        Text { text: root.status-line; }
-        ListView {
-            for r in root.rows: VerticalLayout {
-                padding: 4px;
-                spacing: 3px;
-                Text { text: r.name; overflow: elide; }
-                Bar { value: r.progress; status: r.status; }
-                Text { text: Tr.status(r.status) + "  " + r.progress-text + "  " + r.speed; font-size: 12px; }
-            }
-        }
-        Text { text: @tr("Drop torrent / Metalink files here to add downloads."); font-size: 11px; wrap: word-wrap; }
-        CheckBox { text: @tr("Always on top"); checked <=> root.pinned; }
-        Text { text: @tr("Closing this window restores the main window."); font-size: 11px; wrap: word-wrap; }
-        Button { text: @tr("Restore main window"); clicked => { root.restore(); } }
     }
 }

@@ -35,6 +35,82 @@ pub fn reveal(status: Status, path: &Path) -> Result<(), RevealError> {
     platform_reveal(&file).map_err(RevealError::Io)
 }
 
+/// Opens a completed file with the system default application. Only common media,
+/// document, image, archive and text types are opened; every other type (programs,
+/// scripts, shortcuts, macro documents, installers, unknown) is shown in its folder,
+/// so a downloaded program never starts from a single click.
+pub fn open_file(status: Status, path: &Path) -> Result<(), RevealError> {
+    let file = completed_file(status, path)?;
+    if opens_in_folder_only(&file) {
+        return platform_reveal(&file).map_err(RevealError::Io);
+    }
+    spawn_default_app(&file).map_err(RevealError::Io)
+}
+
+/// Passive file types that are safe to hand to the default application.
+/// An allowlist: anything not listed is revealed in its folder instead.
+const SAFE_TO_OPEN: &[&str] = &[
+    // images
+    "png", "jpg", "jpeg", "gif", "bmp", "webp", "tif", "tiff", "heic", "heif", "avif", "ico",
+    // audio
+    "mp3", "m4a", "aac", "flac", "wav", "ogg", "oga", "opus", "wma", "aiff", "mka",
+    // video
+    "mp4", "m4v", "mkv", "webm", "avi", "mov", "wmv", "flv", "ts", "m2ts", "mpg", "mpeg", "3gp",
+    // subtitles and plain text
+    "srt", "ass", "ssa", "vtt", "txt", "log", "md", "csv", "nfo",
+    // documents without macros
+    "pdf", "epub", "docx", "xlsx", "pptx", "odt", "ods", "odp", "rtf",
+    // archives (opening shows the contents; nothing is extracted or run)
+    "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "zst",
+];
+
+/// True unless the file's extension is on the [`SAFE_TO_OPEN`] allowlist.
+pub fn opens_in_folder_only(path: &Path) -> bool {
+    let Some(name) = path.file_name().map(|n| n.to_string_lossy()) else {
+        return true;
+    };
+    // Windows ignores trailing dots and spaces, so "setup.exe." still starts setup.exe.
+    let name = name.trim_end_matches(['.', ' ']);
+    !name.rsplit_once('.').is_some_and(|(stem, ext)| {
+        !stem.is_empty()
+            && SAFE_TO_OPEN
+                .iter()
+                .any(|safe| ext.eq_ignore_ascii_case(safe))
+    })
+}
+
+/// Whether [`open_file`] would reveal rather than open `path`, judged on the
+/// resolved target so a link named like a document cannot hide a program.
+pub fn reveals_instead_of_opening(path: &Path) -> bool {
+    let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    opens_in_folder_only(&resolved)
+}
+
+/// Hands the path to the OS "open with default app" command as a plain argument.
+/// The exit status is ignored (explorer.exe reports unreliable codes), but the child
+/// is reaped on a helper thread so no zombie process is left behind.
+fn spawn_default_app(path: &Path) -> Result<(), String> {
+    let (program, target) = if cfg!(windows) {
+        (
+            "explorer.exe",
+            dlcore::browser::normal_path(path.to_path_buf()),
+        )
+    } else if cfg!(target_os = "macos") {
+        ("open", path.to_path_buf())
+    } else {
+        ("xdg-open", path.to_path_buf())
+    };
+    std::process::Command::new(program)
+        .arg(target)
+        .spawn()
+        .map(|mut child| {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        })
+        .map_err(|e| e.to_string())
+}
+
 #[derive(Debug, PartialEq)]
 pub enum PreviewError {
     File(RevealError),
@@ -353,6 +429,58 @@ mod tests {
                 completed_file(status, &file),
                 Err(RevealError::NotCompleted)
             );
+        }
+    }
+    #[test]
+    fn open_file_rejects_unfinished_or_missing_files_before_launching_anything() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("fixture.txt");
+        std::fs::write(&file, b"safe test data").unwrap();
+        assert_eq!(
+            open_file(Status::Downloading, &file),
+            Err(RevealError::NotCompleted)
+        );
+        assert_eq!(
+            open_file(Status::Completed, &dir.path().join("absent.txt")),
+            Err(RevealError::Missing)
+        );
+        assert_eq!(
+            open_file(Status::Completed, dir.path()),
+            Err(RevealError::NotFile)
+        );
+    }
+    #[test]
+    fn only_allowlisted_passive_types_are_handed_to_a_default_app() {
+        for name in [
+            "setup.exe",
+            "SETUP.EXE",
+            "run.ps1",
+            "tool.msi",
+            "link.lnk",
+            "site.url",
+            "app.appref-ms",
+            "macro.docm",
+            "script.py",
+            "tool.AppImage",
+            "pkg.dmg",
+            "setup.exe.",
+            "setup.exe ",
+            "photo.jpg.exe",
+            ".pdf",
+            "archive",
+            "run.sh",
+        ] {
+            assert!(opens_in_folder_only(Path::new(name)), "{name}");
+        }
+        for name in [
+            "movie.mkv",
+            "notes.txt",
+            "photo.JPG",
+            "doc.pdf",
+            "a.tar.gz",
+            "song.flac",
+        ] {
+            assert!(!opens_in_folder_only(Path::new(name)), "{name}");
         }
     }
     #[test]

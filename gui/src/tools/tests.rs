@@ -58,8 +58,10 @@ fn traffic_indices_keep_custom_and_three_presets_distinct() {
 fn tools_tabs_expose_typed_controls_and_pinned_close() {
     use i_slint_backend_testing::ElementHandle;
     i_slint_backend_testing::init_no_event_loop();
-    crate::apply_lang("en");
+    // Translations can only be selected once a component exists; earlier calls are
+    // ignored and Slint keeps the system-locale bundle.
     let ui = ToolsWindow::new().unwrap();
+    crate::apply_lang("en");
     ui.show().unwrap();
     ui.window().set_size(slint::LogicalSize::new(660.0, 480.0));
     for (index, label) in [
@@ -97,8 +99,10 @@ fn render_tools_fixture() {
     let output =
         std::env::var_os("DOWNLOADER_UI_SNAPSHOT").expect("explicit screenshot destination");
     crate::select_renderer();
-    crate::apply_lang("zh_TW");
+    // Translations can only be selected once a component exists; earlier calls are
+    // ignored and Slint keeps the system-locale bundle.
     let ui = ToolsWindow::new().unwrap();
+    crate::apply_lang("zh_TW");
     ui.set_tab(
         std::env::var("DOWNLOADER_TOOLS_TAB")
             .unwrap_or_default()

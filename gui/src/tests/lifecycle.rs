@@ -472,6 +472,7 @@ fn compact_rows_are_current_as_soon_as_it_opens() {
         filter: 0,
         selected: None,
         visible: vec![],
+        search: String::new(),
         detail_for: None,
         last_clip: String::new(),
         clipboard: None,
@@ -519,6 +520,7 @@ fn repeated_window_switches_keep_download_and_exit_confirmation_state() {
         filter: 0,
         selected: None,
         visible: vec![],
+        search: String::new(),
         detail_for: None,
         last_clip: String::new(),
         clipboard: None,
@@ -604,4 +606,176 @@ fn repeated_window_switches_keep_download_and_exit_confirmation_state() {
     );
     assert!(!ui.get_notice().is_empty());
     app.borrow_mut().mgr.take().unwrap().shutdown();
+}
+
+fn set_counts(ui: &AppWindow, values: [i32; 10]) {
+    ui.set_counts(ModelRc::new(VecModel::from(values.to_vec())));
+}
+
+// A Ctrl+key chord: Control down, key down and up, Control up.
+fn chord(ui: &AppWindow, key: slint::SharedString) {
+    use slint::platform::{Key, WindowEvent};
+    let ctrl: slint::SharedString = Key::Control.into();
+    let window = ui.window();
+    window.dispatch_event(WindowEvent::KeyPressed { text: ctrl.clone() });
+    window.dispatch_event(WindowEvent::KeyPressed { text: key.clone() });
+    window.dispatch_event(WindowEvent::KeyReleased { text: key });
+    window.dispatch_event(WindowEvent::KeyReleased { text: ctrl });
+}
+
+#[test]
+fn search_and_clear_completed_follow_usability_contract() {
+    use i_slint_backend_testing::ElementHandle;
+    use slint::platform::PointerEventButton::Left;
+    use std::cell::Cell;
+    i_slint_backend_testing::init_no_event_loop();
+    let ui = AppWindow::new().unwrap();
+    apply_lang("en");
+    let cleared = Rc::new(Cell::new(0));
+    let calls = cleared.clone();
+    ui.on_clear_completed(move || calls.set(calls.get() + 1));
+    let searches = Rc::new(RefCell::new(Vec::<String>::new()));
+    let log = searches.clone();
+    ui.on_search_changed(move |text| log.borrow_mut().push(text.to_string()));
+    ui.show().unwrap();
+    let find = |label: &str| ElementHandle::find_by_accessible_label(&ui, label).next();
+    set_counts(&ui, [2, 2, 0, 0, 0, 0, 0, 0, 0, 0]);
+    let clear = find("Clear completed").unwrap();
+    assert_eq!(clear.accessible_enabled(), Some(false));
+    clear.mock_single_click(Left);
+    assert_eq!(cleared.get(), 0, "disabled Clear completed must not fire");
+    set_counts(&ui, [2, 0, 1, 0, 0, 0, 0, 0, 0, 0]);
+    let clear = find("Clear completed").unwrap();
+    assert_eq!(clear.accessible_enabled(), Some(true));
+    clear.mock_single_click(Left);
+    assert_eq!(cleared.get(), 1);
+    find("Search downloads (name or URL)")
+        .unwrap()
+        .set_accessible_value("fixture");
+    assert_eq!(ui.get_search().as_str(), "fixture");
+    find("Clear search")
+        .expect("clear appears while searching")
+        .mock_single_click(Left);
+    assert_eq!(ui.get_search().as_str(), "");
+    assert_eq!(*searches.borrow(), ["fixture", ""]);
+}
+
+#[test]
+fn toolbar_keeps_clear_completed_and_speed_inside_minimum_width() {
+    use i_slint_backend_testing::ElementHandle;
+    i_slint_backend_testing::init_no_event_loop();
+    let ui = AppWindow::new().unwrap();
+    apply_lang("en");
+    ui.set_total_speed("999.9 MB/s".into());
+    set_counts(&ui, [3, 0, 3, 0, 0, 0, 0, 0, 0, 0]);
+    ui.show().unwrap();
+    ui.window().set_size(slint::LogicalSize::new(760.0, 480.0));
+    let right = |label: &str| {
+        let e = ElementHandle::find_by_accessible_label(&ui, label).next();
+        let e = e.unwrap_or_else(|| panic!("missing toolbar control {label}"));
+        e.absolute_position().x + e.size().width
+    };
+    for label in ["Delete", "Clear completed", "Tools"] {
+        assert!(right(label) <= 760.5, "{label} overflows the 760px toolbar");
+    }
+    let speed = ElementHandle::find_by_element_id(&ui, "AppWindow::speed-text").next();
+    let speed = speed.unwrap();
+    assert!(speed.absolute_position().x >= right("Clear completed") - 0.5);
+    assert!(speed.absolute_position().x + speed.size().width <= 760.5);
+}
+
+#[test]
+fn right_click_selects_the_row_before_its_context_menu_opens() {
+    use i_slint_backend_testing::ElementHandle;
+    use std::cell::Cell;
+    i_slint_backend_testing::init_no_event_loop();
+    let ui = AppWindow::new().unwrap();
+    apply_lang("en");
+    let selected = Rc::new(Cell::new(-1));
+    let calls = selected.clone();
+    ui.on_row_clicked(move |i| calls.set(i));
+    let rows = [1, 4].map(|status| Row {
+        status,
+        ..Default::default()
+    });
+    ui.set_rows(ModelRc::new(VecModel::from(rows.to_vec())));
+    set_counts(&ui, [2, 1, 1, 0, 0, 0, 0, 0, 0, 0]);
+    ui.show().unwrap();
+    ui.window().set_size(slint::LogicalSize::new(960.0, 640.0));
+    let hits = ElementHandle::find_by_element_id(&ui, "AppWindow::rta").collect::<Vec<_>>();
+    assert_eq!(hits.len(), 2, "one row hit area per visible row");
+    hits[1].mock_single_click(slint::platform::PointerEventButton::Right);
+    assert_eq!(selected.get(), 1, "right-click must select the row first");
+}
+
+#[test]
+fn keyboard_shortcuts_drive_add_delete_and_list_actions_without_dialogs() {
+    use i_slint_backend_testing::ElementHandle;
+    use slint::platform::Key;
+    use std::cell::Cell;
+    i_slint_backend_testing::init_no_event_loop();
+    let ui = AppWindow::new().unwrap();
+    apply_lang("en");
+    let adds = Rc::new(Cell::new(0));
+    let calls = adds.clone();
+    ui.on_add_clicked(move || calls.set(calls.get() + 1));
+    let starts = Rc::new(Cell::new(0));
+    let calls = starts.clone();
+    ui.on_start_clicked(move || calls.set(calls.get() + 1));
+    let moves = Rc::new(RefCell::new(Vec::<i32>::new()));
+    let log = moves.clone();
+    ui.on_select_relative(move |step| log.borrow_mut().push(step));
+    ui.show().unwrap();
+    set_counts(&ui, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    ui.set_has_selection(true);
+    ui.set_sel_can_start(true);
+    ui.set_d_name("keyboard-fixture.bin".into());
+    chord(&ui, "n".into());
+    chord(&ui, "v".into());
+    assert_eq!(adds.get(), 2, "Ctrl+N and Ctrl+V open the add flow");
+    press_key(&ui, Key::DownArrow);
+    press_key(&ui, Key::UpArrow);
+    assert_eq!(*moves.borrow(), [1, -1]);
+    press_key(&ui, Key::Space);
+    assert_eq!(starts.get(), 1, "Space starts the selected startable row");
+    press_key(&ui, Key::Delete);
+    assert!(
+        ui.get_del_open(),
+        "Delete asks before removing the selection"
+    );
+    let named = ElementHandle::find_by_accessible_label(&ui, "keyboard-fixture.bin").next();
+    assert!(named.is_some(), "delete dialog must name the download");
+    chord(&ui, "n".into());
+    assert_eq!(adds.get(), 2, "shortcuts are inert while a dialog is open");
+    press_key(&ui, Key::Escape);
+    assert!(!ui.get_del_open(), "Escape closes the delete dialog");
+}
+
+#[test]
+fn escape_clears_search_and_add_dialog_submits_or_closes_from_keyboard() {
+    use slint::platform::Key;
+    use std::cell::Cell;
+    i_slint_backend_testing::init_no_event_loop();
+    let ui = AppWindow::new().unwrap();
+    apply_lang("en");
+    let submitted = Rc::new(Cell::new(0));
+    let calls = submitted.clone();
+    ui.on_add_ok(move || calls.set(calls.get() + 1));
+    let searches = Rc::new(RefCell::new(Vec::<String>::new()));
+    let log = searches.clone();
+    ui.on_search_changed(move |text| log.borrow_mut().push(text.to_string()));
+    ui.show().unwrap();
+    set_counts(&ui, [1, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    ui.set_search("fixture".into());
+    press_key(&ui, Key::Escape);
+    assert_eq!(ui.get_search().as_str(), "", "Escape clears the search");
+    assert_eq!(*searches.borrow(), [""]);
+    ui.set_add_open(true);
+    ui.set_add_url("https://example.org/a".into());
+    chord(&ui, Key::Return.into());
+    assert_eq!(submitted.get(), 1, "Ctrl+Return submits the add form");
+    press_key(&ui, Key::Return);
+    assert_eq!(submitted.get(), 1, "plain Return must not submit");
+    press_key(&ui, Key::Escape);
+    assert!(!ui.get_add_open(), "Escape closes the add dialog");
 }

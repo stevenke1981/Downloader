@@ -1,4 +1,5 @@
 //! Download input, OS drops, sharing and preview commands.
+use crate::actions::show_notice;
 use crate::{
     App, AppWindow, CompactWindow, LogWindow, PreviewWindow, Tr, batch, open_add, restore_main,
 };
@@ -129,7 +130,8 @@ pub fn bind(
                             if let Some(id) = ids.last() {
                                 ui.invoke_download_added(*id as i32);
                             }
-                            ui.set_notice(ui.global::<Tr>().invoke_links_added(ids.len() as i32));
+                            let added = ui.global::<Tr>().invoke_links_added(ids.len() as i32);
+                            show_notice(&ui, added, false);
                         }
                         Err(error) => ui.set_add_error(batch::message(&ui, error)),
                     }
@@ -175,10 +177,10 @@ pub fn bind(
                         .set_text(ui.get_d_url().to_string())
                         .map_err(|e| e.to_string())
                 });
-            ui.set_notice(match result {
-                Ok(()) => ui.global::<Tr>().invoke_copied(),
-                Err(error) => error.into(),
-            });
+            match result {
+                Ok(()) => show_notice(&ui, ui.global::<Tr>().invoke_copied(), false),
+                Err(error) => show_notice(&ui, error, true),
+            }
         });
         let (weak, app, preview_weak) = (ui.as_weak(), app.clone(), preview.as_weak());
         ui.on_preview(move || {
@@ -219,7 +221,7 @@ pub fn bind(
                     } else if let Err(error) = result {
                         use crate::reveal::{PreviewError, RevealError};
                         let tr = ui.global::<Tr>();
-                        ui.set_notice(match error {
+                        let text = match error {
                             PreviewError::Unsupported => tr.invoke_preview_unsupported(),
                             PreviewError::File(RevealError::NotCompleted) => tr.invoke_unfinished(),
                             PreviewError::File(RevealError::Missing | RevealError::NotFile) => {
@@ -229,7 +231,8 @@ pub fn bind(
                             | PreviewError::Open(error) => {
                                 format!("{} {error}", tr.invoke_preview_failed()).into()
                             }
-                        });
+                        };
+                        show_notice(&ui, text, true);
                     }
                 });
             });

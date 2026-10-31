@@ -1,0 +1,39 @@
+// Floating compact window.
+import { CheckBox, ListView, Button } from "std-widgets.slint";
+import { Bar } from "widgets.slint";
+import { Row, Tr } from "tr.slint";
+
+export component CompactWindow inherits Window {
+    title: @tr("Downloader — compact");
+    icon: @image-url("icons/app.svg");
+    preferred-width: 400px;
+    preferred-height: 300px;
+    min-width: 340px;
+    min-height: 240px;
+    background: #f6f8fb;
+    in-out property <bool> pinned: false;
+    always-on-top: root.pinned;
+    in property <[Row]> rows;
+    in property <string> status-line;
+    in property <string> total-speed;
+    callback restore();
+    VerticalLayout {
+        padding: 12px;
+        spacing: 8px;
+        Text { text: root.total-speed; font-size: 22px; font-weight: 600; color: #1565c0; }
+        Text { text: root.status-line; }
+        ListView {
+            for r in root.rows: VerticalLayout {
+                padding: 4px;
+                spacing: 3px;
+                Text { text: r.name; overflow: elide; }
+                Bar { value: r.progress; status: r.status; }
+                Text { text: Tr.status(r.status) + "  " + r.progress-text + "  " + r.speed; font-size: 12px; }
+            }
+        }
+        Text { text: @tr("Drop torrent / Metalink files here to add downloads."); font-size: 11px; wrap: word-wrap; }
+        CheckBox { text: @tr("Always on top"); checked <=> root.pinned; }
+        Text { text: @tr("Closing this window restores the main window."); font-size: 11px; wrap: word-wrap; }
+        Button { text: @tr("Restore main window"); clicked => { root.restore(); } }
+    }
+}

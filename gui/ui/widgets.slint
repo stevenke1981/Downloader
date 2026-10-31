@@ -1,0 +1,171 @@
+// Shared building blocks for the main and compact windows.
+import { ScrollView } from "std-widgets.slint";
+
+export global Palette {
+    out property <color> surface: white;
+    out property <color> subtle: #f6f8fb;
+    out property <color> text: #202d3b;
+    out property <color> muted: #556575;
+    out property <color> accent: #1565c0;
+    out property <color> border: #dce3eb;
+    out property <color> error: #b3261e;
+}
+
+export component ToolButton inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <bool> enabled: true;
+    callback clicked;
+    min-width: 64px;
+    height: 58px;
+    border-radius: 6px;
+    border-width: focus-scope.has-focus ? 2px : 0px;
+    border-color: Palette.accent;
+    forward-focus: focus-scope;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    background: ta.has-hover && root.enabled ? (ta.pressed ? #d6e9fb : #eaf4fd) : transparent;
+    VerticalLayout {
+        padding: 4px;
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 3px;
+        alignment: center;
+        HorizontalLayout {
+            alignment: center;
+            Image {
+                source: root.icon;
+                width: 28px;
+                height: 28px;
+                opacity: root.enabled ? 1.0 : 0.35;
+            }
+        }
+        Text {
+            text: root.label;
+            horizontal-alignment: center;
+            font-size: 12px;
+            color: root.enabled ? #2b2b2b : #9a9a9a;
+        }
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+    focus-scope := FocusScope {
+        width: 0px;
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == Key.Space {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+export component SideItem inherits Rectangle {
+    in property <string> label;
+    in property <string> count;
+    in property <bool> active;
+    in property <bool> enabled: true;
+    in property <color> dot: #1e88e5;
+    callback clicked;
+    height: 32px;
+    border-radius: 6px;
+    border-width: focus-scope.has-focus ? 2px : 0px;
+    border-color: Palette.accent;
+    forward-focus: focus-scope;
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+    accessible-checkable: true;
+    accessible-checked: root.active;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    background: active ? #dcebfb : (ta.has-hover ? #edf3fa : transparent);
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+        Rectangle {
+            width: 9px;
+            VerticalLayout {
+                alignment: center;
+                Rectangle { width: 9px; height: 9px; border-radius: 4.5px; background: root.dot; }
+            }
+        }
+        Text { text: root.label; vertical-alignment: center; font-size: 13px; color: active ? #0b5cad : #333; font-weight: active ? 600 : 400; }
+        Text { text: root.count; vertical-alignment: center; horizontal-alignment: right; font-size: 12px; color: #888; }
+    }
+    ta := TouchArea { enabled: root.enabled; clicked => { root.clicked(); } }
+    focus-scope := FocusScope {
+        width: 0px;
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == Key.Space {
+                root.clicked();
+                return accept;
+            }
+            return reject;
+        }
+    }
+}
+
+export component HeaderCell inherits Text {
+    vertical-alignment: center;
+    font-size: 12px;
+    color: #555;
+    overflow: elide;
+}
+
+export component Bar inherits Rectangle {
+    in property <float> value;
+    in property <int> status;
+    height: 14px;
+    border-radius: 7px;
+    background: #e6e9ee;
+    clip: true;
+    Rectangle {
+        x: 0;
+        width: parent.width * clamp(root.value, 0, 1);
+        border-radius: 7px;
+        background: root.status == 4 ? #2eaa5c : (root.status == 5 ? #e5484d : (root.status == 2 ? #f0a830 : #1e88e5));
+    }
+}
+
+export component Dialog inherits Rectangle {
+    in property <string> title;
+    in property <length> dialog-width: 520px;
+    callback close;
+    background: #00000060;
+    TouchArea { }
+    Rectangle {
+        width: min(root.dialog-width, parent.width - 24px);
+        height: min(content.preferred-height, parent.height - 24px);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        background: white;
+        border-radius: 10px;
+        drop-shadow-blur: 18px;
+        drop-shadow-color: #00000050;
+        ScrollView {
+        content-width: self.width;
+        horizontal-scrollbar-policy: always-off;
+        content := VerticalLayout {
+            padding: 18px;
+            spacing: 10px;
+            Text { text: root.title; font-size: 17px; font-weight: 700; color: #1d1d1d; }
+            @children
+        }
+        }
+    }
+}
+
+export component Field inherits HorizontalLayout {
+    in property <string> label;
+    spacing: 10px;
+    Text { text: root.label; width: 150px; vertical-alignment: center; font-size: 13px; color: #333; wrap: word-wrap; }
+    @children
+}
