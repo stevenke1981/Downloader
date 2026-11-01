@@ -261,6 +261,9 @@ msgstr "Doppelklicken Sie auf einen abgeschlossenen Download, um die Datei zu fi
 msgid "Download URLs"
 msgstr "Download-URLs"
 
+msgid "Download copied links automatically (skip the add dialog)"
+msgstr "Kopierte Links automatisch herunterladen (ohne Hinzufügen-Dialog)"
+
 msgid "Download folder"
 msgstr "Download-Ordner"
 

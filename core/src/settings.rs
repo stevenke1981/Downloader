@@ -90,6 +90,8 @@ pub struct Settings {
     pub proxy: String,
     pub schedule: Schedule,
     pub watch_clipboard: bool,
+    /// With `watch_clipboard`, start copied links right away instead of opening the add form.
+    pub clipboard_auto_download: bool,
     /// Look for checksum files / digest headers and verify finished downloads.
     pub auto_verify: bool,
     pub traffic_mode: TrafficMode,
@@ -115,6 +117,7 @@ impl Default for Settings {
             proxy: String::new(),
             schedule: Schedule::default(),
             watch_clipboard: false,
+            clipboard_auto_download: false,
             auto_verify: true,
             traffic_mode: TrafficMode::Custom,
             traffic_presets: [64 * 1024, 512 * 1024, 0],

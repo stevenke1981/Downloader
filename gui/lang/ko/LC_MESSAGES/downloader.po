@@ -261,6 +261,9 @@ msgstr "완료된 다운로드를 더블 클릭하면 파일 위치를 엽니다
 msgid "Download URLs"
 msgstr "다운로드 URL"
 
+msgid "Download copied links automatically (skip the add dialog)"
+msgstr "복사한 링크 자동 다운로드(추가 대화 상자 건너뛰기)"
+
 msgid "Download folder"
 msgstr "다운로드 폴더"
 

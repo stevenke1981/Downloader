@@ -115,6 +115,7 @@ export component AppWindow inherits Window {
     in-out property <string> s-start;
     in-out property <string> s-stop;
     in-out property <bool> s-clip;
+    in-out property <bool> s-clip-auto;
     in-out property <bool> s-verify: true;
     in-out property <string> s-error;
 
@@ -727,6 +728,7 @@ export component AppWindow inherits Window {
                             Text { text: @tr("Language and behavior"); color: Palette.text; font-size: 15px; font-weight: 600; }
                             Field { label: @tr("Language"); ComboBox { model: root.languages; current-index <=> root.s-language; accessible-label: @tr("Language"); horizontal-stretch: 1; } }
                             CheckBox { text: @tr("Watch the clipboard for download links"); checked <=> root.s-clip; }
+                            CheckBox { text: @tr("Download copied links automatically (skip the add dialog)"); checked <=> root.s-clip-auto; enabled: root.s-clip; }
                             CheckBox { text: @tr("Verify downloads automatically (look for checksum files)"); checked <=> root.s-verify; }
                             Rectangle { height: 1px; background: Palette.border; }
                             Text { text: @tr("Storage"); color: Palette.text; font-size: 15px; font-weight: 600; }

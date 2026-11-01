@@ -37,6 +37,7 @@ T = {
 "Extension folder unavailable": ["找不到擴充功能資料夾","找不到扩展文件夹","拡張機能フォルダーがありません","확장 프로그램 폴더 없음","Carpeta de extensión no disponible","Erweiterungsordner nicht verfügbar","Dossier de l'extension indisponible"],
 "Extension path copied.": ["已複製擴充功能路徑。","已复制扩展路径。","拡張機能のパスをコピーしました。","확장 프로그램 경로를 복사했습니다.","Ruta de la extensión copiada.","Erweiterungspfad kopiert.","Chemin de l'extension copié."],
 "General": ["一般","常规","一般","일반","General","Allgemein","Général"],
+"Download copied links automatically (skip the add dialog)": ["自動下載複製的連結（略過新增對話框）","自动下载复制的链接（跳过添加对话框）","コピーしたリンクを自動でダウンロード（追加ダイアログを省略）","복사한 링크 자동 다운로드(추가 대화 상자 건너뛰기)","Descargar automáticamente los enlaces copiados (sin el diálogo de añadir)","Kopierte Links automatisch herunterladen (ohne Hinzufügen-Dialog)","Télécharger automatiquement les liens copiés (sans la boîte d'ajout)"],
 "Language and behavior": ["語言與使用偏好","语言与使用偏好","言語と動作","언어 및 동작","Idioma y comportamiento","Sprache und Verhalten","Langue et comportement"],
 "Make Downloader work the way you do.": ["調整下載偏好，並連接你的瀏覽器。","调整下载偏好，并连接你的浏览器。","ダウンロードの設定やブラウザー連携を調整できます。","다운로드 환경설정과 브라우저 연결을 조정하세요.","Ajusta las descargas y conecta tu navegador.","Downloads anpassen und den Browser verbinden.","Personnalisez les téléchargements et connectez votre navigateur."],
 "Native host": ["本機橋接程式","本机桥接程序","ネイティブホスト","네이티브 호스트","Host nativo","Nativer Host","Hôte natif"],

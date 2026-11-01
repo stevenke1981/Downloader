@@ -261,6 +261,9 @@ msgstr "双击已完成的下载，即可打开文件所在文件夹。"
 msgid "Download URLs"
 msgstr "下载网址"
 
+msgid "Download copied links automatically (skip the add dialog)"
+msgstr "自动下载复制的链接（跳过添加对话框）"
+
 msgid "Download folder"
 msgstr "下载文件夹"
 

@@ -31,7 +31,7 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 - **分類**：依副檔名自動分成影片、音樂、壓縮檔、文件、程式、圖片、其他，可選擇存到各分類的子資料夾。
 - **介面**：工具列、側邊欄篩選（全部／進行中／已完成／分類）、下載清單（名稱、大小、進度、速度、剩餘時間、狀態）、詳細資料區（每一段的進度圖、連線數、限速、優先順序）。
 - **易用性（0.6.0）**：依名稱或網址搜尋、右鍵選單、常用快捷鍵（Ctrl+N／Ctrl+V／Ctrl+F／Space／Delete），以及只清除清單、保留檔案的「清除已完成」。詳見 [易用性說明](docs/usability.zh-TW.md)。
-- **剪貼簿監看**（可選）：複製下載連結時自動跳出新增視窗。
+- **剪貼簿監看**（可選）：複製下載連結時自動跳出新增視窗；亦可設為直接自動下載、不跳視窗。
 - **多國語言**：繁體中文、簡體中文、English、日本語、한국어、Español、Deutsch、Français，在設定裡切換立即生效。系統語言是中文時預設繁體中文（簡體中文系統預設簡體）。
 - **命令列工具 `dlx`**：不需要介面的下載，可續傳。
 
@@ -111,7 +111,7 @@ The **Tools** window adds configurable traffic presets, site/folder rules, bound
 - **Automatic integrity verification** (on by default): size and segment completeness are always checked; then checksum sidecars (`<file>.sha256/.sha512/.b2/.sha1/.md5`) and lists (`sha256sums.txt`, `SHA256SUMS`, `b2sums.txt`, `md5sums.txt`, `CHECKSUMS`, ...; GNU and BSD formats) in the same remote directory, checksum links the browser extension saw on the page, and `Digest` / `Repr-Digest` / `Content-MD5` / `x-goog-hash` headers are used (an MD5-looking ETag is advisory only). SHA-256, SHA-512, SHA-1, MD5 and BLAKE2b-512. A mismatch triggers one full re-download, then the download is marked "Verification failed". `.sig`/`.asc` signatures are detected and reported but not verified. `dlx --verify auto|off|<hash>`.
 - **Categories** by file type (video, music, archives, documents, programs, images, other) with optional per-category sub-folders.
 - **GUI**: toolbar, sidebar filters, download list (name, size, progress, speed, ETA, status), details pane with a per-segment progress map, add-download and settings dialogs.
-- **Clipboard watching** (optional) opens the add dialog when you copy a link.
+- **Clipboard watching** (optional) opens the add dialog when you copy a link, or starts the download right away when auto-download is on.
 - **8 languages** switchable at runtime: 繁體中文, 简体中文, English, 日本語, 한국어, Español, Deutsch, Français. Traditional Chinese is the default on Chinese systems (Simplified on zh-CN/zh-SG).
 - **`dlx` CLI** for headless, resumable downloads.
 - **Usability (0.6.0)**: search by name or URL, right-click menu, common shortcuts, and "Clear completed" that removes list entries but keeps files. Guide (in Traditional Chinese): [usability guide](docs/usability.zh-TW.md).

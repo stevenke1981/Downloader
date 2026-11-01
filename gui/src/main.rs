@@ -445,10 +445,18 @@ fn main() -> Result<(), slint::PlatformError> {
                         });
                         a.last_clip = text;
                         if let Some(links) = offer {
-                            // The form lives on the main window: bring it back from the
-                            // tray or compact view, or the copied link is silently lost.
-                            restore_main(&ui, &compact);
-                            open_add(&ui, &links);
+                            if a.mgr().settings().clipboard_auto_download {
+                                // Auto mode: queue and start, no form and no window pop-up.
+                                let ids = actions::clipboard_auto_add(a.mgr(), &links);
+                                a.selected = ids.last().copied().or(a.selected);
+                                let tr = ui.global::<Tr>();
+                                show_notice(&ui, tr.invoke_links_added(ids.len() as i32), false);
+                            } else {
+                                // The form lives on the main window: bring it back from the
+                                // tray or compact view, or the copied link is silently lost.
+                                restore_main(&ui, &compact);
+                                open_add(&ui, &links);
+                            }
                         }
                     }
                 }
@@ -584,6 +592,7 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.set_s_start(s.schedule.start.clone().into());
         ui.set_s_stop(s.schedule.stop.clone().into());
         ui.set_s_clip(s.watch_clipboard);
+        ui.set_s_clip_auto(s.clipboard_auto_download);
         ui.set_s_verify(s.auto_verify);
         ui.set_s_error("".into());
         ui.set_set_open(true);
@@ -606,6 +615,7 @@ fn main() -> Result<(), slint::PlatformError> {
         s.schedule.start = ui.get_s_start().trim().to_string();
         s.schedule.stop = ui.get_s_stop().trim().to_string();
         s.watch_clipboard = ui.get_s_clip();
+        s.clipboard_auto_download = ui.get_s_clip_auto();
         s.auto_verify = ui.get_s_verify();
         let folder = ui.get_s_folder().trim().to_string();
         let (g, p) = (parse_kbs(&ui.get_s_global()), parse_kbs(&ui.get_s_perdl()));

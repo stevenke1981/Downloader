@@ -1,6 +1,7 @@
 use super::*;
 use crate::actions::{
-    clear_completed, clipboard_links, clipboard_offer, completed_ids, relative_index,
+    clear_completed, clipboard_auto_add, clipboard_links, clipboard_offer, completed_ids,
+    relative_index,
 };
 use crate::view::matches_search;
 use std::time::Instant;
@@ -193,6 +194,32 @@ https://",
         None,
         "already in the list"
     );
+}
+
+#[test]
+fn clipboard_auto_add_queues_and_starts_each_link_in_order() {
+    let state = tempfile::tempdir().unwrap();
+    let manager = Manager::new(state.path());
+    let ids = clipboard_auto_add(
+        &manager,
+        "https://a.invalid/one.bin
+https://a.invalid/two.bin",
+    );
+    assert_eq!(ids.len(), 2);
+    let snaps = manager.snapshots();
+    let urls: Vec<_> = ids
+        .iter()
+        .map(|id| snaps.iter().find(|s| s.id == *id).unwrap().url.as_str())
+        .collect();
+    assert_eq!(
+        urls,
+        ["https://a.invalid/one.bin", "https://a.invalid/two.bin"]
+    );
+    assert!(
+        snaps.iter().all(|s| s.status != Status::Paused),
+        "auto mode starts downloads instead of leaving them paused"
+    );
+    manager.shutdown();
 }
 
 #[test]

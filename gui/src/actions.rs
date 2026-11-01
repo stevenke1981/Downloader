@@ -3,7 +3,7 @@
 //! notice banner's severity.
 use crate::{App, AppWindow, Tr, open_add, refresh_now, reveal};
 use dlcore::util::looks_like_url;
-use dlcore::{Snapshot, Status};
+use dlcore::{Manager, NewDownload, Snapshot, Status};
 use reveal::RevealError;
 use slint::{ComponentHandle, SharedString};
 use std::cell::RefCell;
@@ -215,4 +215,19 @@ pub(super) fn clipboard_offer(text: &str, known: impl Fn(&str) -> bool) -> Optio
         .take(PREFILL_LIMIT)
         .collect();
     (!links.is_empty()).then(|| links.join("\n"))
+}
+
+/// Queues and starts every link from `clipboard_offer` (one per line) with the
+/// default folder and options; returns the new download ids in order.
+pub(super) fn clipboard_auto_add(manager: &Manager, links: &str) -> Vec<u64> {
+    links
+        .lines()
+        .map(|url| {
+            manager.add(NewDownload {
+                url: url.to_owned(),
+                start: true,
+                ..Default::default()
+            })
+        })
+        .collect()
 }

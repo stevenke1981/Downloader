@@ -261,6 +261,9 @@ msgstr "Double-cliquez sur un téléchargement terminé pour localiser son fichi
 msgid "Download URLs"
 msgstr "URL de téléchargement"
 
+msgid "Download copied links automatically (skip the add dialog)"
+msgstr "Télécharger automatiquement les liens copiés (sans la boîte d'ajout)"
+
 msgid "Download folder"
 msgstr "Dossier de téléchargement"
 

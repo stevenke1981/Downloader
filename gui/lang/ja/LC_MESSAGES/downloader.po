@@ -261,6 +261,9 @@ msgstr "完了したダウンロードをダブルクリックすると、ファ
 msgid "Download URLs"
 msgstr "ダウンロード URL"
 
+msgid "Download copied links automatically (skip the add dialog)"
+msgstr "コピーしたリンクを自動でダウンロード（追加ダイアログを省略）"
+
 msgid "Download folder"
 msgstr "ダウンロードフォルダー"
 
