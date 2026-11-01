@@ -1,5 +1,7 @@
 use super::*;
-use crate::actions::{clear_completed, clipboard_links, completed_ids, relative_index};
+use crate::actions::{
+    clear_completed, clipboard_links, clipboard_offer, completed_ids, relative_index,
+};
 use crate::view::matches_search;
 use std::time::Instant;
 
@@ -149,6 +151,48 @@ fn clipboard_links_is_empty_without_any_source() {
     assert_eq!(clipboard_links(""), "");
     assert_eq!(clipboard_links("just some text\nand more"), "");
     assert_eq!(clipboard_links("ftp://"), "", "scheme without a host");
+}
+
+#[test]
+fn clipboard_offer_prefills_only_new_remote_links() {
+    let text = "see this
+ https://a.example/one.bin 
+https://a.example/known.bin
+magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567
+";
+    let known = |u: &str| u == "https://a.example/known.bin";
+    assert_eq!(
+        clipboard_offer(text, known).as_deref(),
+        Some(
+            "https://a.example/one.bin
+magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567"
+        )
+    );
+}
+
+#[test]
+fn clipboard_offer_ignores_text_without_new_links() {
+    let none = |_: &str| false;
+    assert_eq!(clipboard_offer("", none), None);
+    assert_eq!(
+        clipboard_offer(
+            "plain words
+https://",
+            none
+        ),
+        None
+    );
+    assert_eq!(
+        clipboard_offer("C:/files/a.torrent", none),
+        None,
+        "local paths are not watched"
+    );
+    let all = |_: &str| true;
+    assert_eq!(
+        clipboard_offer("https://a.example/x.bin", all),
+        None,
+        "already in the list"
+    );
 }
 
 #[test]

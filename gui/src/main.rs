@@ -440,18 +440,15 @@ fn main() -> Result<(), slint::PlatformError> {
                         .and_then(|c| c.get_text().ok())
                         .unwrap_or_default();
                     if text != a.last_clip {
-                        a.last_clip = text.clone();
-                        let fresh = text.lines().map(str::trim).any(|line| {
-                            [
-                                "https://", "http://", "ftp://", "magnet:", "rtsp://", "mms://",
-                                "mmsh://", "mmst://",
-                            ]
-                            .iter()
-                            .any(|scheme| line.starts_with(scheme))
-                                && !snaps.iter().any(|s| s.url == line)
+                        let offer = actions::clipboard_offer(&text, |link| {
+                            snaps.iter().any(|s| s.url == link)
                         });
-                        if fresh {
-                            open_add(&ui, text.trim());
+                        a.last_clip = text;
+                        if let Some(links) = offer {
+                            // The form lives on the main window: bring it back from the
+                            // tray or compact view, or the copied link is silently lost.
+                            restore_main(&ui, &compact);
+                            open_add(&ui, &links);
                         }
                     }
                 }

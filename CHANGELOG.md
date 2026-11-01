@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Clipboard watching no longer loses a copied link while the app sits in the tray or the compact window: the main window is restored and the Add dialog shown. Previously the dialog opened on the hidden window and watching stalled until it was closed.
+- The watcher pre-fills only the new download links from the copied text, not surrounding text or links already in the list.
+
 ## 0.6.0 — 2026-10-31
 
 ### Usability

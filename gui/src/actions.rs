@@ -193,3 +193,26 @@ pub(super) fn clipboard_links(text: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+/// Remote schemes the clipboard watcher reacts to; local paths are left alone.
+const WATCHED_SCHEMES: [&str; 8] = [
+    "https://", "http://", "ftp://", "magnet:", "rtsp://", "mms://", "mmsh://", "mmst://",
+];
+
+/// Links in freshly copied text that the watcher should offer: remote sources
+/// not already in the list (`known`), capped at `PREFILL_LIMIT`. `None` when
+/// there is nothing new to offer.
+pub(super) fn clipboard_offer(text: &str, known: impl Fn(&str) -> bool) -> Option<String> {
+    let links: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| {
+            WATCHED_SCHEMES
+                .iter()
+                .any(|scheme| line.starts_with(scheme))
+        })
+        .filter(|line| looks_like_url(line) && !known(line))
+        .take(PREFILL_LIMIT)
+        .collect();
+    (!links.is_empty()).then(|| links.join("\n"))
+}
