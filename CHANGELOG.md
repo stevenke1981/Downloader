@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 — 2026-11-01
 
 ### Added
 - Settings → General → **Download copied links automatically**: with clipboard watching on, copied download links are queued and started at once with the default folder and options, without opening the Add dialog or restoring the window; a notice reports how many were added. Off by default.
