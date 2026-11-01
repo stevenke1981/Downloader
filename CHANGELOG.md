@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.2 — 2026-11-01
 
 ### Added
 - Settings → General → **Start at sign-in (minimized to the tray)**: registers a per-user login entry (Windows `HKCU\…\Run`, XDG autostart on Linux, a LaunchAgent on macOS) that starts the app with `--tray`. The window stays hidden unless no tray icon appears within about 5 s. A `--tray` launch while the app already runs does not pop it up. The uninstaller removes the entry. Off by default.

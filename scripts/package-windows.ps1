@@ -31,7 +31,7 @@ Copy-Item docs\fdm-*.md, docs\native-rust-plan.md (Join-Path $stage 'docs')
 Copy-Item docs\desktop-controls.zh-TW.md, docs\browser-setup.zh-TW.md, docs\usability.zh-TW.md $stage
 Copy-Item docs\fdm-tools.zh-TW.md, docs\fdm-feature-matrix.zh-TW.md $stage
 Copy-Item docs\ui-0.5.2-settings-*.png, docs\dispatch-plan.md $stage
-Copy-Item docs\validation-0.6.1.md, docs\small-window-validation.zh-TW.md $stage
+Copy-Item docs\validation-0.6.2.md, docs\small-window-validation.zh-TW.md $stage
 Copy-Item extension (Join-Path $stage 'extension') -Recurse
 foreach ($exe in $exes) { Copy-Item "target\release\$exe" $stage }
 

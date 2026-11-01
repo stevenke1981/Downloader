@@ -75,7 +75,7 @@ Source: "..\docs\usability.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\ui-0.5.2-settings-general.png"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\ui-0.5.2-settings-browser.png"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\dispatch-plan.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\docs\validation-0.6.1.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\validation-0.6.2.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\docs\small-window-validation.zh-TW.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 Source: "..\THIRD_PARTY.md"; DestDir: "{app}"; Flags: ignoreversion
