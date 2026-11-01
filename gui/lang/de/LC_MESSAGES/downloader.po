@@ -66,9 +66,6 @@ msgstr "Alle Downloads"
 msgid "All protocol engines run inside Downloader using Rust libraries."
 msgstr "Alle Protokoll-Engines laufen innerhalb von Downloader mit Rust-Bibliotheken."
 
-msgid "Also delete the file from disk"
-msgstr "Datei auch von der Festplatte löschen"
-
 msgid "Always on top"
 msgstr "Immer im Vordergrund"
 
@@ -242,6 +239,9 @@ msgstr "Löschen"
 
 msgid "Delete download"
 msgstr "Download löschen"
+
+msgid "Delete record and file"
+msgstr "Eintrag und Datei löschen"
 
 msgid "Delete…"
 msgstr "Löschen…"
@@ -543,14 +543,17 @@ msgstr "Die Fernsteuerung ist standardmäßig deaktiviert. Jede Anfrage benötig
 msgid "Remove folder rule"
 msgstr "Ordnerregel entfernen"
 
+msgid "Remove only the record from the list, or also delete the downloaded file?"
+msgstr "Nur den Eintrag aus der Liste entfernen oder auch die heruntergeladene Datei löschen?"
+
+msgid "Remove record only"
+msgstr "Nur Eintrag entfernen"
+
 msgid "Remove scheduled action"
 msgstr "Geplante Aktion entfernen"
 
 msgid "Remove site profile"
 msgstr "Website-Profil entfernen"
-
-msgid "Remove the selected download from the list?"
-msgstr "Ausgewählten Download aus der Liste entfernen?"
 
 msgid "Restore main window"
 msgstr "Hauptfenster wiederherstellen"
@@ -644,6 +647,9 @@ msgstr "Starten / Fortsetzen"
 
 msgid "Start all"
 msgstr "Alle starten"
+
+msgid "Start at sign-in (minimized to the tray)"
+msgstr "Bei der Anmeldung starten (im Infobereich)"
 
 msgid "Start immediately"
 msgstr "Sofort starten"
@@ -758,6 +764,12 @@ msgstr "Hier beginnen Ihre Downloads"
 
 msgid "{0} downloads, {1} active"
 msgstr "{0} Downloads, {1} aktiv"
+
+msgid "Also delete the file from disk"
+msgstr "Datei auch von der Festplatte löschen"
+
+msgid "Remove the selected download from the list?"
+msgstr "Ausgewählten Download aus der Liste entfernen?"
 
 msgid "URL"
 msgstr "URL"

@@ -66,9 +66,6 @@ msgstr "Todas"
 msgid "All protocol engines run inside Downloader using Rust libraries."
 msgstr "Todos los motores de protocolo se ejecutan dentro de Downloader con bibliotecas de Rust."
 
-msgid "Also delete the file from disk"
-msgstr "Eliminar también el archivo del disco"
-
 msgid "Always on top"
 msgstr "Siempre encima"
 
@@ -242,6 +239,9 @@ msgstr "Eliminar"
 
 msgid "Delete download"
 msgstr "Eliminar descarga"
+
+msgid "Delete record and file"
+msgstr "Eliminar registro y archivo"
 
 msgid "Delete…"
 msgstr "Eliminar…"
@@ -543,14 +543,17 @@ msgstr "El control remoto está desactivado por defecto. Cada solicitud requiere
 msgid "Remove folder rule"
 msgstr "Quitar regla de carpeta"
 
+msgid "Remove only the record from the list, or also delete the downloaded file?"
+msgstr "¿Quitar solo el registro de la lista o eliminar también el archivo descargado?"
+
+msgid "Remove record only"
+msgstr "Quitar solo el registro"
+
 msgid "Remove scheduled action"
 msgstr "Quitar acción programada"
 
 msgid "Remove site profile"
 msgstr "Quitar perfil de sitio"
-
-msgid "Remove the selected download from the list?"
-msgstr "¿Quitar la descarga seleccionada de la lista?"
 
 msgid "Restore main window"
 msgstr "Restaurar ventana principal"
@@ -644,6 +647,9 @@ msgstr "Iniciar / Reanudar"
 
 msgid "Start all"
 msgstr "Iniciar todo"
+
+msgid "Start at sign-in (minimized to the tray)"
+msgstr "Iniciar al iniciar sesión (minimizado en la bandeja)"
 
 msgid "Start immediately"
 msgstr "Iniciar ahora"
@@ -758,6 +764,12 @@ msgstr "Tus descargas empiezan aquí"
 
 msgid "{0} downloads, {1} active"
 msgstr "{0} descargas, {1} activas"
+
+msgid "Also delete the file from disk"
+msgstr "Eliminar también el archivo del disco"
+
+msgid "Remove the selected download from the list?"
+msgstr "¿Quitar la descarga seleccionada de la lista?"
 
 msgid "URL"
 msgstr "URL"

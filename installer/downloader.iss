@@ -91,6 +91,10 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 Filename: "{app}\{#AppExe}"; Parameters: "--register-browser"; Flags: runhidden waituntilterminated runasoriginaluser; Tasks: browser; StatusMsg: "{cm:TaskBrowser}"
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
 
+[Registry]
+; Created by the app's "Start at sign-in" option; only removed here, never created.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Downloader"; Flags: uninsdeletevalue dontcreatekey
+
 [UninstallRun]
 Filename: "{app}\{#AppExe}"; Parameters: "--unregister-browser"; Flags: runhidden waituntilterminated; RunOnceId: "UnregisterBrowser"
 

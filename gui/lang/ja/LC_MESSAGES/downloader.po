@@ -66,9 +66,6 @@ msgstr "すべて"
 msgid "All protocol engines run inside Downloader using Rust libraries."
 msgstr "すべてのプロトコルエンジンは Rust ライブラリを使い、Downloader 内で動作します。"
 
-msgid "Also delete the file from disk"
-msgstr "ディスクからファイルも削除する"
-
 msgid "Always on top"
 msgstr "常に手前に表示"
 
@@ -242,6 +239,9 @@ msgstr "削除"
 
 msgid "Delete download"
 msgstr "ダウンロードを削除"
+
+msgid "Delete record and file"
+msgstr "記録とファイルを削除"
 
 msgid "Delete…"
 msgstr "削除…"
@@ -543,14 +543,17 @@ msgstr "リモート操作は既定で無効です。すべてのリクエスト
 msgid "Remove folder rule"
 msgstr "フォルダールールを削除"
 
+msgid "Remove only the record from the list, or also delete the downloaded file?"
+msgstr "一覧から記録だけを削除しますか？それともダウンロードしたファイルも削除しますか？"
+
+msgid "Remove record only"
+msgstr "記録のみ削除"
+
 msgid "Remove scheduled action"
 msgstr "予約した動作を削除"
 
 msgid "Remove site profile"
 msgstr "サイトプロファイルを削除"
-
-msgid "Remove the selected download from the list?"
-msgstr "選択したダウンロードを一覧から削除しますか？"
 
 msgid "Restore main window"
 msgstr "メインウィンドウを復元"
@@ -644,6 +647,9 @@ msgstr "開始／再開"
 
 msgid "Start all"
 msgstr "すべて開始"
+
+msgid "Start at sign-in (minimized to the tray)"
+msgstr "サインイン時に起動（トレイに格納）"
 
 msgid "Start immediately"
 msgstr "すぐに開始"
@@ -758,6 +764,12 @@ msgstr "ここからダウンロードを開始"
 
 msgid "{0} downloads, {1} active"
 msgstr "ダウンロード {0} 件、実行中 {1} 件"
+
+msgid "Also delete the file from disk"
+msgstr "ディスクからファイルも削除する"
+
+msgid "Remove the selected download from the list?"
+msgstr "選択したダウンロードを一覧から削除しますか？"
 
 msgid "URL"
 msgstr "URL"

@@ -66,9 +66,6 @@ msgstr "全部下载"
 msgid "All protocol engines run inside Downloader using Rust libraries."
 msgstr "所有协议引擎都使用 Rust 库在 Downloader 内运行。"
 
-msgid "Also delete the file from disk"
-msgstr "同时从磁盘删除文件"
-
 msgid "Always on top"
 msgstr "保持置顶"
 
@@ -242,6 +239,9 @@ msgstr "删除"
 
 msgid "Delete download"
 msgstr "删除下载"
+
+msgid "Delete record and file"
+msgstr "连文件一起删除"
 
 msgid "Delete…"
 msgstr "删除…"
@@ -543,14 +543,17 @@ msgstr "远程控制默认关闭。每个请求都需要访问令牌。"
 msgid "Remove folder rule"
 msgstr "删除文件夹规则"
 
+msgid "Remove only the record from the list, or also delete the downloaded file?"
+msgstr "只从列表移除记录，还是连下载的文件一起删除？"
+
+msgid "Remove record only"
+msgstr "只删除记录"
+
 msgid "Remove scheduled action"
 msgstr "删除计划动作"
 
 msgid "Remove site profile"
 msgstr "删除站点配置"
-
-msgid "Remove the selected download from the list?"
-msgstr "要从列表中移除选中的下载吗？"
 
 msgid "Restore main window"
 msgstr "还原主窗口"
@@ -644,6 +647,9 @@ msgstr "开始／继续"
 
 msgid "Start all"
 msgstr "全部开始"
+
+msgid "Start at sign-in (minimized to the tray)"
+msgstr "登录时自动启动（最小化到托盘）"
 
 msgid "Start immediately"
 msgstr "立即开始"
@@ -758,6 +764,12 @@ msgstr "从这里开始下载"
 
 msgid "{0} downloads, {1} active"
 msgstr "共 {0} 个下载，{1} 个进行中"
+
+msgid "Also delete the file from disk"
+msgstr "同时从磁盘删除文件"
+
+msgid "Remove the selected download from the list?"
+msgstr "要从列表中移除选中的下载吗？"
 
 msgid "URL"
 msgstr "网址"

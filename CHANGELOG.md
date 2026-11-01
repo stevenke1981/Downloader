@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Settings → General → **Start at sign-in (minimized to the tray)**: registers a per-user login entry (Windows `HKCU\…\Run`, XDG autostart on Linux, a LaunchAgent on macOS) that starts the app with `--tray`. The window stays hidden unless no tray icon appears within about 5 s. A `--tray` launch while the app already runs does not pop it up. The uninstaller removes the entry. Off by default.
+- **Clear completed** is also in each download's right-click menu.
+
+### Changed
+- The delete dialog asks explicitly: **Remove record only** (default) or **Delete record and file**, replacing the "Also delete the file from disk" checkbox.
+
 ## 0.6.1 — 2026-11-01
 
 ### Added

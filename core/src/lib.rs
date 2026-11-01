@@ -10,6 +10,7 @@ pub mod site;
 pub mod grabber;
 pub mod remote;
 pub mod automation;
+pub mod autostart;
 mod google_drive;
 pub mod ipc;
 pub mod native;

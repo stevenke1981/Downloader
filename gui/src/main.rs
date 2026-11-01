@@ -27,6 +27,9 @@ use actions::{reveal_download, show_notice};
 use view::sync_model;
 use view::{Models, kbs, open_compact, parse_kbs, refresh, refresh_now, sync_compact};
 
+/// Ticks (500 ms each) the tray icon gets to register before a hidden app shows its window.
+const TRAY_GRACE_TICKS: u32 = 10;
+
 fn schedule_initial_placement(_ui: &AppWindow) {
     #[cfg(windows)]
     {
@@ -145,6 +148,12 @@ fn state_dir() -> PathBuf {
 }
 
 /// `--register-browser` / `--unregister-browser`: native messaging host manifests.
+/// Points the sign-in entry at this program (on) or removes it (off).
+fn set_launch_at_login(enabled: bool) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| format!("Cannot locate this program: {e}"))?;
+    dlcore::autostart::set(enabled, &exe)
+}
+
 fn browser_flags() -> Option<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--unregister-browser") {
@@ -249,9 +258,13 @@ fn main() -> Result<(), slint::PlatformError> {
         .skip(1)
         .filter(|a| looks_like_url(a))
         .collect();
+    let start_in_tray = std::env::args().any(|a| a == dlcore::autostart::TRAY_FLAG);
     {
         use dlcore::ipc::{AddRequest, Command};
-        let cmd = if cli_urls.is_empty() {
+        let cmd = if cli_urls.is_empty() && start_in_tray {
+            // A sign-in launch must not pop up a copy that is already running.
+            Command::Ping
+        } else if cli_urls.is_empty() {
             Command::Show
         } else {
             Command::Add {
@@ -271,6 +284,12 @@ fn main() -> Result<(), slint::PlatformError> {
     select_renderer();
     let mgr = Manager::new(&state_dir());
     let settings = mgr.settings();
+    if settings.launch_at_login {
+        // Keep the sign-in entry pointing at this copy after an update or a move.
+        if let Err(e) = set_launch_at_login(true) {
+            eprintln!("{e}");
+        }
+    }
     // URLs on the command line are queued right away (e.g. from a browser or script).
     for a in cli_urls {
         mgr.add(NewDownload {
@@ -384,7 +403,11 @@ fn main() -> Result<(), slint::PlatformError> {
                 };
                 let available = tray.as_ref().as_ref().is_some_and(|t| t.available());
                 ui.set_tray_available(available);
-                if !available && !ui.window().is_visible() && !compact.window().is_visible() {
+                if !available
+                    && ticks >= TRAY_GRACE_TICKS
+                    && !ui.window().is_visible()
+                    && !compact.window().is_visible()
+                {
                     minimize_to_tray(&ui, &compact, false);
                 }
                 if let Some(t) = tray.as_ref() {
@@ -593,6 +616,7 @@ fn main() -> Result<(), slint::PlatformError> {
         ui.set_s_stop(s.schedule.stop.clone().into());
         ui.set_s_clip(s.watch_clipboard);
         ui.set_s_clip_auto(s.clipboard_auto_download);
+        ui.set_s_login(s.launch_at_login);
         ui.set_s_verify(s.auto_verify);
         ui.set_s_error("".into());
         ui.set_set_open(true);
@@ -635,6 +659,14 @@ fn main() -> Result<(), slint::PlatformError> {
         }
         s.global_limit = g;
         s.per_download_limit = p;
+        let login = ui.get_s_login();
+        if login != s.launch_at_login {
+            if let Err(e) = set_launch_at_login(login) {
+                ui.set_s_error(e.into());
+                return;
+            }
+            s.launch_at_login = login;
+        }
         let lang = s.language.clone();
         if let Err(e) = app.mgr().set_settings(s) {
             ui.set_s_error(e.into());
@@ -646,7 +678,10 @@ fn main() -> Result<(), slint::PlatformError> {
         refresh_now(&ui, &mut app);
     });
 
-    ui.show()?;
+    // A sign-in launch stays hidden; the tick shows the window if no tray icon appears.
+    if !start_in_tray {
+        ui.show()?;
+    }
     schedule_initial_placement(&ui);
     let result = slint::run_event_loop_until_quit();
     drop(timer);

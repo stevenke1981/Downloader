@@ -66,9 +66,6 @@ msgstr "모든 다운로드"
 msgid "All protocol engines run inside Downloader using Rust libraries."
 msgstr "모든 프로토콜 엔진은 Rust 라이브러리를 사용해 Downloader 안에서 실행됩니다."
 
-msgid "Also delete the file from disk"
-msgstr "디스크에서 파일도 삭제"
-
 msgid "Always on top"
 msgstr "항상 위에 표시"
 
@@ -242,6 +239,9 @@ msgstr "삭제"
 
 msgid "Delete download"
 msgstr "다운로드 삭제"
+
+msgid "Delete record and file"
+msgstr "기록과 파일 삭제"
 
 msgid "Delete…"
 msgstr "삭제…"
@@ -543,14 +543,17 @@ msgstr "원격 제어는 기본적으로 꺼져 있습니다. 모든 요청에�
 msgid "Remove folder rule"
 msgstr "폴더 규칙 삭제"
 
+msgid "Remove only the record from the list, or also delete the downloaded file?"
+msgstr "목록에서 기록만 제거할까요, 아니면 다운로드한 파일도 삭제할까요?"
+
+msgid "Remove record only"
+msgstr "기록만 삭제"
+
 msgid "Remove scheduled action"
 msgstr "예약 작업 삭제"
 
 msgid "Remove site profile"
 msgstr "사이트 프로필 삭제"
-
-msgid "Remove the selected download from the list?"
-msgstr "선택한 다운로드를 목록에서 제거할까요?"
 
 msgid "Restore main window"
 msgstr "기본 창 복원"
@@ -644,6 +647,9 @@ msgstr "시작 / 재개"
 
 msgid "Start all"
 msgstr "모두 시작"
+
+msgid "Start at sign-in (minimized to the tray)"
+msgstr "로그인 시 자동 시작(트레이로 최소화)"
 
 msgid "Start immediately"
 msgstr "바로 시작"
@@ -758,6 +764,12 @@ msgstr "여기에서 다운로드를 시작하세요"
 
 msgid "{0} downloads, {1} active"
 msgstr "다운로드 {0}개, 진행 중 {1}개"
+
+msgid "Also delete the file from disk"
+msgstr "디스크에서 파일도 삭제"
+
+msgid "Remove the selected download from the list?"
+msgstr "선택한 다운로드를 목록에서 제거할까요?"
 
 msgid "URL"
 msgstr "URL"

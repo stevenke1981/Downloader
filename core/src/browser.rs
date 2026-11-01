@@ -179,6 +179,8 @@ pub fn manifest_json(host_path: &Path) -> String {
 mod registration;
 #[cfg(windows)]
 pub use registration::browser_app_path;
+#[cfg(windows)]
+pub(crate) use registration::{check_command, reg_command};
 pub use registration::{native_host_status, register, unregister};
 
 #[cfg(test)]

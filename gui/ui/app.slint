@@ -116,6 +116,7 @@ export component AppWindow inherits Window {
     in-out property <string> s-stop;
     in-out property <bool> s-clip;
     in-out property <bool> s-clip-auto;
+    in-out property <bool> s-login;
     in-out property <bool> s-verify: true;
     in-out property <string> s-error;
 
@@ -389,6 +390,7 @@ export component AppWindow inherits Window {
                                     MenuItem { title: @tr("Copy URL"); activated => { root.copy-url(); } }
                                     MenuSeparator { }
                                     MenuItem { title: @tr("Delete…"); activated => { root.del-file = false; root.del-open = true; } }
+                                    MenuItem { title: @tr("Clear completed"); enabled: root.counts[2] > 0; activated => { root.clear-completed(); } }
                                 }
                             }
                             rta := TouchArea {
@@ -636,13 +638,14 @@ export component AppWindow inherits Window {
             color: Palette.text;
             overflow: elide;
         }
-        Text { text: @tr("Remove the selected download from the list?"); wrap: word-wrap; }
-        CheckBox { text: @tr("Also delete the file from disk"); checked <=> root.del-file; }
+        Text { text: @tr("Remove only the record from the list, or also delete the downloaded file?"); wrap: word-wrap; }
+        // Two explicit choices instead of a checkbox; the safe one (keep the file) is primary.
         HorizontalLayout {
             alignment: end;
             spacing: 8px;
             Button { text: @tr("Cancel"); clicked => { root.del-open = false; } }
-            Button { text: @tr("Delete"); primary: true; clicked => { root.del-open = false; root.delete-confirmed(); } }
+            Button { text: @tr("Delete record and file"); clicked => { root.del-file = true; root.del-open = false; root.delete-confirmed(); } }
+            Button { text: @tr("Remove record only"); primary: true; clicked => { root.del-file = false; root.del-open = false; root.delete-confirmed(); } }
         }
     }
 
@@ -729,6 +732,7 @@ export component AppWindow inherits Window {
                             Field { label: @tr("Language"); ComboBox { model: root.languages; current-index <=> root.s-language; accessible-label: @tr("Language"); horizontal-stretch: 1; } }
                             CheckBox { text: @tr("Watch the clipboard for download links"); checked <=> root.s-clip; }
                             CheckBox { text: @tr("Download copied links automatically (skip the add dialog)"); checked <=> root.s-clip-auto; enabled: root.s-clip; }
+                            CheckBox { text: @tr("Start at sign-in (minimized to the tray)"); checked <=> root.s-login; }
                             CheckBox { text: @tr("Verify downloads automatically (look for checksum files)"); checked <=> root.s-verify; }
                             Rectangle { height: 1px; background: Palette.border; }
                             Text { text: @tr("Storage"); color: Palette.text; font-size: 15px; font-weight: 600; }

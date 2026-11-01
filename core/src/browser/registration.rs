@@ -219,7 +219,7 @@ fn registry_default_at(hive: isize, key: &str, view: u32) -> Result<Option<PathB
 }
 
 #[cfg(windows)]
-fn reg_command() -> std::process::Command {
+pub(crate) fn reg_command() -> std::process::Command {
     use std::os::windows::process::CommandExt;
     let mut command = std::process::Command::new("reg.exe");
     command.creation_flags(0x08000000); // CREATE_NO_WINDOW for Settings actions.
@@ -227,7 +227,7 @@ fn reg_command() -> std::process::Command {
 }
 
 #[cfg(windows)]
-fn check_command(output: std::process::Output, action: &str) -> Result<(), String> {
+pub(crate) fn check_command(output: std::process::Output, action: &str) -> Result<(), String> {
     if output.status.success() {
         Ok(())
     } else {
