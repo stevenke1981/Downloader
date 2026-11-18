@@ -41,6 +41,7 @@ fn mode(index: i32) -> TrafficMode {
 }
 
 mod ftp;
+mod modules;
 use ftp::{ftp_directory, ftp_sources};
 
 fn populate(ui: &ToolsWindow, context: &Context) {
@@ -98,6 +99,7 @@ fn populate(ui: &ToolsWindow, context: &Context) {
     ui.set_bind_address(settings.remote.bind.into());
     ui.set_token(settings.remote.token.into());
     let tr = ui.global::<ToolTr>();
+    modules::populate(ui, &context.manager);
     ui.set_remote_status(match context.remote.lock().unwrap().as_ref() {
         Some(server) => tr.invoke_remote_on(server.address().to_string().into()),
         None => tr.invoke_remote_off(),
@@ -553,6 +555,7 @@ pub fn bind(main: &AppWindow, app: &Rc<RefCell<App>>) -> Result<Controller, slin
             restart_remote(context, remote)
         });
     });
+    modules::bind(&ui, &context);
     bind!(on_refresh, |ui, context| {
         populate(&ui, context);
         refresh_capabilities(&ui);

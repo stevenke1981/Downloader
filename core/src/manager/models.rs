@@ -48,4 +48,14 @@ pub struct NewDownload {
     pub checksum_urls: Vec<String>,
     /// `Cookie` header sent with every request (kept in memory only).
     pub cookie: Option<String>,
+    /// Extra request headers.
+    pub headers: Vec<(String, String)>,
+    /// User-Agent override.
+    pub user_agent: Option<String>,
+    /// Alternative URLs for the same file.
+    pub mirrors: Vec<String>,
+    /// None = from settings.
+    pub conflict: Option<crate::task::ConflictPolicy>,
+    /// Refuse to add when the same URL is already queued.
+    pub unique: bool,
 }

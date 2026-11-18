@@ -158,6 +158,117 @@ pub fn unique_name(dir: &Path, name: &str) -> String {
         .unwrap()
 }
 
+/// Free bytes available to the current user on the volume holding `dir` (or its nearest existing
+/// parent). Only measured on Windows; `None` elsewhere or when it cannot be determined.
+pub fn free_space(dir: &Path) -> Option<u64> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn GetDiskFreeSpaceExW(
+                directory: *const u16,
+                available: *mut u64,
+                total: *mut u64,
+                free: *mut u64,
+            ) -> i32;
+        }
+        let existing = dir.ancestors().find(|p| p.exists())?;
+        let wide: Vec<u16> = existing.as_os_str().encode_wide().chain([0]).collect();
+        let mut available = 0u64;
+        let (mut total, mut free) = (0u64, 0u64);
+        // SAFETY: `wide` is NUL-terminated and the out pointers are valid for the call.
+        let ok =
+            unsafe { GetDiskFreeSpaceExW(wide.as_ptr(), &mut available, &mut total, &mut free) };
+        (ok != 0).then_some(available)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = dir;
+        None
+    }
+}
+
+/// Name to save `name` under in `dir` according to `p`.
+pub fn resolve_conflict(
+    dir: &Path,
+    name: &str,
+    p: crate::task::ConflictPolicy,
+) -> Result<String, String> {
+    use crate::task::ConflictPolicy;
+    match p {
+        ConflictPolicy::Rename => Ok(unique_name(dir, name)),
+        ConflictPolicy::Overwrite => Ok(name.to_string()),
+        ConflictPolicy::Skip => {
+            let path = dir.join(name);
+            if path.exists() {
+                Err(format!("file exists: {}", path.display()))
+            } else {
+                Ok(name.to_string())
+            }
+        }
+    }
+}
+
+/// First "http 404", "status 503", "status code 500", "server returned 403" status in `s`.
+fn http_status(s: &str) -> Option<u16> {
+    ["http ", "status ", "status code ", "server returned "]
+        .iter()
+        .find_map(|p| {
+            s.match_indices(p).find_map(|(i, _)| {
+                let rest = &s.as_bytes()[i + p.len()..];
+                (rest.len() >= 3
+                    && rest[..3].iter().all(u8::is_ascii_digit)
+                    && (b'1'..=b'5').contains(&rest[0])
+                    && rest.get(3).is_none_or(|b| !b.is_ascii_digit()))
+                .then(|| s[i + p.len()..i + p.len() + 3].parse().ok())
+                .flatten()
+            })
+        })
+}
+
+/// Stable machine-readable class of an error message:
+/// http | network | verify | conflict | duplicate | disk | module | auth | invalid | error.
+pub fn error_code(msg: &str) -> &'static str {
+    let m = msg.trim().to_ascii_lowercase();
+    if m.starts_with("duplicate:") {
+        "duplicate"
+    } else if m.starts_with("file exists:") {
+        "conflict"
+    } else if m.starts_with("not enough disk space:") {
+        "disk"
+    } else if m.starts_with("module ") {
+        "module"
+    } else if m.contains("verification failed") || m.contains("checksum mismatch") {
+        "verify"
+    } else if m.contains("token")
+        || m.contains("unauthorized")
+        || matches!(http_status(&m), Some(401 | 403))
+    {
+        "auth"
+    } else if http_status(&m).is_some() {
+        "http"
+    } else if [
+        "connect",
+        "timed out",
+        "timeout",
+        "dns",
+        "resolve",
+        "unreachable",
+        "connection",
+        "network",
+    ]
+    .iter()
+    .any(|k| m.contains(k))
+    {
+        "network"
+    } else if m.contains("invalid") || m.contains("unsupported") {
+        "invalid"
+    } else {
+        "error"
+    }
+}
+
 pub fn default_download_dir() -> PathBuf {
     dirs::download_dir()
         .or_else(dirs::home_dir)
@@ -291,6 +402,62 @@ mod tests {
             "b".repeat(200)
         );
         assert_eq!(sanitize("short.tar.gz"), "short.tar.gz");
+    }
+    #[test]
+    fn conflict_policies() {
+        use crate::task::ConflictPolicy;
+        let dir = tempfile::tempdir().unwrap();
+        let d = dir.path();
+        for p in [
+            ConflictPolicy::Rename,
+            ConflictPolicy::Overwrite,
+            ConflictPolicy::Skip,
+        ] {
+            assert_eq!(resolve_conflict(d, "a.zip", p).unwrap(), "a.zip");
+        }
+        std::fs::write(d.join("a.zip"), b"x").unwrap();
+        assert_eq!(
+            resolve_conflict(d, "a.zip", ConflictPolicy::Rename).unwrap(),
+            "a (1).zip"
+        );
+        assert_eq!(
+            resolve_conflict(d, "a.zip", ConflictPolicy::Overwrite).unwrap(),
+            "a.zip"
+        );
+        let e = resolve_conflict(d, "a.zip", ConflictPolicy::Skip).unwrap_err();
+        assert!(
+            e.starts_with("file exists: ") && e.ends_with("a.zip"),
+            "{e}"
+        );
+        assert_eq!(error_code(&e), "conflict");
+    }
+    #[test]
+    fn error_codes() {
+        for (msg, code) in [
+            ("duplicate: already queued as #4", "duplicate"),
+            ("file exists: C:\\x\\a.zip", "conflict"),
+            ("not enough disk space: need 2 GB, 1 GB free", "disk"),
+            ("module example-resolver: timed out", "module"),
+            ("verification failed: SHA-256 mismatch", "verify"),
+            ("checksum mismatch", "verify"),
+            ("HTTP 404 Not Found", "http"),
+            ("server returned status 503", "http"),
+            ("HTTP 401 Unauthorized", "auth"),
+            ("HTTP 403 Forbidden", "auth"),
+            ("error sending request: connection refused", "network"),
+            ("HTTP 404 Not Found", "http"),
+            ("missing or wrong token", "auth"),
+            ("unauthorized", "auth"),
+            ("error sending request: connection refused", "network"),
+            ("operation timed out", "network"),
+            ("dns error: failed to lookup address", "network"),
+            ("invalid header name", "invalid"),
+            ("unsupported download source", "invalid"),
+            ("something odd", "error"),
+            ("downloaded 4010 bytes", "error"),
+        ] {
+            assert_eq!(error_code(msg), code, "{msg}");
+        }
     }
     #[test]
     fn url_scheme_gate() {

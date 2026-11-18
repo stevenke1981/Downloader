@@ -11,7 +11,10 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     pub fn new(rate: u64) -> Self {
-        RateLimiter { rate: AtomicU64::new(rate), state: Mutex::new((0.0, Instant::now())) }
+        RateLimiter {
+            rate: AtomicU64::new(rate),
+            state: Mutex::new((0.0, Instant::now())),
+        }
     }
     pub fn rate(&self) -> u64 {
         self.rate.load(Ordering::Relaxed)
@@ -33,7 +36,11 @@ impl RateLimiter {
         st.0 = (st.0 + now.duration_since(st.1).as_secs_f64() * rate).min(burst);
         st.1 = now;
         st.0 -= n as f64;
-        if st.0 < 0.0 { Duration::from_secs_f64(-st.0 / rate) } else { Duration::ZERO }
+        if st.0 < 0.0 {
+            Duration::from_secs_f64(-st.0 / rate)
+        } else {
+            Duration::ZERO
+        }
     }
     pub async fn acquire(&self, n: u64) {
         let d = self.reserve(n);

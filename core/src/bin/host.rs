@@ -11,7 +11,11 @@ use std::time::{Duration, Instant};
 
 fn app_path() -> Option<std::path::PathBuf> {
     let me = std::env::current_exe().ok()?;
-    let p = me.with_file_name(if cfg!(windows) { "downloader.exe" } else { "downloader" });
+    let p = me.with_file_name(if cfg!(windows) {
+        "downloader.exe"
+    } else {
+        "downloader"
+    });
     p.exists().then_some(p)
 }
 
@@ -23,10 +27,14 @@ fn forward(cmd: Command, launch: bool) -> Reply {
     if !launch {
         return Reply::err("app not running");
     }
-    let Some(app) = app_path() else { return Reply::err("Downloader app not found next to the host") };
+    let Some(app) = app_path() else {
+        return Reply::err("Downloader app not found next to the host");
+    };
     let _ = std::fs::remove_file(ipc::endpoint_path(&dir));
     let mut c = std::process::Command::new(app);
-    c.stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+    c.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
     if let Err(e) = c.spawn() {
         return Reply::err(format!("cannot start Downloader: {e}"));
     }
@@ -47,10 +55,14 @@ fn handle(msg: &Value) -> Reply {
         "add" => {
             let items: Vec<AddRequest> = match msg.get("downloads") {
                 Some(v) => serde_json::from_value(v.clone()).unwrap_or_default(),
-                None => serde_json::from_value(msg.clone()).map(|a| vec![a]).unwrap_or_default(),
+                None => serde_json::from_value(msg.clone())
+                    .map(|a| vec![a])
+                    .unwrap_or_default(),
             };
-            let items: Vec<AddRequest> =
-                items.into_iter().filter(|a| a.url.starts_with("http://") || a.url.starts_with("https://")).collect();
+            let items: Vec<AddRequest> = items
+                .into_iter()
+                .filter(|a| a.url.starts_with("http://") || a.url.starts_with("https://"))
+                .collect();
             if items.is_empty() {
                 return Reply::err("no http(s) URL");
             }

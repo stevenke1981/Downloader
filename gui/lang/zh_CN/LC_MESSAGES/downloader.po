@@ -57,6 +57,9 @@ msgstr "添加已收集的链接"
 msgid "Add download"
 msgstr "新建下载"
 
+msgid "Add-on modules extend what Downloader can fetch. They are off by default."
+msgstr "附加模块可扩展 Downloader 能下载的内容，默认关闭。"
+
 msgid "Added {} downloads."
 msgstr "已添加 {} 个下载。"
 
@@ -77,6 +80,15 @@ msgstr "应用远程 API"
 
 msgid "Apply traffic limits"
 msgstr "应用流量限制"
+
+msgid "Approve"
+msgstr "批准"
+
+msgid "Approved"
+msgstr "已批准"
+
+msgid "Approving an external module lets that program run on this computer. Approve only modules you trust. Editing a module disables it again."
+msgstr "批准外部模块后，该程序即可在这台电脑上运行。请只批准你信任的模块。模块一经修改就会再次停用。"
 
 msgid "Archives"
 msgstr "压缩文件"
@@ -104,6 +116,9 @@ msgstr "浏览器设置操作立即生效。“保存”仅应用 App 偏好设�
 
 msgid "Browse…"
 msgstr "浏览…"
+
+msgid "Built-in"
+msgstr "内置"
 
 msgid "Built-in Rust"
 msgstr "内置 Rust"
@@ -291,6 +306,9 @@ msgstr "仍有排队、下载或校验中的项目。要退出并暂停它们吗
 msgid "Drop torrent / Metalink files here to add downloads."
 msgstr "将 torrent／Metalink 文件拖放到此处即可添加下载。"
 
+msgid "Enable add-on modules"
+msgstr "启用附加模块"
+
 msgid "Enable remote API"
 msgstr "启用远程 API"
 
@@ -302,6 +320,9 @@ msgstr "请至少输入一个下载链接。"
 
 msgid "Error"
 msgstr "错误"
+
+msgid "Error: {}"
+msgstr "错误：{}"
 
 msgid "Exit"
 msgstr "退出"
@@ -393,6 +414,9 @@ msgstr "中速上限"
 msgid "Minimize to tray"
 msgstr "最小化到托盘"
 
+msgid "Modules"
+msgstr "模块"
+
 msgid "Music"
 msgstr "音乐"
 
@@ -429,8 +453,14 @@ msgstr "无校验文件"
 msgid "No downloads in this view"
 msgstr "此分类目前没有下载"
 
+msgid "No modules found."
+msgstr "未找到模块。"
+
 msgid "Normal"
 msgstr "普通"
+
+msgid "Not approved"
+msgstr "未批准"
 
 msgid "Not checked yet."
 msgstr "尚未检查。"
@@ -459,6 +489,9 @@ msgstr "打开文件"
 msgid "Open folder"
 msgstr "打开文件夹"
 
+msgid "Open modules folder"
+msgstr "打开模块文件夹"
+
 msgid "Opened the browser extension manager."
 msgstr "已打开浏览器扩展管理页。"
 
@@ -467,6 +500,9 @@ msgstr "已打开扩展文件夹。"
 
 msgid "Other"
 msgstr "其他"
+
+msgid "Overwrite"
+msgstr "覆盖"
 
 msgid "Page URL"
 msgstr "网页网址"
@@ -555,6 +591,9 @@ msgstr "删除计划动作"
 msgid "Remove site profile"
 msgstr "删除站点配置"
 
+msgid "Rename"
+msgstr "自动重命名"
+
 msgid "Restore main window"
 msgstr "还原主窗口"
 
@@ -566,6 +605,9 @@ msgstr "重试次数"
 
 msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
 msgstr "添加前请先检查下方链接。需要验证的下载，请在“站点／文件夹”中保存会话凭据。"
+
+msgid "Revoke"
+msgstr "撤销批准"
 
 msgid "Run a program"
 msgstr "运行程序"
@@ -626,6 +668,9 @@ msgstr "站点／文件夹"
 
 msgid "Size"
 msgstr "大小"
+
+msgid "Skip"
+msgstr "跳过"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "按分类保存到子文件夹（视频、音乐…）"
@@ -752,6 +797,9 @@ msgstr "网页／FTP"
 
 msgid "Webpage media (Rust)"
 msgstr "网页影音（Rust）"
+
+msgid "When a file already exists"
+msgstr "文件已存在时"
 
 msgid "Working…"
 msgstr "处理中…"

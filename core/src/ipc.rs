@@ -49,10 +49,18 @@ pub struct Reply {
 
 impl Reply {
     pub fn ok() -> Reply {
-        Reply { ok: true, error: None, version: Some(env!("CARGO_PKG_VERSION").into()) }
+        Reply {
+            ok: true,
+            error: None,
+            version: Some(env!("CARGO_PKG_VERSION").into()),
+        }
     }
     pub fn err(e: impl Into<String>) -> Reply {
-        Reply { ok: false, error: Some(e.into()), version: None }
+        Reply {
+            ok: false,
+            error: Some(e.into()),
+            version: None,
+        }
     }
 }
 
@@ -72,7 +80,12 @@ pub fn random_token() -> String {
     for i in 0..4u64 {
         let mut h = std::collections::hash_map::RandomState::new().build_hasher();
         h.write_u64(i ^ std::process::id() as u64);
-        h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos());
+        h.write_u128(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos(),
+        );
         out += &format!("{:016x}", h.finish());
     }
     out
@@ -89,14 +102,19 @@ pub fn serve(
     std_listener.set_nonblocking(true)?;
     let port = std_listener.local_addr()?.port();
     let token = random_token();
-    let ep = Endpoint { port, token: token.clone() };
+    let ep = Endpoint {
+        port,
+        token: token.clone(),
+    };
     std::fs::create_dir_all(state_dir)?;
     write_endpoint(&endpoint_path(state_dir), &serde_json::to_vec(&ep).unwrap())?;
     let handler = std::sync::Arc::new(handler);
     rt.spawn(async move {
         let listener = tokio::net::TcpListener::from_std(std_listener).unwrap();
         loop {
-            let Ok((sock, _)) = listener.accept().await else { continue };
+            let Ok((sock, _)) = listener.accept().await else {
+                continue;
+            };
             let (handler, token) = (handler.clone(), token.clone());
             tokio::spawn(async move {
                 let (r, mut w) = sock.into_split();
@@ -157,12 +175,17 @@ pub fn send(ep: &Endpoint, cmd: Command) -> std::io::Result<Reply> {
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], ep.port));
     let mut s = TcpStream::connect_timeout(&addr, Duration::from_secs(2))?;
     s.set_read_timeout(Some(Duration::from_secs(10)))?;
-    let mut line = serde_json::to_vec(&Envelope { token: ep.token.clone(), command: cmd }).unwrap();
+    let mut line = serde_json::to_vec(&Envelope {
+        token: ep.token.clone(),
+        command: cmd,
+    })
+    .unwrap();
     line.push(b'\n');
     s.write_all(&line)?;
     let mut reply = String::new();
     BufReader::new(s).read_line(&mut reply)?;
-    serde_json::from_str(&reply).map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    serde_json::from_str(&reply)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
 }
 
 /// Read the endpoint file and send; fails if the app isn't running.
@@ -177,5 +200,7 @@ pub fn default_state_dir() -> PathBuf {
     if let Some(d) = std::env::var_os("DOWNLOADER_STATE_DIR") {
         return d.into();
     }
-    dirs::config_dir().unwrap_or_else(std::env::temp_dir).join("Downloader")
+    dirs::config_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("Downloader")
 }

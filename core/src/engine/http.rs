@@ -69,30 +69,78 @@ pub(super) fn same_origin(a: &str, b: &str) -> bool {
     }
 }
 
+/// Add the user's extra headers and User-Agent. The headers go only to the origin of `base`;
+/// the User-Agent is always sent.
+pub(super) fn with_extras(
+    mut req: reqwest::RequestBuilder,
+    base: &str,
+    target: &str,
+    headers: &[(String, String)],
+    user_agent: Option<&str>,
+) -> reqwest::RequestBuilder {
+    if let Some(ua) = user_agent {
+        req = req.header(reqwest::header::USER_AGENT, ua);
+    }
+    if same_origin(base, target) {
+        for (k, v) in headers {
+            req = req.header(k.as_str(), v.as_str());
+        }
+    }
+    req
+}
+
 pub(super) async fn probe(
     client: &reqwest::Client,
     url: &str,
     referer: Option<&str>,
     cookie: Option<&str>,
     authorization: Option<&str>,
+    headers: &[(String, String)],
+    user_agent: Option<&str>,
 ) -> Result<Probe, String> {
     let mut target = google_drive::download_url(url)?;
     let mut drive_download = google_drive::is_drive(&target);
     let mut confirmations = 0;
+    // reqwest keeps custom headers across redirects, so with custom headers the redirects are
+    // followed here, hop by hop, and the headers are added only while the origin is unchanged.
+    let manual = !headers.is_empty();
     let resp = loop {
-        let mut req = client.get(target.clone()).header(RANGE, "bytes=0-0");
-        if let Some(r) = referer {
-            req = req.header(reqwest::header::REFERER, r);
-        }
-        // The browser header applies only to its original origin, including when
-        // following a confirmation form. Never copy it to another Google host.
-        if let Some(c) = cookie.filter(|_| same_origin(url, target.as_str())) {
-            req = req.header(reqwest::header::COOKIE, c);
-        }
-        if let Some(value) = authorization.filter(|_| same_origin(url, target.as_str())) {
-            req = req.header(reqwest::header::AUTHORIZATION, value);
-        }
-        let resp = req.send().await.map_err(err_str)?;
+        let mut hop = target.clone();
+        let mut hops = 0;
+        let resp = loop {
+            let mut req = client.get(hop.clone()).header(RANGE, "bytes=0-0");
+            if let Some(r) = referer {
+                req = req.header(reqwest::header::REFERER, r);
+            }
+            // The browser header applies only to its original origin, including when
+            // following a confirmation form. Never copy it to another Google host.
+            if let Some(c) = cookie.filter(|_| same_origin(url, hop.as_str())) {
+                req = req.header(reqwest::header::COOKIE, c);
+            }
+            if let Some(value) = authorization.filter(|_| same_origin(url, hop.as_str())) {
+                req = req.header(reqwest::header::AUTHORIZATION, value);
+            }
+            req = with_extras(req, url, hop.as_str(), headers, user_agent);
+            let resp = req.send().await.map_err(err_str)?;
+            let next = resp
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|l| resp.url().join(l).ok());
+            match next {
+                Some(next) if manual && resp.status().is_redirection() => {
+                    hops += 1;
+                    let downgrade = next.scheme() != hop.scheme()
+                        && next.host_str() == hop.host_str()
+                        && next.port_or_known_default() == hop.port_or_known_default();
+                    if hops > 10 || downgrade {
+                        break resp;
+                    }
+                    hop = next;
+                }
+                _ => break resp,
+            }
+        };
         if google_drive::is_sign_in(resp.url()) {
             return Err(google_drive::SIGN_IN.into());
         }

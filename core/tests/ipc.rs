@@ -45,12 +45,26 @@ fn ipc_add_and_token_check() {
     })
     .unwrap();
     assert!(ipc::endpoint_path(dir.path()).exists());
-    let req = AddRequest { url: "https://x.org/f.iso".into(), referrer: Some("https://x.org/".into()), filename: Some("f.iso".into()), ..Default::default() };
-    let r = ipc::send_to_app(dir.path(), Command::Add { downloads: vec![req.clone()] }).unwrap();
+    let req = AddRequest {
+        url: "https://x.org/f.iso".into(),
+        referrer: Some("https://x.org/".into()),
+        filename: Some("f.iso".into()),
+        ..Default::default()
+    };
+    let r = ipc::send_to_app(
+        dir.path(),
+        Command::Add {
+            downloads: vec![req.clone()],
+        },
+    )
+    .unwrap();
     assert!(r.ok);
     assert_eq!(got.lock().unwrap().as_slice(), &[req]);
     assert!(ipc::send_to_app(dir.path(), Command::Ping).unwrap().ok);
-    let bad = ipc::Endpoint { port: ep.port, token: "wrong".into() };
+    let bad = ipc::Endpoint {
+        port: ep.port,
+        token: "wrong".into(),
+    };
     let r = ipc::send(&bad, Command::Ping).unwrap();
     assert!(!r.ok && r.error.unwrap().contains("token"));
 }
@@ -69,8 +83,19 @@ fn ipc_accepts_large_batch() {
         Reply::ok()
     })
     .unwrap();
-    let downloads: Vec<AddRequest> = (0..4000).map(|i| AddRequest { url: format!("https://files.example.org/archive/{i:05}/{}", "x".repeat(300)), ..Default::default() }).collect();
-    assert!(serde_json::to_vec(&downloads).unwrap().len() > 1 << 20, "batch should exceed the old 1 MiB limit");
+    let downloads: Vec<AddRequest> = (0..4000)
+        .map(|i| AddRequest {
+            url: format!(
+                "https://files.example.org/archive/{i:05}/{}",
+                "x".repeat(300)
+            ),
+            ..Default::default()
+        })
+        .collect();
+    assert!(
+        serde_json::to_vec(&downloads).unwrap().len() > 1 << 20,
+        "batch should exceed the old 1 MiB limit"
+    );
     let r = ipc::send(&ep, Command::Add { downloads }).unwrap();
     assert!(r.ok, "{:?}", r.error);
     assert_eq!(got.lock().unwrap().len(), 4000);
@@ -83,7 +108,8 @@ fn bad_token_closes_connection() {
     let dir = tempfile::tempdir().unwrap();
     let ep = ipc::serve(rt.handle(), dir.path(), |_| Reply::ok()).unwrap();
     let mut s = std::net::TcpStream::connect(("127.0.0.1", ep.port)).unwrap();
-    s.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+    s.set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .unwrap();
     // A bad token is answered, then the connection is closed even though a valid request follows.
     let bad = json!({"token": "wrong", "cmd": "ping"});
     let good = json!({"token": ep.token, "cmd": "ping"});
@@ -93,7 +119,11 @@ fn bad_token_closes_connection() {
     r.read_line(&mut line).unwrap();
     assert!(line.contains("bad token"), "got {line}");
     line.clear();
-    assert_eq!(r.read_line(&mut line).unwrap(), 0, "connection must be closed, got {line}");
+    assert_eq!(
+        r.read_line(&mut line).unwrap(),
+        0,
+        "connection must be closed, got {line}"
+    );
 }
 
 #[test]

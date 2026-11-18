@@ -57,6 +57,9 @@ msgstr "수집된 링크 추가"
 msgid "Add download"
 msgstr "다운로드 추가"
 
+msgid "Add-on modules extend what Downloader can fetch. They are off by default."
+msgstr "애드온 모듈은 Downloader가 가져올 수 있는 항목을 확장합니다. 기본적으로 꺼져 있습니다."
+
 msgid "Added {} downloads."
 msgstr "다운로드 {}개를 추가했습니다."
 
@@ -77,6 +80,15 @@ msgstr "원격 API 적용"
 
 msgid "Apply traffic limits"
 msgstr "트래픽 제한 적용"
+
+msgid "Approve"
+msgstr "승인"
+
+msgid "Approved"
+msgstr "승인됨"
+
+msgid "Approving an external module lets that program run on this computer. Approve only modules you trust. Editing a module disables it again."
+msgstr "외부 모듈을 승인하면 해당 프로그램이 이 컴퓨터에서 실행될 수 있습니다. 신뢰하는 모듈만 승인하세요. 모듈을 수정하면 다시 비활성화됩니다."
 
 msgid "Archives"
 msgstr "압축 파일"
@@ -104,6 +116,9 @@ msgstr "브라우저 설정 작업은 즉시 적용됩니다. 저장은 앱 환�
 
 msgid "Browse…"
 msgstr "찾아보기…"
+
+msgid "Built-in"
+msgstr "내장"
 
 msgid "Built-in Rust"
 msgstr "내장 Rust"
@@ -291,6 +306,9 @@ msgstr "대기, 다운로드 또는 확인 중인 항목이 있습니다. 종료
 msgid "Drop torrent / Metalink files here to add downloads."
 msgstr "torrent / Metalink 파일을 여기에 놓으면 다운로드가 추가됩니다."
 
+msgid "Enable add-on modules"
+msgstr "애드온 모듈 사용"
+
 msgid "Enable remote API"
 msgstr "원격 API 사용"
 
@@ -302,6 +320,9 @@ msgstr "다운로드 링크를 하나 이상 입력하세요."
 
 msgid "Error"
 msgstr "오류"
+
+msgid "Error: {}"
+msgstr "오류: {}"
 
 msgid "Exit"
 msgstr "종료"
@@ -393,6 +414,9 @@ msgstr "보통 제한"
 msgid "Minimize to tray"
 msgstr "트레이로 최소화"
 
+msgid "Modules"
+msgstr "모듈"
+
 msgid "Music"
 msgstr "음악"
 
@@ -429,8 +453,14 @@ msgstr "체크섬 없음"
 msgid "No downloads in this view"
 msgstr "이 보기에는 다운로드가 없습니다"
 
+msgid "No modules found."
+msgstr "모듈이 없습니다."
+
 msgid "Normal"
 msgstr "보통"
+
+msgid "Not approved"
+msgstr "승인되지 않음"
 
 msgid "Not checked yet."
 msgstr "아직 확인하지 않았습니다."
@@ -459,6 +489,9 @@ msgstr "파일 열기"
 msgid "Open folder"
 msgstr "폴더 열기"
 
+msgid "Open modules folder"
+msgstr "모듈 폴더 열기"
+
 msgid "Opened the browser extension manager."
 msgstr "브라우저 확장 프로그램 관리자를 열었습니다."
 
@@ -467,6 +500,9 @@ msgstr "확장 프로그램 폴더를 열었습니다."
 
 msgid "Other"
 msgstr "기타"
+
+msgid "Overwrite"
+msgstr "덮어쓰기"
 
 msgid "Page URL"
 msgstr "페이지 URL"
@@ -555,6 +591,9 @@ msgstr "예약 작업 삭제"
 msgid "Remove site profile"
 msgstr "사이트 프로필 삭제"
 
+msgid "Rename"
+msgstr "이름 바꾸기"
+
 msgid "Restore main window"
 msgstr "기본 창 복원"
 
@@ -566,6 +605,9 @@ msgstr "재시도 횟수"
 
 msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
 msgstr "추가하기 전에 아래 링크를 확인하세요. 인증이 필요한 다운로드는 '사이트 / 폴더'에 세션 자격 증명을 저장하세요."
+
+msgid "Revoke"
+msgstr "승인 취소"
 
 msgid "Run a program"
 msgstr "프로그램 실행"
@@ -626,6 +668,9 @@ msgstr "사이트 / 폴더"
 
 msgid "Size"
 msgstr "크기"
+
+msgid "Skip"
+msgstr "건너뛰기"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "분류별 하위 폴더에 저장 (동영상, 음악…)"
@@ -752,6 +797,9 @@ msgstr "웹 / FTP"
 
 msgid "Webpage media (Rust)"
 msgstr "웹페이지 미디어(Rust)"
+
+msgid "When a file already exists"
+msgstr "파일이 이미 있을 때"
 
 msgid "Working…"
 msgstr "작업 중…"

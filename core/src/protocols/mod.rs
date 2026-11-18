@@ -1,11 +1,12 @@
 //! In-process Rust protocol adapters and verified publication.
 //! Adapters own protocol I/O; this facade owns dispatch, staging and publication.
 mod ftp;
-mod metalink;
-mod torrent;
 mod media;
+mod metalink;
+pub mod registry;
+mod torrent;
 use crate::engine::{Ctx, Outcome};
-use crate::task::{DownloadKind, Seg, Status, Task, Verification, VerifyState};
+use crate::task::{ConflictPolicy, DownloadKind, Seg, Status, Task, Verification, VerifyState};
 use crate::{checksum, util};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -35,44 +36,8 @@ pub fn capabilities() -> Vec<Capability> {
     .collect()
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Protocol {
-    Ftp,
-    Metalink,
-    Torrent,
-    Media,
-}
-
-fn protocol(source: &str, kind: DownloadKind) -> Option<Protocol> {
-    if kind == DownloadKind::Video {
-        return Some(Protocol::Media);
-    }
-    let extension = if let Some(path) = util::descriptor_path(source) {
-        path.extension()?.to_str()?.to_ascii_lowercase()
-    } else {
-        let url = reqwest::Url::parse(source).ok()?;
-        match url.scheme() {
-            "ftp" => return Some(Protocol::Ftp),
-            "magnet" => return Some(Protocol::Torrent),
-            "rtsp" | "mms" | "mmsh" | "mmst" => return Some(Protocol::Media),
-            "http" | "https" => {}
-            _ => return None,
-        }
-        Path::new(url.path())
-            .extension()?
-            .to_str()?
-            .to_ascii_lowercase()
-    };
-    match extension.as_str() {
-        "torrent" => Some(Protocol::Torrent),
-        "metalink" | "meta4" => Some(Protocol::Metalink),
-        "m3u8" => Some(Protocol::Media),
-        _ => None,
-    }
-}
-
 pub(crate) fn handles(source: &str, kind: DownloadKind) -> bool {
-    protocol(source, kind).is_some()
+    registry::find(source, kind).is_some()
 }
 
 /// Stable across pause/restart. Legacy prefix keeps existing task cleanup compatible.
@@ -118,7 +83,8 @@ fn outputs(directory: &Path) -> Result<Vec<(PathBuf, u64)>, String> {
 pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     let snapshot = task.lock().unwrap().clone();
     util::validate_source(&snapshot.url)?;
-    let protocol = protocol(&snapshot.url, snapshot.kind).ok_or("unsupported native protocol")?;
+    let protocol =
+        registry::find(&snapshot.url, snapshot.kind).ok_or("unsupported native protocol")?;
     if snapshot.kind == DownloadKind::Video
         && !reqwest::Url::parse(&snapshot.url).is_ok_and(|u| matches!(u.scheme(), "http" | "https"))
     {
@@ -127,6 +93,16 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     if ctx.cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
     }
+    // Skip is decided before transferring whenever the name is known up front.
+    if snapshot.conflict == ConflictPolicy::Skip
+        && let Some(name) = snapshot
+            .suggested_name
+            .as_deref()
+            .map(util::sanitize)
+            .filter(|n| !n.is_empty())
+    {
+        util::resolve_conflict(&snapshot.dir, &name, ConflictPolicy::Skip)?;
+    }
     let stage = staging_path(&snapshot);
     std::fs::create_dir_all(stage.join("payload"))
         .map_err(|e| format!("cannot create protocol staging folder: {e}"))?;
@@ -134,16 +110,11 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     let stage = std::fs::canonicalize(stage).map_err(|e| e.to_string())?;
     task.lock()
         .unwrap()
-        .append_log(format!("Starting native Rust {protocol:?} adapter"));
+        .append_log(format!("Starting native Rust {} adapter", protocol.name()));
     // Adapters own network cancellation and protocol integrity; state never enters publication.
     let verify = ctx.verify;
     let cancel = ctx.cancel.clone();
-    let result = match protocol {
-        Protocol::Ftp => crate::protocols::ftp::download(task.clone(), ctx, &stage).await,
-        Protocol::Metalink => crate::protocols::metalink::download(task.clone(), ctx, &stage).await,
-        Protocol::Torrent => crate::protocols::torrent::download(task.clone(), ctx, &stage).await,
-        Protocol::Media => crate::protocols::media::download(task.clone(), ctx, &stage).await,
-    }?;
+    let result = protocol.download(task.clone(), ctx, stage.clone()).await?;
     if result == Outcome::Cancelled || cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
     }
@@ -209,16 +180,7 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
             .as_deref()
             .map(util::sanitize)
             .filter(|s| !s.is_empty());
-        match protocol {
-            Protocol::Ftp => suggested.unwrap_or(actual),
-            // Descriptor names describe the request, not the downloaded payload.
-            Protocol::Torrent | Protocol::Metalink => actual,
-            Protocol::Media => suggested.map_or(actual, |name| {
-                let mut name = PathBuf::from(name);
-                name.set_extension(files[0].0.extension().unwrap_or_default());
-                name.to_string_lossy().into_owned()
-            }),
-        }
+        protocol.publish_name(actual, suggested, &files[0].0)
     } else {
         let name = util::name_from_url(&snapshot.url);
         let stem = Path::new(&name)
@@ -231,8 +193,9 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
             format!("{stem}-files")
         }
     };
-    let name = util::unique_name(&snapshot.dir, &name);
+    let name = publish_target(&snapshot.dir, &name, snapshot.conflict)?;
     let destination = snapshot.dir.join(&name);
+    // Overwrite: rename replaces an old file in one step, so a failure keeps it.
     let source = if files.len() == 1 {
         &files[0].0
     } else {
@@ -253,6 +216,16 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     }];
     task.append_log(format!("Published {} output file(s)", files.len()));
     Ok(Outcome::Completed)
+}
+
+/// Pick the published name under the task's conflict policy. Existing folders are never
+/// replaced: an overwrite that would hit a folder falls back to a unique name.
+fn publish_target(dir: &Path, name: &str, policy: ConflictPolicy) -> Result<String, String> {
+    let name = util::resolve_conflict(dir, name, policy)?;
+    if dir.join(&name).is_dir() {
+        return Ok(util::unique_name(dir, &name));
+    }
+    Ok(name)
 }
 
 /// List one FTP directory in process. Credentials are never persisted.

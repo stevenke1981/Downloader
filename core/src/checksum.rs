@@ -49,7 +49,11 @@ impl Algo {
     }
     /// Parse names like "SHA256", "sha-256", "b2", "BLAKE2b", "md5".
     pub fn parse(s: &str) -> Option<Algo> {
-        let n: String = s.to_ascii_lowercase().chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let n: String = s
+            .to_ascii_lowercase()
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .collect();
         Some(match n.as_str() {
             "md5" => Algo::Md5,
             "sha1" | "sha" => Algo::Sha1,
@@ -114,7 +118,11 @@ impl Checksum {
             (None, 128) => Algo::Sha512,
             _ => return None,
         };
-        Some(Checksum { algo, expected: h, source: "user".into() })
+        Some(Checksum {
+            algo,
+            expected: h,
+            source: "user".into(),
+        })
     }
 }
 
@@ -154,7 +162,10 @@ pub fn verify(path: &Path, c: &Checksum) -> Result<(), String> {
     if got.eq_ignore_ascii_case(c.expected.trim()) {
         Ok(())
     } else {
-        Err(format!("checksum mismatch: expected {}, got {}", c.expected, got))
+        Err(format!(
+            "checksum mismatch: expected {}, got {}",
+            c.expected, got
+        ))
     }
 }
 
@@ -169,8 +180,16 @@ fn base_name(s: &str) -> &str {
 /// `hint` is the algorithm implied by the list's file name (e.g. b2sums.txt).
 /// A single bare hash (sidecar file like `x.iso.sha256` with just the digest) is accepted
 /// when `single_file` is true.
-pub fn find_in_list(text: &str, file_name: &str, hint: Option<Algo>, single_file: bool) -> Option<Checksum> {
-    let mut lines = text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#'));
+pub fn find_in_list(
+    text: &str,
+    file_name: &str,
+    hint: Option<Algo>,
+    single_file: bool,
+) -> Option<Checksum> {
+    let mut lines = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with('#'));
     let all: Vec<&str> = lines.by_ref().collect();
     for l in &all {
         // BSD style
@@ -185,27 +204,45 @@ pub fn find_in_list(text: &str, file_name: &str, hint: Option<Algo>, single_file
                 && is_hex(&h)
                 && h.len() == a.hex_len()
             {
-                return Some(Checksum { algo: a, expected: h, source: String::new() });
+                return Some(Checksum {
+                    algo: a,
+                    expected: h,
+                    source: String::new(),
+                });
             }
             continue;
         }
         // GNU style
         let mut it = l.splitn(2, char::is_whitespace);
-        let (Some(h), Some(name)) = (it.next(), it.next()) else { continue };
+        let (Some(h), Some(name)) = (it.next(), it.next()) else {
+            continue;
+        };
         let h = h.to_ascii_lowercase();
         if !is_hex(&h) || base_name(name) != file_name {
             continue;
         }
         if let Some(a) = by_len(&h, hint) {
-            return Some(Checksum { algo: a, expected: h, source: String::new() });
+            return Some(Checksum {
+                algo: a,
+                expected: h,
+                source: String::new(),
+            });
         }
     }
     if single_file && all.len() == 1 {
-        let h = all[0].split_whitespace().next().unwrap_or("").to_ascii_lowercase();
+        let h = all[0]
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_ascii_lowercase();
         if is_hex(&h)
             && let Some(a) = by_len(&h, hint)
         {
-            return Some(Checksum { algo: a, expected: h, source: String::new() });
+            return Some(Checksum {
+                algo: a,
+                expected: h,
+                source: String::new(),
+            });
         }
     }
     None
@@ -227,20 +264,35 @@ fn by_len(h: &str, hint: Option<Algo>) -> Option<Algo> {
 
 fn b64_to_hex(v: &str) -> Option<String> {
     let v = v.trim().trim_matches(':');
-    base64::engine::general_purpose::STANDARD.decode(v).ok().map(hex::encode)
+    base64::engine::general_purpose::STANDARD
+        .decode(v)
+        .ok()
+        .map(hex::encode)
 }
 
 /// Checksums from response headers. `full_body` = the response carried the whole
 /// file (Content-MD5 describes the body, so it's only usable then).
 pub fn from_headers(h: &reqwest::header::HeaderMap, full_body: bool) -> Vec<Checksum> {
     let mut out = vec![];
-    let get = |n: &str| h.get_all(n).iter().filter_map(|v| v.to_str().ok()).collect::<Vec<_>>().join(",");
+    let get = |n: &str| {
+        h.get_all(n)
+            .iter()
+            .filter_map(|v| v.to_str().ok())
+            .collect::<Vec<_>>()
+            .join(",")
+    };
     for name in ["repr-digest", "digest"] {
         for part in get(name).split(',') {
-            let Some((a, v)) = part.split_once('=') else { continue };
+            let Some((a, v)) = part.split_once('=') else {
+                continue;
+            };
             let Some(algo) = Algo::parse(a) else { continue };
             if let Some(hex) = b64_to_hex(v).filter(|x| x.len() == algo.hex_len()) {
-                out.push(Checksum { algo, expected: hex, source: format!("header: {name}") });
+                out.push(Checksum {
+                    algo,
+                    expected: hex,
+                    source: format!("header: {name}"),
+                });
             }
         }
     }
@@ -248,13 +300,19 @@ pub fn from_headers(h: &reqwest::header::HeaderMap, full_body: bool) -> Vec<Chec
         if let Some(("md5", v)) = part.trim().split_once('=')
             && let Some(hex) = b64_to_hex(v).filter(|x| x.len() == 32)
         {
-            out.push(Checksum { algo: Algo::Md5, expected: hex, source: "header: x-goog-hash".into() });
+            out.push(Checksum {
+                algo: Algo::Md5,
+                expected: hex,
+                source: "header: x-goog-hash".into(),
+            });
         }
     }
-    if full_body
-        && let Some(hex) = b64_to_hex(&get("content-md5")).filter(|x| x.len() == 32)
-    {
-        out.push(Checksum { algo: Algo::Md5, expected: hex, source: "header: Content-MD5".into() });
+    if full_body && let Some(hex) = b64_to_hex(&get("content-md5")).filter(|x| x.len() == 32) {
+        out.push(Checksum {
+            algo: Algo::Md5,
+            expected: hex,
+            source: "header: Content-MD5".into(),
+        });
     }
     out
 }
@@ -262,8 +320,16 @@ pub fn from_headers(h: &reqwest::header::HeaderMap, full_body: bool) -> Vec<Chec
 /// An ETag that is exactly a 32-hex MD5 (single-part S3 style). Advisory only:
 /// many servers use other ETag schemes, so a mismatch is not treated as failure.
 pub fn etag_md5(etag: &str) -> Option<Checksum> {
-    let e = etag.trim().trim_start_matches("W/").trim_matches('"').to_ascii_lowercase();
-    (e.len() == 32 && is_hex(&e)).then(|| Checksum { algo: Algo::Md5, expected: e, source: "ETag".into() })
+    let e = etag
+        .trim()
+        .trim_start_matches("W/")
+        .trim_matches('"')
+        .to_ascii_lowercase();
+    (e.len() == 32 && is_hex(&e)).then(|| Checksum {
+        algo: Algo::Md5,
+        expected: e,
+        source: "ETag".into(),
+    })
 }
 
 #[cfg(test)]
@@ -276,7 +342,12 @@ mod tests {
         let c = find_in_list(&gnu, "archlinux-x86_64.iso", Some(Algo::Sha256), false).unwrap();
         assert_eq!(c.algo, Algo::Sha256);
         let bsd = format!("SHA256 (archlinux-x86_64.iso) = {H}\n");
-        assert_eq!(find_in_list(&bsd, "archlinux-x86_64.iso", None, false).unwrap().expected, H);
+        assert_eq!(
+            find_in_list(&bsd, "archlinux-x86_64.iso", None, false)
+                .unwrap()
+                .expected,
+            H
+        );
         assert!(find_in_list(&bsd, "nope.iso", None, false).is_none());
         assert!(find_in_list(H, "x", None, true).is_some());
         assert!(find_in_list(H, "x", None, false).is_none());
@@ -284,16 +355,32 @@ mod tests {
     #[test]
     fn guess_lengths() {
         assert_eq!(Checksum::guess(&"a".repeat(40)).unwrap().algo, Algo::Sha1);
-        assert_eq!(Checksum::guess(&"a".repeat(128)).unwrap().algo, Algo::Sha512);
-        assert_eq!(Checksum::guess(&format!("b2:{}", "a".repeat(128))).unwrap().algo, Algo::Blake2b);
+        assert_eq!(
+            Checksum::guess(&"a".repeat(128)).unwrap().algo,
+            Algo::Sha512
+        );
+        assert_eq!(
+            Checksum::guess(&format!("b2:{}", "a".repeat(128)))
+                .unwrap()
+                .algo,
+            Algo::Blake2b
+        );
         assert!(Checksum::guess("xyz").is_none());
     }
     #[test]
     fn headers() {
         let mut h = reqwest::header::HeaderMap::new();
-        h.insert("digest", "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE=".parse().unwrap());
+        h.insert(
+            "digest",
+            "SHA-256=X48E9qOokqqrvdts8nOJRJN3OWDUoyWxBf7kbu9DBPE="
+                .parse()
+                .unwrap(),
+        );
         let v = from_headers(&h, false);
-        assert_eq!(v[0].expected, "5f8f04f6a3a892aaabbddb6cf273894493773960d4a325b105fee46eef4304f1");
+        assert_eq!(
+            v[0].expected,
+            "5f8f04f6a3a892aaabbddb6cf273894493773960d4a325b105fee46eef4304f1"
+        );
         assert!(etag_md5("\"d41d8cd98f00b204e9800998ecf8427e\"").is_some());
         assert!(etag_md5("\"5f3c-61a2b\"").is_none());
     }

@@ -3,15 +3,17 @@ mod automation;
 mod models;
 mod persistence;
 mod scheduler;
+mod transfer;
 
-use persistence::{load_json, write_atomic};
 use crate::automation::Action;
 use crate::category::Category;
 use crate::checksum::Checksum;
 use crate::engine::{self, Ctx, Outcome};
 use crate::limiter::RateLimiter;
+use crate::modules::{HookEvent, ModuleInfo, Registry};
 use crate::settings::Settings;
 use crate::task::{DownloadKind, Status, Task};
+use persistence::{load_json, write_atomic};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -51,9 +53,12 @@ struct Inner {
     save_disabled: AtomicBool,
     credentials: Mutex<HashMap<String, String>>,
     automation_log: Mutex<Vec<String>>,
+    /// External modules found in `<state dir>/modules`; rebuilt whenever settings change.
+    modules: Mutex<Arc<Registry>>,
 }
 
 pub use models::{NewDownload, Snapshot};
+pub use transfer::ImportReport;
 
 struct RuntimeOwner(Option<tokio::runtime::Runtime>);
 
@@ -100,7 +105,8 @@ impl Manager {
             .or_else(|_| Settings::default().build_client())
             .expect("http client");
         let global = Arc::new(RateLimiter::new(settings.effective_global_limit()));
-        let protocol_client = settings.build_protocol_client()
+        let protocol_client = settings
+            .build_protocol_client()
             .or_else(|_| Settings::default().build_protocol_client())
             .expect("native protocol client");
         let entries = tasks
@@ -115,6 +121,7 @@ impl Manager {
                 speed: 0.0,
             })
             .collect();
+        let modules = Registry::load(&settings.modules, &dir.join("modules"));
         let inner = Arc::new(Inner {
             entries: Mutex::new(entries),
             settings: Mutex::new(settings),
@@ -128,6 +135,7 @@ impl Manager {
             save_disabled: AtomicBool::new(!tasks_readable),
             credentials: Mutex::new(HashMap::new()),
             automation_log: Mutex::new(Vec::new()),
+            modules: Mutex::new(modules),
         });
         let tick = inner.clone();
         rt.spawn(async move {
@@ -155,7 +163,37 @@ impl Manager {
         self.inner.settings.lock().unwrap().clone()
     }
 
+    /// Approvals are never taken from `s`: only `approve_module` / `revoke_module` change them.
     pub fn set_settings(&self, mut s: Settings) -> Result<(), String> {
+        s.modules = self.synced_modules(Some(s.modules.enabled));
+        self.apply_settings(s)
+    }
+
+    /// The module settings to build on: what is in memory, minus whatever a CLI (dlxctl) revoked or
+    /// disabled in settings.json since the last save. Revocation on disk always wins.
+    /// `enabled` is the caller's wish for the master switch (None: keep the current one).
+    fn synced_modules(&self, enabled: Option<bool>) -> crate::modules::ModuleSettings {
+        let mut m = self.settings().modules;
+        let on_disk = std::fs::read(self.inner.dir.join("settings.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Settings>(&b).ok());
+        let wish = enabled.unwrap_or(m.enabled);
+        if let Some(disk) = on_disk {
+            m.approved
+                .retain(|id, hash| disk.modules.approved.get(id) == Some(hash));
+            // The app writes settings.json itself, so a difference means an outside change.
+            m.enabled = if disk.modules.enabled != m.enabled && !disk.modules.enabled {
+                false
+            } else {
+                wish
+            };
+        } else {
+            m.enabled = wish;
+        }
+        m
+    }
+
+    fn apply_settings(&self, mut s: Settings) -> Result<(), String> {
         s.validate()?;
         for rule in &mut s.site_rules {
             rule.host = crate::site::origin(&rule.host)?;
@@ -181,6 +219,8 @@ impl Manager {
             let json = serde_json::to_vec_pretty(&s).map_err(|e| e.to_string())?;
             write_atomic(&self.inner.dir.join("settings.json"), &json)
                 .map_err(|e| e.to_string())?;
+            *self.inner.modules.lock().unwrap() =
+                Registry::load(&s.modules, &self.inner.dir.join("modules"));
             *self.inner.client.lock().unwrap() = client;
             *self.inner.protocol_client.lock().unwrap() = protocol_client;
             self.inner.global.set_rate(s.effective_global_limit());
@@ -188,6 +228,42 @@ impl Manager {
         }
         self.inner.dispatch();
         Ok(())
+    }
+
+    /// Modules found on disk and whether each is approved.
+    pub fn modules(&self) -> Vec<ModuleInfo> {
+        self.inner.modules.lock().unwrap().list()
+    }
+
+    /// Trust the module's current `module.json`. Editing it later revokes the approval.
+    pub fn approve_module(&self, id: &str) -> Result<(), String> {
+        // Validates the manifest and caps its size, like the loader does.
+        let hash = crate::modules::manifest_hash(&self.inner.dir.join("modules"), id)?;
+        let mut s = self.settings();
+        s.modules = self.synced_modules(None);
+        s.modules.approved.insert(id.to_string(), hash);
+        self.apply_settings(s)
+    }
+
+    pub fn revoke_module(&self, id: &str) -> Result<(), String> {
+        let mut s = self.settings();
+        s.modules = self.synced_modules(None);
+        s.modules.approved.remove(id);
+        self.apply_settings(s)
+    }
+
+    /// Id of a queued, running or failed download of the same URL and kind.
+    pub fn find_duplicate(&self, url: &str) -> Option<u64> {
+        self.duplicate_of(url, None)
+    }
+
+    fn duplicate_of(&self, url: &str, kind: Option<DownloadKind>) -> Option<u64> {
+        let url = url.trim();
+        self.inner.entries.lock().unwrap().iter().find_map(|e| {
+            let t = e.task.lock().unwrap();
+            (t.url == url && t.status != Status::Completed && kind.is_none_or(|k| k == t.kind))
+                .then_some(t.id)
+        })
     }
 
     pub fn add(&self, d: NewDownload) -> u64 {
@@ -203,6 +279,23 @@ impl Manager {
             .is_some_and(|count| !(1..=32).contains(&count))
         {
             return Err("connections must be 1–32".into());
+        }
+        crate::task::validate_headers(&d.headers)?;
+        if let Some(ua) = &d.user_agent
+            && (ua.len() > 512 || reqwest::header::HeaderValue::from_str(ua).is_err())
+        {
+            return Err("invalid user agent".into());
+        }
+        if d.mirrors.len() > 8 {
+            return Err("invalid mirrors: at most 8 are allowed".into());
+        }
+        for m in &d.mirrors {
+            crate::util::validate_source(m.trim())?;
+        }
+        if d.unique
+            && let Some(other) = self.duplicate_of(&d.url, Some(d.kind))
+        {
+            return Err(format!("duplicate: already queued as #{other}"));
         }
         let s = self.settings();
         let id = self.inner.next_id.fetch_add(1, Ordering::Relaxed);
@@ -257,10 +350,28 @@ impl Manager {
             checksum_urls: d.checksum_urls,
             cookie,
             had_cookie,
+            headers: d.headers,
+            user_agent: d.user_agent.filter(|u| !u.trim().is_empty()),
+            mirrors: d
+                .mirrors
+                .into_iter()
+                .map(|m| m.trim().to_string())
+                .collect(),
+            conflict: d.conflict.unwrap_or(s.conflict),
             ..Default::default()
         };
         let last_bytes = t.downloaded();
-        self.inner.entries.lock().unwrap().push(Entry {
+        let mut entries = self.inner.entries.lock().unwrap();
+        if d.unique
+            && let Some(other) = entries.iter().find_map(|e| {
+                let o = e.task.lock().unwrap();
+                (o.url == t.url && o.kind == t.kind && o.status != Status::Completed)
+                    .then_some(o.id)
+            })
+        {
+            return Err(format!("duplicate: already queued as #{other}"));
+        }
+        entries.push(Entry {
             task: Arc::new(Mutex::new(t)),
             limiter: Arc::new(RateLimiter::new(limit)),
             cancel: None,
@@ -268,6 +379,7 @@ impl Manager {
             speed: 0.0,
             last_bytes,
         });
+        drop(entries);
         self.save_async();
         self.inner.dispatch();
         Ok(id)

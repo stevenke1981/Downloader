@@ -57,6 +57,9 @@ msgstr "収集したリンクを追加"
 msgid "Add download"
 msgstr "ダウンロードを追加"
 
+msgid "Add-on modules extend what Downloader can fetch. They are off by default."
+msgstr "アドオンモジュールは Downloader が取得できる対象を拡張します。既定ではオフです。"
+
 msgid "Added {} downloads."
 msgstr "{} 件のダウンロードを追加しました。"
 
@@ -77,6 +80,15 @@ msgstr "リモート API を適用"
 
 msgid "Apply traffic limits"
 msgstr "通信制限を適用"
+
+msgid "Approve"
+msgstr "承認"
+
+msgid "Approved"
+msgstr "承認済み"
+
+msgid "Approving an external module lets that program run on this computer. Approve only modules you trust. Editing a module disables it again."
+msgstr "外部モジュールを承認すると、そのプログラムがこのコンピューターで実行できるようになります。信頼できるモジュールだけを承認してください。モジュールを編集すると再び無効になります。"
 
 msgid "Archives"
 msgstr "圧縮ファイル"
@@ -104,6 +116,9 @@ msgstr "ブラウザー設定の操作はすぐに反映されます。保存は
 
 msgid "Browse…"
 msgstr "参照…"
+
+msgid "Built-in"
+msgstr "内蔵"
 
 msgid "Built-in Rust"
 msgstr "内蔵 Rust"
@@ -291,6 +306,9 @@ msgstr "待機中、ダウンロード中、または検証中の項目があり
 msgid "Drop torrent / Metalink files here to add downloads."
 msgstr "torrent／Metalink ファイルをここにドロップするとダウンロードを追加します。"
 
+msgid "Enable add-on modules"
+msgstr "アドオンモジュールを有効にする"
+
 msgid "Enable remote API"
 msgstr "リモート API を有効にする"
 
@@ -302,6 +320,9 @@ msgstr "ダウンロードリンクを 1 つ以上入力してください。"
 
 msgid "Error"
 msgstr "エラー"
+
+msgid "Error: {}"
+msgstr "エラー: {}"
 
 msgid "Exit"
 msgstr "終了"
@@ -393,6 +414,9 @@ msgstr "中速の上限"
 msgid "Minimize to tray"
 msgstr "トレイに最小化"
 
+msgid "Modules"
+msgstr "モジュール"
+
 msgid "Music"
 msgstr "音楽"
 
@@ -429,8 +453,14 @@ msgstr "チェックサムなし"
 msgid "No downloads in this view"
 msgstr "この表示にダウンロードはありません"
 
+msgid "No modules found."
+msgstr "モジュールが見つかりません。"
+
 msgid "Normal"
 msgstr "標準"
+
+msgid "Not approved"
+msgstr "未承認"
 
 msgid "Not checked yet."
 msgstr "未確認です。"
@@ -459,6 +489,9 @@ msgstr "ファイルを開く"
 msgid "Open folder"
 msgstr "フォルダーを開く"
 
+msgid "Open modules folder"
+msgstr "モジュールフォルダーを開く"
+
 msgid "Opened the browser extension manager."
 msgstr "ブラウザーの拡張機能管理を開きました。"
 
@@ -467,6 +500,9 @@ msgstr "拡張機能フォルダーを開きました。"
 
 msgid "Other"
 msgstr "その他"
+
+msgid "Overwrite"
+msgstr "上書き"
 
 msgid "Page URL"
 msgstr "ページの URL"
@@ -555,6 +591,9 @@ msgstr "予約した動作を削除"
 msgid "Remove site profile"
 msgstr "サイトプロファイルを削除"
 
+msgid "Rename"
+msgstr "名前を変更"
+
 msgid "Restore main window"
 msgstr "メインウィンドウを復元"
 
@@ -566,6 +605,9 @@ msgstr "再試行回数"
 
 msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
 msgstr "追加する前に下のリンクを確認してください。認証が必要なダウンロードは、「サイト／フォルダー」にセッションの認証情報を保存してください。"
+
+msgid "Revoke"
+msgstr "承認を取り消す"
 
 msgid "Run a program"
 msgstr "プログラムを実行"
@@ -626,6 +668,9 @@ msgstr "サイト／フォルダー"
 
 msgid "Size"
 msgstr "サイズ"
+
+msgid "Skip"
+msgstr "スキップ"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "カテゴリ別のサブフォルダーに保存（動画、音楽…）"
@@ -752,6 +797,9 @@ msgstr "Web／FTP"
 
 msgid "Webpage media (Rust)"
 msgstr "Web ページのメディア（Rust）"
+
+msgid "When a file already exists"
+msgstr "ファイルが既に存在する場合"
 
 msgid "Working…"
 msgstr "処理中…"

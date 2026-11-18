@@ -75,6 +75,7 @@ fn protocols_are_embedded_and_never_spawn_external_engines() {
         include_str!("../src/engine/segments.rs"),
         include_str!("../src/engine/worker.rs"),
         include_str!("../src/protocols/mod.rs"),
+        include_str!("../src/protocols/registry.rs"),
         include_str!("../src/protocols/ftp.rs"),
         include_str!("../src/protocols/ftp/connection.rs"),
         include_str!("../src/protocols/metalink.rs"),
@@ -96,6 +97,24 @@ fn protocols_are_embedded_and_never_spawn_external_engines() {
         assert!(!source.contains("DOWNLOADER_FFMPEG"));
         assert!(!source.contains("DOWNLOADER_YTDLP"));
         assert!(!source.contains("DOWNLOADER_CURL"));
+    }
+}
+
+#[test]
+fn only_the_module_host_starts_processes() {
+    let host = include_str!("../src/modules/external.rs");
+    assert!(host.contains("Command::new"));
+    assert!(host.contains("env_clear()") && host.contains("kill_on_drop(true)"));
+    for shell in ["\"cmd\"", "\"/c\"", "\"sh\"", "\"-c\"", "powershell"] {
+        assert!(!host.contains(shell), "{shell}");
+    }
+    for source in [
+        include_str!("../src/modules/mod.rs"),
+        include_str!("../src/modules/manifest.rs"),
+        include_str!("../src/protocols/registry.rs"),
+    ] {
+        assert!(!source.contains("process::Command"));
+        assert!(!source.contains("Command::new"));
     }
 }
 

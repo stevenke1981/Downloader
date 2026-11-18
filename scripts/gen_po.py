@@ -14,6 +14,22 @@ ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gui")
 LANGS = ["zh_TW", "zh_CN", "ja", "ko", "es", "de", "fr"]
 
 T = {
+"Built-in": ["內建","内置","内蔵","내장","Integrado","Integriert","Intégré"],
+"Approved": ["已核准","已批准","承認済み","승인됨","Aprobado","Genehmigt","Approuvé"],
+"Error: {}": ["錯誤：{}","错误：{}","エラー: {}","오류: {}","Error: {}","Fehler: {}","Erreur : {}"],
+"Not approved": ["未核准","未批准","未承認","승인되지 않음","No aprobado","Nicht genehmigt","Non approuvé"],
+"Overwrite": ["覆寫","覆盖","上書き","덮어쓰기","Sobrescribir","Überschreiben","Écraser"],
+"Skip": ["略過","跳过","スキップ","건너뛰기","Omitir","Überspringen","Ignorer"],
+"Rename": ["自動重新命名","自动重命名","名前を変更","이름 바꾸기","Renombrar","Umbenennen","Renommer"],
+"Modules": ["模組","模块","モジュール","모듈","Módulos","Module","Modules"],
+"When a file already exists": ["檔案已存在時","文件已存在时","ファイルが既に存在する場合","파일이 이미 있을 때","Cuando el archivo ya existe","Wenn die Datei bereits existiert","Si le fichier existe déjà"],
+"Add-on modules extend what Downloader can fetch. They are off by default.": ["附加模組可擴充 Downloader 能下載的內容，預設為關閉。","附加模块可扩展 Downloader 能下载的内容，默认关闭。","アドオンモジュールは Downloader が取得できる対象を拡張します。既定ではオフです。","애드온 모듈은 Downloader가 가져올 수 있는 항목을 확장합니다. 기본적으로 꺼져 있습니다.","Los módulos adicionales amplían lo que Downloader puede descargar. Están desactivados de forma predeterminada.","Zusatzmodule erweitern, was Downloader abrufen kann. Sie sind standardmäßig deaktiviert.","Les modules complémentaires étendent ce que Downloader peut récupérer. Ils sont désactivés par défaut."],
+"Enable add-on modules": ["啟用附加模組","启用附加模块","アドオンモジュールを有効にする","애드온 모듈 사용","Activar módulos adicionales","Zusatzmodule aktivieren","Activer les modules complémentaires"],
+"Approving an external module lets that program run on this computer. Approve only modules you trust. Editing a module disables it again.": ["核准外部模組後，該程式即可在這台電腦上執行。請只核准你信任的模組。模組一經修改就會再次停用。","批准外部模块后，该程序即可在这台电脑上运行。请只批准你信任的模块。模块一经修改就会再次停用。","外部モジュールを承認すると、そのプログラムがこのコンピューターで実行できるようになります。信頼できるモジュールだけを承認してください。モジュールを編集すると再び無効になります。","외부 모듈을 승인하면 해당 프로그램이 이 컴퓨터에서 실행될 수 있습니다. 신뢰하는 모듈만 승인하세요. 모듈을 수정하면 다시 비활성화됩니다.","Aprobar un módulo externo permite que ese programa se ejecute en este equipo. Aprueba solo módulos de confianza. Si se edita un módulo, se desactiva de nuevo.","Das Genehmigen eines externen Moduls erlaubt diesem Programm, auf diesem Computer zu laufen. Nur vertrauenswürdige Module genehmigen. Wird ein Modul bearbeitet, ist es wieder deaktiviert.","Approuver un module externe permet à ce programme de s'exécuter sur cet ordinateur. N'approuvez que des modules de confiance. Modifier un module le désactive à nouveau."],
+"No modules found.": ["找不到模組。","未找到模块。","モジュールが見つかりません。","모듈이 없습니다.","No se encontraron módulos.","Keine Module gefunden.","Aucun module trouvé."],
+"Approve": ["核准","批准","承認","승인","Aprobar","Genehmigen","Approuver"],
+"Revoke": ["撤銷核准","撤销批准","承認を取り消す","승인 취소","Revocar","Widerrufen","Révoquer"],
+"Open modules folder": ["開啟模組資料夾","打开模块文件夹","モジュールフォルダーを開く","모듈 폴더 열기","Abrir carpeta de módulos","Modulordner öffnen","Ouvrir le dossier des modules"],
 "1. Register the native host": ["1. 註冊本機橋接程式","1. 注册本机桥接程序","1. ネイティブホストを登録","1. 네이티브 호스트 등록","1. Registrar el host nativo","1. Nativen Host registrieren","1. Enregistrer l'hôte natif"],
 "2. Open extensions, enable Developer mode, then choose Load unpacked.": ["2. 開啟擴充功能，啟用「開發人員模式」，再選擇「載入未封裝項目」。","2. 打开扩展程序，启用“开发者模式”，再选择“加载已解压的扩展程序”。","2. 拡張機能を開き、デベロッパーモードを有効にして「パッケージ化されていない拡張機能を読み込む」を選びます。","2. 확장 프로그램을 열고 개발자 모드를 켠 다음 압축 해제된 확장 프로그램 로드를 선택하세요.","2. Abre extensiones, activa el modo de desarrollador y elige Cargar descomprimida.","2. Erweiterungen öffnen, Entwicklermodus aktivieren und Entpackte Erweiterung laden wählen.","2. Ouvrez les extensions, activez le mode développeur et choisissez Charger l'extension non empaquetée."],
 "3. Select this folder. In the extension options, choose Check connection.": ["3. 選取下方資料夾，並在擴充功能選項中按「檢查連線」。","3. 选择下方文件夹，然后在扩展选项中点击“检查连接”。","3. 下のフォルダーを選び、拡張機能のオプションで「接続を確認」を選びます。","3. 아래 폴더를 선택하고 확장 프로그램 옵션에서 연결 확인을 누르세요.","3. Selecciona esta carpeta. En las opciones de la extensión, elige Comprobar conexión.","3. Diesen Ordner auswählen. In den Erweiterungsoptionen Verbindung prüfen wählen.","3. Sélectionnez ce dossier, puis Vérifier la connexion dans les options de l'extension."],

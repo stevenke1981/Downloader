@@ -7,7 +7,11 @@ pub(super) struct TorrentSource {
 }
 
 impl TorrentSource {
-    pub(super) async fn prepare(snapshot: &Task, ctx: &Ctx, state: &Path) -> Result<Option<Self>, String> {
+    pub(super) async fn prepare(
+        snapshot: &Task,
+        ctx: &Ctx,
+        state: &Path,
+    ) -> Result<Option<Self>, String> {
         let source = snapshot.url.trim();
         let mut initial_peers = Vec::<SocketAddr>::new();
         let mut local_discovery = false;
@@ -34,7 +38,8 @@ impl TorrentSource {
             match tokio::fs::read(state.join("metadata.torrent")).await {
                 Ok(bytes)
                     if bytes.len() <= MAX_DESCRIPTOR
-                        && librqbit::torrent_from_bytes(&bytes).is_ok_and(|t| t.info_hash == hash) =>
+                        && librqbit::torrent_from_bytes(&bytes)
+                            .is_ok_and(|t| t.info_hash == hash) =>
                 {
                     Some(bytes)
                 }
@@ -124,7 +129,8 @@ impl TorrentSource {
                 let mut bytes = Vec::new();
                 let mut stream = response.bytes_stream();
                 while let Some(chunk) = stream.next().await {
-                    let chunk = chunk.map_err(|e| format!("torrent descriptor read failed: {e}"))?;
+                    let chunk =
+                        chunk.map_err(|e| format!("torrent descriptor read failed: {e}"))?;
                     if bytes.len().saturating_add(chunk.len()) > MAX_DESCRIPTOR {
                         return Err("torrent descriptor exceeds 8 MiB".into());
                     }
@@ -161,6 +167,10 @@ impl TorrentSource {
                 local_discovery = true;
             }
         }
-        Ok(Some(Self { descriptor, initial_peers, local_discovery }))
+        Ok(Some(Self {
+            descriptor,
+            initial_peers,
+            local_discovery,
+        }))
     }
 }

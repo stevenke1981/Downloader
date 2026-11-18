@@ -133,14 +133,14 @@ pub fn serve(manager: Manager, settings: RemoteSettings) -> Result<RemoteServer,
                             Ok(Ok(request)) => {
                                 let expected = format!("Bearer {token}");
                                 if request.authorization.as_deref() != Some(expected.as_str()) {
-                                    (401, json!({"error":"authentication required"}))
+                                    (401, json!({"error":"authentication required","code":"auth"}))
                                 } else { route(&manager, request) }
                             }
-                            Ok(Err(error)) => (400, json!({"error":error})),
-                            Err(_) => (408, json!({"error":"request timed out"})),
+                            Ok(Err(error)) => (400, json!({"error":error,"code":"invalid"})),
+                            Err(_) => (408, json!({"error":"request timed out","code":"network"})),
                         };
                         let body = serde_json::to_vec(&body).unwrap_or_default();
-                        let reason = match status { 200 => "OK", 201 => "Created", 400 => "Bad Request", 401 => "Unauthorized", 404 => "Not Found", 408 => "Request Timeout", _ => "Error" };
+                        let reason = match status { 200 => "OK", 201 => "Created", 400 => "Bad Request", 401 => "Unauthorized", 404 => "Not Found", 409 => "Conflict", 408 => "Request Timeout", _ => "Error" };
                         let headers = format!("HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nCache-Control: no-store\r\n\r\n", body.len());
                         let _ = tokio::time::timeout(Duration::from_secs(5), async {
                             stream.write_all(headers.as_bytes()).await?;
@@ -168,6 +168,8 @@ struct Request {
 async fn read_request(stream: &mut tokio::net::TcpStream) -> Result<Request, &'static str> {
     const HEADER_LIMIT: usize = 16 * 1024;
     const BODY_LIMIT: usize = 64 * 1024;
+    // A queue export can be large.
+    const IMPORT_LIMIT: usize = 1024 * 1024;
     let mut bytes = Vec::new();
     let header_end = loop {
         let mut chunk = [0; 4096];
@@ -231,7 +233,13 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Result<Request, &'s
         }
     }
     let length = length.unwrap_or(0);
-    if length > BODY_LIMIT {
+    if length
+        > if path.split('?').next() == Some("/import") {
+            IMPORT_LIMIT
+        } else {
+            BODY_LIMIT
+        }
+    {
         return Err("request body too large");
     }
     while bytes.len() < header_end + length {
@@ -265,6 +273,52 @@ struct AddDownload {
     #[serde(default = "start_by_default")]
     start: bool,
     file_name: Option<String>,
+    #[serde(default)]
+    priority: i32,
+    /// "sha256:<hex>" or a bare digest.
+    checksum: Option<String>,
+    referer: Option<String>,
+    /// An object `{"Name":"value"}` or a list of `["Name","value"]` pairs.
+    #[serde(default)]
+    headers: Headers,
+    user_agent: Option<String>,
+    #[serde(default)]
+    unique: bool,
+    conflict: Option<crate::task::ConflictPolicy>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum Headers {
+    Map(std::collections::BTreeMap<String, String>),
+    List(Vec<(String, String)>),
+}
+
+impl Default for Headers {
+    fn default() -> Self {
+        Headers::List(Vec::new())
+    }
+}
+
+impl Headers {
+    fn into_vec(self) -> Vec<(String, String)> {
+        match self {
+            Headers::Map(m) => m.into_iter().collect(),
+            Headers::List(l) => l,
+        }
+    }
+}
+
+fn error_body(error: &str) -> Value {
+    json!({"error":error,"code":crate::util::error_code(error)})
+}
+
+/// Duplicates and file conflicts are 409; everything else the caller can fix is 400.
+fn error_status(error: &str) -> u16 {
+    match crate::util::error_code(error) {
+        "duplicate" | "conflict" => 409,
+        _ => 400,
+    }
 }
 
 fn start_by_default() -> bool {
@@ -272,20 +326,51 @@ fn start_by_default() -> bool {
 }
 
 fn route(manager: &Manager, request: Request) -> (u16, Value) {
-    match (request.method.as_str(), request.path.as_str()) {
+    let (path, query) = request
+        .path
+        .split_once('?')
+        .unwrap_or((request.path.as_str(), ""));
+    let start = !query
+        .split('&')
+        .any(|q| q == "start=0" || q == "start=false");
+    match (request.method.as_str(), path) {
         ("GET", "/downloads") => (200, json!(manager.snapshots())),
         ("POST", "/downloads") => {
             let download: AddDownload = match serde_json::from_slice(&request.body) {
                 Ok(download) => download,
-                Err(_) => return (400, json!({"error":"invalid download fields"})),
+                Err(_) => {
+                    return (
+                        400,
+                        json!({"error":"invalid download fields","code":"invalid"}),
+                    );
+                }
             };
             if download
                 .connections
                 .is_some_and(|count| !(1..=32).contains(&count))
             {
-                return (400, json!({"error":"connections must be 1–32"}));
+                return (
+                    400,
+                    json!({"error":"connections must be 1–32","code":"invalid"}),
+                );
             }
+            let checksum = match download.checksum.as_deref() {
+                None | Some("") => None,
+                Some(text) => match crate::checksum::Checksum::guess(text) {
+                    Some(c) => Some(c),
+                    None => {
+                        return (400, json!({"error":"invalid checksum","code":"invalid"}));
+                    }
+                },
+            };
             match manager.try_add(NewDownload {
+                priority: download.priority,
+                checksum,
+                referer: download.referer,
+                headers: download.headers.into_vec(),
+                user_agent: download.user_agent,
+                unique: download.unique,
+                conflict: download.conflict,
                 url: download.url,
                 dir: download.dir,
                 connections: download.connections,
@@ -296,9 +381,27 @@ fn route(manager: &Manager, request: Request) -> (u16, Value) {
                 ..Default::default()
             }) {
                 Ok(id) => (201, json!({"id":id})),
-                Err(error) => (400, json!({"error":error})),
+                Err(error) => (error_status(&error), error_body(&error)),
             }
         }
+        ("GET", "/export") => match serde_json::from_str::<Value>(&manager.export_queue()) {
+            Ok(queue) => (200, queue),
+            Err(e) => (500, error_body(&e.to_string())),
+        },
+        ("POST", "/import") => {
+            let Ok(text) = std::str::from_utf8(&request.body) else {
+                return (
+                    400,
+                    json!({"error":"invalid queue file: not UTF-8","code":"invalid"}),
+                );
+            };
+            match manager.import_queue(text, start) {
+                Ok(report) => (200, json!(report)),
+                Err(error) => (400, error_body(&error)),
+            }
+        }
+        ("GET", "/modules") => (200, json!(manager.modules())),
+        ("GET", "/version") => (200, json!({"version":env!("CARGO_PKG_VERSION")})),
         ("POST", "/start-all") => {
             manager.start_all();
             (200, json!({"ok":true}))
@@ -308,20 +411,29 @@ fn route(manager: &Manager, request: Request) -> (u16, Value) {
             (200, json!({"ok":true}))
         }
         _ => {
-            let parts: Vec<_> = request.path.trim_start_matches('/').split('/').collect();
+            let parts: Vec<_> = path.trim_start_matches('/').split('/').collect();
             let id = parts.get(1).and_then(|id| id.parse::<u64>().ok());
             if parts.first() != Some(&"downloads")
                 || !id
                     .is_some_and(|id| manager.snapshots().iter().any(|download| download.id == id))
             {
-                return (404, json!({"error":"unknown route or download"}));
+                return (
+                    404,
+                    json!({"error":"unknown route or download","code":"invalid"}),
+                );
             }
             let id = id.unwrap();
             match (request.method.as_str(), parts.as_slice()) {
                 ("POST", [_, _, "start"]) => manager.start(id),
                 ("POST", [_, _, "pause"]) => manager.pause(id),
+                ("GET", [_, _]) => {
+                    return match manager.snapshots().into_iter().find(|d| d.id == id) {
+                        Some(d) => (200, json!(d)),
+                        None => (404, json!({"error":"unknown download","code":"invalid"})),
+                    };
+                }
                 ("DELETE", [_, _]) => manager.remove(id, false),
-                _ => return (404, json!({"error":"unknown route"})),
+                _ => return (404, json!({"error":"unknown route","code":"invalid"})),
             }
             (200, json!({"ok":true}))
         }

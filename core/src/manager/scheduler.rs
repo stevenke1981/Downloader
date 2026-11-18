@@ -111,8 +111,45 @@ impl Inner {
             let task = e.task.clone();
             let me = self.clone();
             e.cancel = Some(cancel);
+            let registry = self.modules.lock().unwrap().clone();
+            let rt = self.rt.clone();
             e.handle = Some(self.rt.spawn(async move {
-                let r = engine::run(task.clone(), ctx).await;
+                // Resolver modules run first; the engine itself never knows about them.
+                let r = match registry.prepare(&task, &ctx.cancel).await {
+                    Ok(()) => engine::run(task.clone(), ctx).await,
+                    Err(_) if ctx.cancel.is_cancelled() => Ok(Outcome::Cancelled),
+                    Err(e) => Err(e),
+                };
+                let event = {
+                    let t = task.lock().unwrap();
+                    match &r {
+                        Ok(Outcome::Completed) => Some(HookEvent {
+                            event: "completed",
+                            id: t.id,
+                            url: t.url.clone(),
+                            path: t.final_path(),
+                            size: t.total,
+                            error: None,
+                        }),
+                        Err(err) => Some(HookEvent {
+                            event: "failed",
+                            id: t.id,
+                            url: t.url.clone(),
+                            // Never point at a pre-existing file the task did not create.
+                            path: if err.starts_with("file exists:") || t.file_name.is_empty() {
+                                std::path::PathBuf::new()
+                            } else {
+                                t.final_path()
+                            },
+                            size: t.total,
+                            error: Some(err.clone()),
+                        }),
+                        Ok(Outcome::Cancelled) => None,
+                    }
+                };
+                if let Some(event) = event {
+                    registry.notify(&rt, event);
+                }
                 {
                     let mut t = task.lock().unwrap();
                     match r {

@@ -7,9 +7,9 @@ mod http;
 mod segments;
 mod worker;
 
-use http::{probe, response_range, same_origin, Probe};
 #[cfg(test)]
 use http::content_range;
+use http::{Probe, probe, response_range, same_origin};
 pub use segments::{claim, plan_segments};
 use worker::Shared;
 
@@ -17,7 +17,7 @@ use crate::category::Category;
 use crate::checksum;
 use crate::google_drive;
 use crate::limiter::RateLimiter;
-use crate::task::{Seg, Status, Task};
+use crate::task::{ConflictPolicy, Seg, Status, Task};
 use crate::util;
 use futures_util::StreamExt;
 use reqwest::header::{CONTENT_DISPOSITION, CONTENT_RANGE, ETAG, IF_RANGE, LAST_MODIFIED, RANGE};
@@ -71,6 +71,8 @@ fn with_cookie_hint(err: String, lost_cookie: bool) -> String {
 }
 
 fn err_str(e: reqwest::Error) -> String {
+    // The URL (query strings may carry tokens) must not skew error classification.
+    let e = e.without_url();
     let mut s = e.to_string();
     let mut src = std::error::Error::source(&e);
     while let Some(c) = src {
@@ -86,11 +88,19 @@ async fn probe_retry(
     referer: Option<&str>,
     cookie: Option<&str>,
     authorization: Option<&str>,
+    headers: &[(String, String)],
+    user_agent: Option<&str>,
 ) -> Result<Probe, String> {
+    // Custom headers need a client that does not follow redirects by itself.
+    let client = if headers.is_empty() {
+        &ctx.client
+    } else {
+        &ctx.protocol_client
+    };
     let mut attempt = 0;
     loop {
         let r = tokio::select! {
-            r = probe(&ctx.client, url, referer, cookie, authorization) => r,
+            r = probe(client, url, referer, cookie, authorization, headers, user_agent) => r,
             _ = ctx.cancel.cancelled() => return Err(String::new()),
         };
         match r {
@@ -128,12 +138,21 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     if external {
         return crate::protocols::run(task, ctx).await;
     }
+    // Under Overwrite the new file is published beside the old one; it only replaces it once verified.
+    let mut wanted: Option<String> = None;
     loop {
-        if run_once(task.clone(), ctx.clone()).await? == Outcome::Cancelled {
+        let (outcome, want) = run_once(task.clone(), ctx.clone()).await?;
+        if outcome == Outcome::Cancelled {
             return Ok(Outcome::Cancelled);
         }
+        wanted = want.or(wanted);
         match crate::verify::verify_task(&task, &ctx).await {
-            Ok(()) => return Ok(Outcome::Completed),
+            Ok(()) => {
+                if let Some(name) = wanted {
+                    replace_existing(&task, &name);
+                }
+                return Ok(Outcome::Completed);
+            }
             Err(e) => {
                 let mut t = task.lock().unwrap();
                 if t.verify_retried {
@@ -151,30 +170,69 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     }
 }
 
-async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
-    let (url, referer, cookie, had_cookie, authorization) = {
+/// Move the verified download onto `name`, replacing the old file (Overwrite policy).
+fn replace_existing(task: &Arc<Mutex<Task>>, name: &str) {
+    let mut t = task.lock().unwrap();
+    let target = t.dir.join(name);
+    if target.is_dir() {
+        return;
+    }
+    if std::fs::rename(t.final_path(), &target).is_ok() {
+        t.file_name = name.to_string();
+        t.category = Category::from_name(name);
+        t.append_log("HTTP output replaced the existing file");
+    }
+}
+
+/// One transfer. The second value is the wanted name when an existing file is to be overwritten once verified.
+async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<String>), String> {
+    let mut wanted: Option<String> = None;
+    let (task_url, url, referer, cookie, had_cookie, authorization, headers, user_agent) = {
         let mut t = task.lock().unwrap();
         t.append_log("HTTP probe started");
         (
             t.url.clone(),
+            // A resolver module may have pointed this download somewhere else.
+            t.resolved_url.clone().unwrap_or_else(|| t.url.clone()),
             t.referer.clone(),
             t.cookie.clone().filter(|c| !c.trim().is_empty()),
             t.had_cookie,
             t.authorization.clone(),
+            // Module headers only travel with the URL the module chose.
+            t.headers
+                .iter()
+                .chain(
+                    t.resolved_url
+                        .is_some()
+                        .then_some(&t.module_headers)
+                        .into_iter()
+                        .flatten(),
+                )
+                .cloned()
+                .collect::<Vec<_>>(),
+            t.user_agent.clone(),
         )
     };
     let lost_cookie = had_cookie && cookie.is_none();
+    // Credentials belong to the URL the user gave, not to wherever a module sent us.
+    let (cookie, authorization) = if same_origin(&task_url, &url) {
+        (cookie, authorization)
+    } else {
+        (None, None)
+    };
     let p = match probe_retry(
         &ctx,
         &url,
         referer.as_deref(),
         cookie.as_deref(),
         authorization.as_deref(),
+        &headers,
+        user_agent.as_deref(),
     )
     .await
     {
         Ok(p) => p,
-        Err(_) if ctx.cancel.is_cancelled() => return Ok(Outcome::Cancelled),
+        Err(_) if ctx.cancel.is_cancelled() => return Ok((Outcome::Cancelled, None)),
         Err(e) => return Err(with_cookie_hint(e, lost_cookie)),
     };
     // The probe follows redirects (reqwest drops Cookie on cross-origin hops), but the workers add the cookie
@@ -187,6 +245,11 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         c => c,
     };
     let authorization = authorization.filter(|_| same_origin(&url, &p.url));
+    let headers = if same_origin(&url, &p.url) {
+        headers
+    } else {
+        Vec::new()
+    };
 
     let (part, conns) = {
         let mut t = task.lock().unwrap();
@@ -206,7 +269,19 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
             let name = suggested
                 .or_else(|| p.name.clone())
                 .unwrap_or_else(|| "download".into());
-            t.file_name = util::unique_name(&t.dir, &name);
+            // A leftover .part (possibly another task's) is never reused, whatever the policy.
+            let policy = if t.dir.join(format!("{name}.part")).exists() {
+                ConflictPolicy::Rename
+            } else {
+                t.conflict
+            };
+            t.file_name = if policy == ConflictPolicy::Overwrite && t.dir.join(&name).exists() {
+                // Keep the old file until the new one is verified.
+                wanted = Some(name.clone());
+                util::unique_name(&t.dir, &name)
+            } else {
+                util::resolve_conflict(&t.dir, &name, policy)?
+            };
             t.category = Category::from_name(&t.file_name);
         }
         let changed = (t.etag.is_some() && p.etag.is_some() && t.etag != p.etag)
@@ -249,7 +324,27 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
 
     std::fs::create_dir_all(part.parent().unwrap())
         .map_err(|e| format!("cannot create folder: {e}"))?;
+    // Space already reserved by an earlier set_len of this .part does not need to be found again.
     let fresh = task.lock().unwrap().downloaded() == 0;
+    let have = if fresh {
+        0
+    } else {
+        std::fs::metadata(&part).map(|m| m.len()).unwrap_or(0)
+    };
+    let need: u64 = match task.lock().unwrap().total {
+        Some(n) => n.saturating_sub(have),
+        None => 0,
+    };
+    if need > 0
+        && let Some(free) = util::free_space(part.parent().unwrap())
+        && need > free
+    {
+        return Err(format!(
+            "not enough disk space: need {}, {} free",
+            util::human_size(need),
+            util::human_size(free)
+        ));
+    }
     let file = std::fs::OpenOptions::new()
         .create(true)
         .write(true)
@@ -270,6 +365,8 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         referer,
         cookie,
         authorization,
+        headers,
+        user_agent,
         ctx: ctx.clone(),
     });
     let mut set = tokio::task::JoinSet::new();
@@ -287,7 +384,7 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         task.lock()
             .unwrap()
             .append_log("HTTP transfer stopped; partial data retained");
-        return Ok(Outcome::Cancelled);
+        return Ok((Outcome::Cancelled, None));
     }
     let (complete, total, final_path) = {
         let t = task.lock().unwrap();
@@ -326,9 +423,23 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     }
     let final_path = if final_path.exists() {
         let mut t = task.lock().unwrap();
-        let n = util::unique_name(&t.dir, &t.file_name);
-        t.file_name = n;
-        t.final_path()
+        match t.conflict {
+            // Publish beside the old file; it is replaced after verification.
+            ConflictPolicy::Overwrite => {
+                wanted = Some(t.file_name.clone());
+                let n = util::unique_name(&t.dir, &t.file_name);
+                t.file_name = n;
+                t.final_path()
+            }
+            ConflictPolicy::Skip => {
+                return Err(format!("file exists: {}", final_path.display()));
+            }
+            ConflictPolicy::Rename => {
+                let n = util::unique_name(&t.dir, &t.file_name);
+                t.file_name = n;
+                t.final_path()
+            }
+        }
     } else {
         final_path
     };
@@ -341,7 +452,7 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     }
     std::fs::rename(&part, &final_path).map_err(|e| format!("rename failed: {e}"))?;
     task.lock().unwrap().append_log("HTTP output published");
-    Ok(Outcome::Completed)
+    Ok((Outcome::Completed, wanted))
 }
 
 #[cfg(test)]

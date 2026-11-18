@@ -14,7 +14,8 @@ fn attributes(value: &str) -> Result<HashMap<&str, &str>, String> {
             let tail = if tail.is_empty() {
                 ""
             } else {
-                tail.strip_prefix(',').ok_or("invalid HLS attribute separator")?
+                tail.strip_prefix(',')
+                    .ok_or("invalid HLS attribute separator")?
             };
             (&quoted[..end], tail)
         } else {
@@ -50,7 +51,10 @@ fn byte_range(value: &str, previous: Option<(u64, u64)>) -> Result<(u64, u64), S
     Ok((offset, length))
 }
 
-pub(in crate::protocols::media) fn parse_playlist(text: &str, base: &Url) -> Result<Playlist, String> {
+pub(in crate::protocols::media) fn parse_playlist(
+    text: &str,
+    base: &Url,
+) -> Result<Playlist, String> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
     if !text.starts_with("#EXTM3U") {
         return Err("invalid HLS playlist signature".into());
@@ -193,7 +197,10 @@ mod tests {
     fn accepts_utf8_bom_before_playlist_signature() {
         let base = Url::parse("https://example.test/list.m3u8").unwrap();
         let text = "\u{feff}#EXTM3U\n#EXTINF:1,\nsegment.ts\n#EXT-X-ENDLIST\n";
-        assert!(matches!(parse_playlist(text, &base), Ok(Playlist::Media(_))));
+        assert!(matches!(
+            parse_playlist(text, &base),
+            Ok(Playlist::Media(_))
+        ));
     }
 
     #[test]

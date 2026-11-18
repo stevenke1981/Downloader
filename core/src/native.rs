@@ -13,17 +13,25 @@ pub fn read_message<R: Read>(r: &mut R) -> io::Result<Option<serde_json::Value>>
     }
     let n = u32::from_ne_bytes(len);
     if n > MAX_IN {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, format!("message too large ({n} bytes)")));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("message too large ({n} bytes)"),
+        ));
     }
     let mut buf = vec![0u8; n as usize];
     r.read_exact(&mut buf)?;
-    serde_json::from_slice(&buf).map(Some).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    serde_json::from_slice(&buf)
+        .map(Some)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
 pub fn write_message<W: Write>(w: &mut W, v: &serde_json::Value) -> io::Result<()> {
     let body = serde_json::to_vec(v).unwrap();
     if body.len() > 1 << 20 {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "reply too large"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "reply too large",
+        ));
     }
     w.write_all(&(body.len() as u32).to_ne_bytes())?;
     w.write_all(&body)?;

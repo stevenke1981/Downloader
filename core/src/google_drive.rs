@@ -7,7 +7,10 @@ pub(crate) const UNAVAILABLE: &str = "Google Drive: file unavailable or access r
 const MAX_CONFIRMATION_BYTES: usize = 1024 * 1024;
 
 pub(crate) fn is_drive(url: &Url) -> bool {
-    matches!(url.host_str(), Some("drive.google.com" | "drive.usercontent.google.com"))
+    matches!(
+        url.host_str(),
+        Some("drive.google.com" | "drive.usercontent.google.com")
+    )
 }
 
 pub(crate) fn is_sign_in(url: &Url) -> bool {
@@ -30,15 +33,28 @@ pub(crate) fn download_url(input: &str) -> Result<Url, String> {
     let segments: Vec<_> = path.trim_matches('/').split('/').collect();
     let id = match segments.as_slice() {
         ["file", "d", id, ..] => Some((*id).to_string()),
-        ["open"] => url.query_pairs().find(|(k, _)| k == "id").map(|(_, v)| v.into_owned()),
+        ["open"] => url
+            .query_pairs()
+            .find(|(k, _)| k == "id")
+            .map(|(_, v)| v.into_owned()),
         _ => None,
     };
-    if let Some(id) = id.filter(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))) {
-        let resource_key = url.query_pairs().find(|(k, _)| k == "resourcekey").map(|(_, v)| v.into_owned());
+    if let Some(id) = id.filter(|id| {
+        !id.is_empty()
+            && id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
+    }) {
+        let resource_key = url
+            .query_pairs()
+            .find(|(k, _)| k == "resourcekey")
+            .map(|(_, v)| v.into_owned());
         url.set_path("/uc");
         url.set_query(None);
         url.set_fragment(None);
-        url.query_pairs_mut().append_pair("export", "download").append_pair("id", &id);
+        url.query_pairs_mut()
+            .append_pair("export", "download")
+            .append_pair("id", &id);
         if let Some(key) = resource_key {
             url.query_pairs_mut().append_pair("resourcekey", &key);
         }
@@ -52,7 +68,12 @@ pub(crate) fn is_html_page(response: &Response) -> bool {
         .get(CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.split(';').next())
-        .is_some_and(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "text/html" | "application/xhtml+xml"));
+        .is_some_and(|v| {
+            matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "text/html" | "application/xhtml+xml"
+            )
+        });
     // An actual .html attachment stored on Drive is still a valid file.
     let attachment = response
         .headers()
@@ -63,7 +84,10 @@ pub(crate) fn is_html_page(response: &Response) -> bool {
     html && !attachment
 }
 
-pub(crate) fn validate_file_response(response: &Response, drive_download: bool) -> Result<(), String> {
+pub(crate) fn validate_file_response(
+    response: &Response,
+    drive_download: bool,
+) -> Result<(), String> {
     if is_sign_in(response.url()) {
         return Err(SIGN_IN.into());
     }
@@ -77,11 +101,18 @@ pub(crate) fn validate_file_response(response: &Response, drive_download: bool) 
 /// Read only a bounded page, never the (potentially large) file body.
 pub(crate) async fn confirmation_url(mut response: Response) -> Result<Url, String> {
     let base = response.url().clone();
-    if response.content_length().is_some_and(|n| n > MAX_CONFIRMATION_BYTES as u64) {
+    if response
+        .content_length()
+        .is_some_and(|n| n > MAX_CONFIRMATION_BYTES as u64)
+    {
         return Err(UNAVAILABLE.into());
     }
     let mut body = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| UNAVAILABLE.to_string())? {
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| UNAVAILABLE.to_string())?
+    {
         if body.len().saturating_add(chunk.len()) > MAX_CONFIRMATION_BYTES {
             return Err(UNAVAILABLE.into());
         }
@@ -93,7 +124,9 @@ pub(crate) async fn confirmation_url(mut response: Response) -> Result<Url, Stri
 fn allowed_confirmation(base: &Url, target: &Url) -> bool {
     target.username().is_empty()
         && target.password().is_none()
-        && ((target.origin() == base.origin() && is_drive(target) && matches!(target.path(), "/uc" | "/download"))
+        && ((target.origin() == base.origin()
+            && is_drive(target)
+            && matches!(target.path(), "/uc" | "/download"))
             || (target.scheme() == "https"
                 && target.host_str() == Some("drive.usercontent.google.com")
                 && target.port_or_known_default() == Some(443)
@@ -143,7 +176,9 @@ fn attributes(tag: &str) -> Vec<(String, String)> {
     let mut result = Vec::new();
     while !s.is_empty() {
         s = s.trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '/');
-        let end = s.find(|c: char| c.is_ascii_whitespace() || matches!(c, '=' | '>')).unwrap_or(s.len());
+        let end = s
+            .find(|c: char| c.is_ascii_whitespace() || matches!(c, '=' | '>'))
+            .unwrap_or(s.len());
         if end == 0 {
             break;
         }
@@ -162,7 +197,9 @@ fn attributes(tag: &str) -> Vec<(String, String)> {
             value = unescape(&s[..end]);
             s = &s[end + 1..];
         } else {
-            let end = s.find(|c: char| c.is_ascii_whitespace() || c == '>').unwrap_or(s.len());
+            let end = s
+                .find(|c: char| c.is_ascii_whitespace() || c == '>')
+                .unwrap_or(s.len());
             value = unescape(&s[..end]);
             s = &s[end..];
         }
@@ -172,22 +209,36 @@ fn attributes(tag: &str) -> Vec<(String, String)> {
 }
 
 fn attr<'a>(attrs: &'a [(String, String)], key: &str) -> Option<&'a str> {
-    attrs.iter().find(|(name, _)| name == key).map(|(_, value)| value.as_str())
+    attrs
+        .iter()
+        .find(|(name, _)| name == key)
+        .map(|(_, value)| value.as_str())
 }
 
 fn parse_confirmation(base: &Url, html: &str) -> Option<Url> {
     let mut form: Option<Url> = None;
-    for tag in html.split('<').skip(1).filter_map(|s| s.split_once('>').map(|(tag, _)| tag)) {
-        let end = tag.find(|c: char| c.is_ascii_whitespace() || c == '/').unwrap_or(tag.len());
+    for tag in html
+        .split('<')
+        .skip(1)
+        .filter_map(|s| s.split_once('>').map(|(tag, _)| tag))
+    {
+        let end = tag
+            .find(|c: char| c.is_ascii_whitespace() || c == '/')
+            .unwrap_or(tag.len());
         let (name, rest) = tag.split_at(end);
         if tag.trim().eq_ignore_ascii_case("/form") {
-            if let Some(url) = form.take().filter(|u| u.query_pairs().any(|(k, v)| k == "confirm" && !v.is_empty())) {
+            if let Some(url) = form.take().filter(|u| {
+                u.query_pairs()
+                    .any(|(k, v)| k == "confirm" && !v.is_empty())
+            }) {
                 return Some(url);
             }
         } else if name.eq_ignore_ascii_case("form") {
             form = None;
             let attrs = attributes(rest);
-            if attr(&attrs, "id") != Some("download-form") || attr(&attrs, "method").is_some_and(|m| !m.eq_ignore_ascii_case("get")) {
+            if attr(&attrs, "id") != Some("download-form")
+                || attr(&attrs, "method").is_some_and(|m| !m.eq_ignore_ascii_case("get"))
+            {
                 continue;
             }
             let url = base.join(attr(&attrs, "action")?).ok()?;
@@ -203,9 +254,15 @@ fn parse_confirmation(base: &Url, html: &str) -> Option<Url> {
                 continue;
             }
             if let (Some(name), Some(value)) = (attr(&attrs, "name"), attr(&attrs, "value")) {
-                let retained: Vec<_> = url.query_pairs().filter(|(k, _)| k != name).map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
+                let retained: Vec<_> = url
+                    .query_pairs()
+                    .filter(|(k, _)| k != name)
+                    .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                    .collect();
                 url.set_query(None);
-                url.query_pairs_mut().extend_pairs(retained).append_pair(name, value);
+                url.query_pairs_mut()
+                    .extend_pairs(retained)
+                    .append_pair(name, value);
             }
         } else if name.eq_ignore_ascii_case("a") {
             let attrs = attributes(rest);
@@ -215,7 +272,11 @@ fn parse_confirmation(base: &Url, html: &str) -> Option<Url> {
             let Ok(url) = base.join(href) else {
                 continue;
             };
-            if allowed_confirmation(base, &url) && url.query_pairs().any(|(k, v)| k == "confirm" && !v.is_empty()) {
+            if allowed_confirmation(base, &url)
+                && url
+                    .query_pairs()
+                    .any(|(k, v)| k == "confirm" && !v.is_empty())
+            {
                 return Some(url);
             }
         }
@@ -229,13 +290,33 @@ mod tests {
 
     #[test]
     fn file_links_keep_resource_keys_and_signed_downloads() {
-        let url = download_url("https://drive.google.com/file/d/abc-123/view?usp=sharing&resourcekey=key_1").unwrap();
-        assert_eq!(url.as_str(), "https://drive.google.com/uc?export=download&id=abc-123&resourcekey=key_1");
-        assert_eq!(download_url("https://drive.google.com/open?id=abc-123").unwrap().path(), "/uc");
+        let url = download_url(
+            "https://drive.google.com/file/d/abc-123/view?usp=sharing&resourcekey=key_1",
+        )
+        .unwrap();
+        assert_eq!(
+            url.as_str(),
+            "https://drive.google.com/uc?export=download&id=abc-123&resourcekey=key_1"
+        );
+        assert_eq!(
+            download_url("https://drive.google.com/open?id=abc-123")
+                .unwrap()
+                .path(),
+            "/uc"
+        );
         let direct = "https://drive.usercontent.google.com/download?id=abc&export=download&authuser=1&uuid=token";
         assert_eq!(download_url(direct).unwrap().as_str(), direct);
-        assert!(download_url("https://drive.google.com/drive/folders/folder_1").unwrap_err().contains("folder"));
-        assert_eq!(download_url("https://example.com/file/d/abc/view").unwrap().path(), "/file/d/abc/view");
+        assert!(
+            download_url("https://drive.google.com/drive/folders/folder_1")
+                .unwrap_err()
+                .contains("folder")
+        );
+        assert_eq!(
+            download_url("https://example.com/file/d/abc/view")
+                .unwrap()
+                .path(),
+            "/file/d/abc/view"
+        );
     }
 
     #[test]
@@ -247,8 +328,22 @@ mod tests {
         assert!(pairs.iter().any(|(k, v)| k == "id" && v == "abc"));
         assert!(pairs.iter().any(|(k, v)| k == "uuid" && v == "a&b+c"));
         assert_eq!(pairs.iter().filter(|(k, _)| k == "id").count(), 1);
-        assert!(parse_confirmation(&base, &form.replace("drive.usercontent.google.com", "example.com")).is_none());
-        assert!(parse_confirmation(&base, &form.replace("method=\"get\"", "method=\"post\"")).is_none());
-        assert!(parse_confirmation(&base, r#"<a href="/uc?id=abc&amp;confirm=t">Download anyway</a>"#).is_some());
+        assert!(
+            parse_confirmation(
+                &base,
+                &form.replace("drive.usercontent.google.com", "example.com")
+            )
+            .is_none()
+        );
+        assert!(
+            parse_confirmation(&base, &form.replace("method=\"get\"", "method=\"post\"")).is_none()
+        );
+        assert!(
+            parse_confirmation(
+                &base,
+                r#"<a href="/uc?id=abc&amp;confirm=t">Download anyway</a>"#
+            )
+            .is_some()
+        );
     }
 }
