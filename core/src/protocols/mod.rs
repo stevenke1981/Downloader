@@ -1,9 +1,9 @@
 //! In-process Rust protocol adapters and verified publication.
 //! Adapters own protocol I/O; this facade owns dispatch, staging and publication.
 mod ftp;
+mod media;
 mod metalink;
 mod torrent;
-mod media;
 use crate::engine::{Ctx, Outcome};
 use crate::task::{DownloadKind, Seg, Status, Task, Verification, VerifyState};
 use crate::{checksum, util};

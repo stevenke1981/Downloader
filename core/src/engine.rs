@@ -7,9 +7,9 @@ mod http;
 mod segments;
 mod worker;
 
-use http::{probe, response_range, same_origin, Probe};
 #[cfg(test)]
 use http::content_range;
+use http::{Probe, probe, response_range, same_origin};
 pub use segments::{claim, plan_segments};
 use worker::Shared;
 

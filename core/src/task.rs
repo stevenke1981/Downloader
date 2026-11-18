@@ -10,6 +10,19 @@ pub enum DownloadKind {
     Video,
 }
 
+/// What to do when the target file already exists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ConflictPolicy {
+    /// Save as `name (1).ext`.
+    #[default]
+    Rename,
+    /// Replace the existing file once the download completes.
+    Overwrite,
+    /// Fail with "file exists: <path>".
+    Skip,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Status {
     #[default]
@@ -103,6 +116,19 @@ pub struct Task {
     pub authorization: Option<String>,
     /// Bounded lifecycle messages. Request headers and credentials are excluded.
     pub log: Vec<String>,
+    /// Extra request headers (validated with `validate_headers`).
+    pub headers: Vec<(String, String)>,
+    /// User-Agent override.
+    pub user_agent: Option<String>,
+    /// Alternative URLs for the same file.
+    pub mirrors: Vec<String>,
+    /// What to do when the target file already exists.
+    pub conflict: ConflictPolicy,
+    /// URL a resolver module produced. Never persisted.
+    #[serde(skip)]
+    pub resolved_url: Option<String>,
+    /// Id of the module that resolved this download.
+    pub module: Option<String>,
     /// Bytes hashed so far while verifying (not persisted).
     #[serde(skip)]
     pub verify_done: std::sync::Arc<std::sync::atomic::AtomicU64>,
@@ -164,5 +190,105 @@ impl Task {
     }
     pub fn part_path(&self) -> PathBuf {
         self.dir.join(format!("{}.part", self.file_name))
+    }
+}
+
+const MAX_HEADERS: usize = 16;
+const MAX_HEADER_BYTES: usize = 4096;
+const FORBIDDEN_HEADERS: [&str; 6] = [
+    "cookie",
+    "authorization",
+    "host",
+    "range",
+    "if-range",
+    "content-length",
+];
+
+/// Check user-supplied request headers: at most 16, 4 KiB in total, valid names, no CR/LF,
+/// and none the downloader manages itself (Cookie, Authorization, Host, Range, If-Range,
+/// Content-Length).
+pub fn validate_headers(h: &[(String, String)]) -> Result<(), String> {
+    if h.len() > MAX_HEADERS {
+        return Err(format!(
+            "invalid headers: at most {MAX_HEADERS} are allowed"
+        ));
+    }
+    let total: usize = h.iter().map(|(k, v)| k.len() + v.len()).sum();
+    if total > MAX_HEADER_BYTES {
+        return Err("invalid headers: more than 4 KiB in total".into());
+    }
+    for (name, value) in h {
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+        {
+            return Err(format!("invalid header name {name:?}"));
+        }
+        if value.bytes().any(|b| b == b'\r' || b == b'\n' || b == 0) {
+            return Err(format!(
+                "invalid header value for {name}: line breaks are not allowed"
+            ));
+        }
+        if FORBIDDEN_HEADERS.contains(&name.to_ascii_lowercase().as_str()) {
+            return Err(format!(
+                "invalid header {name}: set by the downloader itself"
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn h(k: &str, v: &str) -> (String, String) {
+        (k.into(), v.into())
+    }
+
+    #[test]
+    fn headers_accepted() {
+        assert!(validate_headers(&[]).is_ok());
+        assert!(validate_headers(&[h("Accept", "*/*"), h("X-Api-Key", "abc")]).is_ok());
+        assert!(validate_headers(&vec![h("X-A", "1"); 16]).is_ok());
+    }
+
+    #[test]
+    fn headers_rejected() {
+        for name in [
+            "Cookie",
+            "authorization",
+            "HOST",
+            "Range",
+            "If-Range",
+            "Content-Length",
+        ] {
+            assert!(validate_headers(&[h(name, "x")]).is_err(), "{name}");
+        }
+        assert!(validate_headers(&[h("X-A", "a\r\nX-B: b")]).is_err());
+        assert!(validate_headers(&[h("X-A", "a\nb")]).is_err());
+        assert!(validate_headers(&[h("X-A\r\n", "a")]).is_err());
+        assert!(validate_headers(&[h("Bad Name", "a")]).is_err());
+        assert!(validate_headers(&[h("", "a")]).is_err());
+        assert!(validate_headers(&vec![h("X-A", "1"); 17]).is_err());
+        assert!(validate_headers(&[h("X-A", &"a".repeat(4096))]).is_err());
+        assert!(validate_headers(&[h("X-A", &"a".repeat(4093))]).is_ok());
+    }
+
+    #[test]
+    fn old_task_json_loads() {
+        let t: Task =
+            serde_json::from_str(r#"{"id":3,"url":"https://x.org/a.zip","status":"Paused"}"#)
+                .unwrap();
+        assert_eq!(t.conflict, ConflictPolicy::Rename);
+        assert!(t.headers.is_empty() && t.user_agent.is_none() && t.mirrors.is_empty());
+        assert!(t.module.is_none() && t.resolved_url.is_none());
+        let p: ConflictPolicy = serde_json::from_str("\"overwrite\"").unwrap();
+        assert_eq!(p, ConflictPolicy::Overwrite);
+        assert_eq!(
+            serde_json::to_string(&ConflictPolicy::Skip).unwrap(),
+            "\"skip\""
+        );
     }
 }

@@ -4,7 +4,6 @@ mod models;
 mod persistence;
 mod scheduler;
 
-use persistence::{load_json, write_atomic};
 use crate::automation::Action;
 use crate::category::Category;
 use crate::checksum::Checksum;
@@ -12,6 +11,7 @@ use crate::engine::{self, Ctx, Outcome};
 use crate::limiter::RateLimiter;
 use crate::settings::Settings;
 use crate::task::{DownloadKind, Status, Task};
+use persistence::{load_json, write_atomic};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -100,7 +100,8 @@ impl Manager {
             .or_else(|_| Settings::default().build_client())
             .expect("http client");
         let global = Arc::new(RateLimiter::new(settings.effective_global_limit()));
-        let protocol_client = settings.build_protocol_client()
+        let protocol_client = settings
+            .build_protocol_client()
             .or_else(|_| Settings::default().build_protocol_client())
             .expect("native protocol client");
         let entries = tasks

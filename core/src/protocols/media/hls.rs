@@ -158,5 +158,4 @@ impl Transfer {
         self.finish(file, extension.ok_or("HLS has no media representation")?)
             .await
     }
-
 }

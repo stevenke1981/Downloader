@@ -1,13 +1,13 @@
 //! Embedded BitTorrent v1 engine. Payload and control data have separate roots.
 mod source;
 
-use source::TorrentSource;
 use crate::engine::{Ctx, Outcome};
 use crate::task::{Seg, Task};
 use futures_util::StreamExt;
 use librqbit::{
     AddTorrent, AddTorrentOptions, AddTorrentResponse, DhtSessionConfig, Session, SessionOptions,
 };
+use source::TorrentSource;
 use std::net::SocketAddr;
 use std::num::NonZeroU32;
 use std::path::{Component, Path};
@@ -55,8 +55,11 @@ pub(crate) async fn download(
         .map_err(|e| e.to_string())?;
     let initial_rate = session_rate(&ctx);
     let source = snapshot.url.trim();
-    let Some(TorrentSource { descriptor, mut initial_peers, local_discovery }) =
-        TorrentSource::prepare(&snapshot, &ctx, &state).await?
+    let Some(TorrentSource {
+        descriptor,
+        mut initial_peers,
+        local_discovery,
+    }) = TorrentSource::prepare(&snapshot, &ctx, &state).await?
     else {
         return Ok(Outcome::Cancelled);
     };

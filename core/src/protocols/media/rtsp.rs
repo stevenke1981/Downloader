@@ -196,7 +196,6 @@ impl Transfer {
         self.finish(file, if audio.is_some() { "wav" } else { "h264" })
             .await
     }
-
 }
 
 fn pcm_wav_header(data_length: u32, sample_rate: u32, channels: u16) -> [u8; 44] {

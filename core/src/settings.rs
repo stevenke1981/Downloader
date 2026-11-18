@@ -1,4 +1,6 @@
 use crate::category::Category;
+use crate::modules::ModuleSettings;
+use crate::task::ConflictPolicy;
 use crate::{automation::ScheduledAction, remote::RemoteSettings, site::SiteRule};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -103,6 +105,9 @@ pub struct Settings {
     pub folder_rules: Vec<FolderRule>,
     pub scheduled_actions: Vec<ScheduledAction>,
     pub remote: RemoteSettings,
+    /// What to do when a downloaded file already exists.
+    pub conflict: ConflictPolicy,
+    pub modules: ModuleSettings,
 }
 
 impl Default for Settings {
@@ -128,6 +133,8 @@ impl Default for Settings {
             folder_rules: Vec::new(),
             scheduled_actions: Vec::new(),
             remote: RemoteSettings::default(),
+            conflict: ConflictPolicy::default(),
+            modules: ModuleSettings::default(),
         }
     }
 }
@@ -175,6 +182,7 @@ impl Settings {
                 return Err("scheduled action IDs must be unique".into());
             }
         }
+        self.modules.validate()?;
         self.remote.validate()
     }
 
@@ -244,7 +252,8 @@ impl Settings {
 
     /// Crawler requests inspect each Location header before following it.
     pub fn build_crawl_client(&self) -> Result<crate::grabber::CrawlClient, String> {
-        self.build_protocol_client().map(crate::grabber::CrawlClient::new)
+        self.build_protocol_client()
+            .map(crate::grabber::CrawlClient::new)
     }
 
     /// Protocol adapters follow redirects explicitly and retain the configured proxy.
@@ -258,9 +267,7 @@ impl Settings {
             builder = builder
                 .proxy(reqwest::Proxy::all(self.proxy.trim()).map_err(|e| format!("proxy: {e}"))?);
         }
-        builder
-            .build()
-            .map_err(|e| e.to_string())
+        builder.build().map_err(|e| e.to_string())
     }
 }
 

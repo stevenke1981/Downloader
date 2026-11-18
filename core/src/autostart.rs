@@ -148,7 +148,10 @@ mod tests {
             command_line(exe),
             "\"C:/Program Files/Downloader/downloader.exe\" --tray"
         );
-        assert!(desktop_entry(exe).contains("\nExec=\"C:/Program Files/Downloader/downloader.exe\" --tray\n"));
+        assert!(
+            desktop_entry(exe)
+                .contains("\nExec=\"C:/Program Files/Downloader/downloader.exe\" --tray\n")
+        );
     }
 
     #[test]

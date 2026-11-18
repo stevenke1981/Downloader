@@ -35,7 +35,6 @@ impl Inner {
             }
         }
     }
-
 }
 
 pub(super) fn write_atomic(path: &Path, data: &[u8]) -> std::io::Result<()> {

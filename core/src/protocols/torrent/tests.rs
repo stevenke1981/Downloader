@@ -1,8 +1,8 @@
 mod fixture;
 
-use fixture::Swarm;
 use super::*;
 use crate::limiter::RateLimiter;
+use fixture::Swarm;
 use sha2::{Digest, Sha256};
 use tokio_util::sync::CancellationToken;
 

@@ -39,9 +39,24 @@ pub struct Server {
 
 fn is_meta(name: &str) -> bool {
     let l = name.to_ascii_lowercase();
-    ["sha256", "sha512", "sha1", "md5", "b2", "sig", "asc", "sum", "sums", "sum.txt", "sums.txt", "checksums", "checksum", "checksums.txt"]
-        .iter()
-        .any(|e| l.ends_with(&format!(".{e}")) || l == *e || l.ends_with(e))
+    [
+        "sha256",
+        "sha512",
+        "sha1",
+        "md5",
+        "b2",
+        "sig",
+        "asc",
+        "sum",
+        "sums",
+        "sum.txt",
+        "sums.txt",
+        "checksums",
+        "checksum",
+        "checksums.txt",
+    ]
+    .iter()
+    .any(|e| l.ends_with(&format!(".{e}")) || l == *e || l.ends_with(e))
 }
 
 pub fn test_data(n: usize) -> Vec<u8> {
@@ -117,29 +132,44 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
     let req = String::from_utf8_lossy(&buf).to_string();
     let header = |name: &str| {
         req.lines()
-            .find(|l| l.to_ascii_lowercase().starts_with(&format!("{}:", name.to_ascii_lowercase())))
+            .find(|l| {
+                l.to_ascii_lowercase()
+                    .starts_with(&format!("{}:", name.to_ascii_lowercase()))
+            })
             .map(|l| l[name.len() + 1..].trim().to_string())
     };
-    s.cookies.lock().unwrap().push(header("Cookie").unwrap_or_default());
+    s.cookies
+        .lock()
+        .unwrap()
+        .push(header("Cookie").unwrap_or_default());
     let path = req.split_whitespace().nth(1).unwrap_or("/").to_string();
     let name = path.rsplit('/').next().unwrap_or("").to_string();
     let extra = s.extra.lock().unwrap().get(&name).cloned();
     if let Some(body) = extra {
-        let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n", body.len());
+        let head = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n",
+            body.len()
+        );
         sock.write_all(head.as_bytes()).await?;
         return sock.write_all(&body).await;
     }
     if is_meta(&name) {
-        return sock.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+        return sock
+            .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .await;
     }
     // Bind the guard first: a guard alive across an await would make this future non-Send.
     let redirect = s.redirect.lock().unwrap().clone();
     if let Some(base) = redirect {
-        let head = format!("HTTP/1.1 302 Found\r\nLocation: {base}{name}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        let head = format!(
+            "HTTP/1.1 302 Found\r\nLocation: {base}{name}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
         return sock.write_all(head.as_bytes()).await;
     }
     if s.require_cookie.load(Ordering::SeqCst) && header("Cookie").is_none() {
-        return sock.write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+        return sock
+            .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .await;
     }
     let mut data = s.data.lock().unwrap().clone();
     let etag = s.etag.lock().unwrap().clone();
@@ -153,9 +183,15 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
         let spec = r.trim_start_matches("bytes=");
         let (a, b) = spec.split_once('-').unwrap();
         let a: u64 = a.parse().unwrap();
-        let mut b: u64 = if b.is_empty() { total - 1 } else { b.parse::<u64>().unwrap().min(total - 1) };
+        let mut b: u64 = if b.is_empty() {
+            total - 1
+        } else {
+            b.parse::<u64>().unwrap().min(total - 1)
+        };
         let max = s.max_range_bytes.load(Ordering::SeqCst);
-        if max > 0 { b = b.min(a.saturating_add(max - 1)); }
+        if max > 0 {
+            b = b.min(a.saturating_add(max - 1));
+        }
         range = Some((a, b));
     }
     let (status, start, end) = match range {
@@ -170,9 +206,13 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
         head += &format!("Accept-Ranges: bytes\r\nETag: {etag}\r\n");
     }
     if range.is_some() {
-        let override_range = if end - start > 1 { s.data_content_range.lock().unwrap().clone() } else { None };
+        let override_range = if end - start > 1 {
+            s.data_content_range.lock().unwrap().clone()
+        } else {
+            None
+        };
         match override_range {
-            Some(value) if value.is_empty() => {},
+            Some(value) if value.is_empty() => {}
             Some(value) => head += &format!("Content-Range: {value}\r\n"),
             None => head += &format!("Content-Range: bytes {start}-{}/{total}\r\n", end - 1),
         }

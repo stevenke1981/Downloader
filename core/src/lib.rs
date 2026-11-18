@@ -1,22 +1,23 @@
 //! Download engine: segmented multi-connection HTTP(S) downloads, queue, limits, scheduler.
+pub mod browser;
 pub mod category;
 pub mod checksum;
-pub mod browser;
 pub mod engine;
 pub mod protocols;
 /// Compatibility alias for the former external-engine facade.
 pub use protocols as external;
-pub mod site;
-pub mod grabber;
-pub mod remote;
 pub mod automation;
 pub mod autostart;
 mod google_drive;
+pub mod grabber;
 pub mod ipc;
-pub mod native;
 pub mod limiter;
 pub mod manager;
+pub mod modules;
+pub mod native;
+pub mod remote;
 pub mod settings;
+pub mod site;
 pub mod task;
 pub mod util;
 pub mod verify;

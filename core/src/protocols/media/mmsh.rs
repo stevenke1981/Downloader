@@ -127,7 +127,6 @@ impl Transfer {
         file.write_all(&header).await.map_err(|e| e.to_string())?;
         self.finish(file, "asf").await
     }
-
 }
 
 struct BodyReader<'a> {

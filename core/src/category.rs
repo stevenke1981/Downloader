@@ -27,12 +27,19 @@ impl Category {
         let lower = file_name.to_ascii_lowercase();
         let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
         match ext {
-            "mp4" | "mkv" | "avi" | "mov" | "webm" | "flv" | "wmv" | "m4v" | "mpg" | "mpeg" | "ts" | "3gp" => Category::Video,
-            "mp3" | "flac" | "wav" | "aac" | "ogg" | "m4a" | "opus" | "wma" | "ape" => Category::Audio,
-            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "zst" | "tgz" | "txz" | "lz" | "lzma" | "cab" => Category::Archive,
-            "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "epub" | "md" | "odt" | "ods" | "rtf" | "csv" => Category::Document,
-            "exe" | "msi" | "dmg" | "pkg" | "deb" | "rpm" | "appimage" | "apk" | "iso" | "img" | "bin" | "run" | "sh" => Category::Program,
-            "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "tif" | "tiff" | "heic" | "ico" => Category::Image,
+            "mp4" | "mkv" | "avi" | "mov" | "webm" | "flv" | "wmv" | "m4v" | "mpg" | "mpeg"
+            | "ts" | "3gp" => Category::Video,
+            "mp3" | "flac" | "wav" | "aac" | "ogg" | "m4a" | "opus" | "wma" | "ape" => {
+                Category::Audio
+            }
+            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "zst" | "tgz" | "txz" | "lz"
+            | "lzma" | "cab" => Category::Archive,
+            "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "epub" | "md"
+            | "odt" | "ods" | "rtf" | "csv" => Category::Document,
+            "exe" | "msi" | "dmg" | "pkg" | "deb" | "rpm" | "appimage" | "apk" | "iso" | "img"
+            | "bin" | "run" | "sh" => Category::Program,
+            "jpg" | "jpeg" | "png" | "gif" | "webp" | "svg" | "bmp" | "tif" | "tiff" | "heic"
+            | "ico" => Category::Image,
             _ => Category::Other,
         }
     }
