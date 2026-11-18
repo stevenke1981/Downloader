@@ -32,6 +32,9 @@ pub(super) struct Shared {
     pub(super) referer: Option<String>,
     pub(super) cookie: Option<String>,
     pub(super) authorization: Option<String>,
+    /// Extra headers, already limited to the origin of `url`.
+    pub(super) headers: Vec<(String, String)>,
+    pub(super) user_agent: Option<String>,
     pub(super) ctx: Ctx,
 }
 
@@ -59,6 +62,12 @@ impl Shared {
         }
         if let Some(value) = &self.authorization {
             req = req.header(reqwest::header::AUTHORIZATION, value);
+        }
+        if let Some(ua) = &self.user_agent {
+            req = req.header(reqwest::header::USER_AGENT, ua);
+        }
+        for (k, v) in &self.headers {
+            req = req.header(k.as_str(), v.as_str());
         }
         if self.range {
             let r = if end == u64::MAX {

@@ -50,8 +50,9 @@ The public `dlcore::external` API remains a compatibility alias for `dlcore::pro
 | Open or preview completed files | Windows Shell / file associations; macOS `open`, Linux `xdg-open` | User opens completed file |
 | Scheduled program | User-selected executable and arguments | Explicitly configured schedule |
 | Scheduled shutdown | Windows `shutdown.exe` or Unix `shutdown` | Explicit shutdown schedule |
+| Approved external module (optional) | The module's own `command` in `<state dir>/modules/<id>/` | Settings enable modules and the module is approved by SHA-256 |
 
-These integrations do not transfer download protocol data. They remain necessary for their existing features. OS permissions, file associations and desktop configuration affect their availability.
+These integrations do not transfer download protocol data. An approved external module only returns URLs, headers and mirrors (or receives events); the downloader still performs the transfer. Modules are described in [modules](modules.md) and the command-line tools in [cli](cli.md). They remain necessary for their existing features. OS permissions, file associations and desktop configuration affect their availability.
 
 ## Support boundaries
 

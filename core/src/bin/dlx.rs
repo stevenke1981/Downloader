@@ -1,9 +1,15 @@
 //! dlx - headless multi-connection downloader.
+#[path = "shared/cli.rs"]
+mod cli;
+
 use clap::Parser;
+use cli::{CliError, ConflictArg, parse_header, print_json};
+use dlcore::modules::{ModuleSettings, Registry};
 use dlcore::task::DownloadKind;
 use dlcore::{Checksum, Ctx, Outcome, RateLimiter, Settings, Status, Task, engine, util};
+use serde_json::{Value, json};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
@@ -24,6 +30,24 @@ struct Args {
     /// Show built-in Rust protocol engines
     #[arg(long)]
     tools: bool,
+    /// NDJSON events on stdout (start, progress, done, error, summary); human text stays on stderr
+    #[arg(long)]
+    json: bool,
+    /// Extra request header "Name: value" (repeatable). Cookie, Authorization and Host are refused
+    #[arg(long = "header", value_name = "NAME: VALUE")]
+    headers: Vec<String>,
+    /// User-Agent sent with every request
+    #[arg(long, value_name = "TEXT")]
+    user_agent: Option<String>,
+    /// Referer sent with every request
+    #[arg(long, value_name = "URL")]
+    referer: Option<String>,
+    /// When the file exists: rename (default), overwrite, or skip (exit 6)
+    #[arg(long, value_enum, default_value = "rename")]
+    on_conflict: ConflictArg,
+    /// Load modules from DIR. Only modules approved with "dlxctl modules approve" run
+    #[arg(long, value_name = "DIR")]
+    modules_dir: Option<PathBuf>,
     /// Output directory
     #[arg(short = 'o', long, default_value = ".")]
     dir: PathBuf,
@@ -52,7 +76,7 @@ struct Args {
     quiet: bool,
 }
 
-fn state_path(dir: &std::path::Path, url: &str) -> PathBuf {
+fn state_path(dir: &Path, url: &str) -> PathBuf {
     // FNV-1a of the URL keeps one resume file per URL.
     let h = url.bytes().fold(0xcbf29ce484222325u64, |h, b| {
         (h ^ b as u64).wrapping_mul(0x100000001b3)
@@ -60,20 +84,70 @@ fn state_path(dir: &std::path::Path, url: &str) -> PathBuf {
     dir.join(format!(".dlx-{h:016x}.json"))
 }
 
+/// Usage errors exit 2 before any transfer starts.
+fn usage(json: bool, message: String) -> ! {
+    if json {
+        print_json(&json!({"event":"error","code":"invalid","message":message}));
+    } else {
+        eprintln!("{message}");
+    }
+    finish(json, 0, 0, cli::USAGE)
+}
+
+/// The NDJSON summary (when --json) and exit.
+fn finish(json: bool, completed: u32, failed: u32, code: i32) -> ! {
+    if json {
+        print_json(
+            &json!({"event":"summary","completed":completed,"failed":failed,"exit_code":code}),
+        );
+    }
+    std::process::exit(code)
+}
+
+fn report_url_error(json: bool, url: &str, error: &CliError) {
+    if json {
+        print_json(&json!({"event":"error","url":url,"code":error.code,"message":error.message}));
+    } else {
+        eprintln!("error: {url}: {}", error.message);
+    }
+}
+
+/// Approvals from the default state directory's settings.json (written by "dlxctl modules approve").
+fn approved_modules(json: bool) -> ModuleSettings {
+    let path = dlcore::ipc::default_state_dir().join("settings.json");
+    match std::fs::read(&path) {
+        Ok(bytes) => serde_json::from_slice::<Settings>(&bytes)
+            .map(|settings| settings.modules)
+            .unwrap_or_else(|e| usage(json, format!("{}: {e}", path.display()))),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => ModuleSettings::default(),
+        Err(e) => usage(json, format!("{}: {e}", path.display())),
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let a = Args::parse();
+    let json = a.json;
     if a.tools {
-        for tool in dlcore::protocols::capabilities() {
-            println!(
-                "{}: {}",
-                tool.name,
-                if tool.available {
-                    "built-in Rust"
-                } else {
-                    "unavailable"
-                }
-            );
+        let tools = dlcore::protocols::capabilities();
+        if json {
+            let list: Vec<Value> = tools
+                .iter()
+                .map(|tool| json!({"name": tool.name, "available": tool.available}))
+                .collect();
+            print_json(&json!({"event":"tools","tools":list}));
+        } else {
+            for tool in &tools {
+                println!(
+                    "{}: {}",
+                    tool.name,
+                    if tool.available {
+                        "built-in Rust"
+                    } else {
+                        "unavailable"
+                    }
+                );
+            }
         }
         if a.urls.is_empty() {
             return;
@@ -81,8 +155,7 @@ async fn main() {
     }
     for (index, url) in a.urls.iter().enumerate() {
         if let Err(error) = util::validate_source(url) {
-            eprintln!("source {}: {error}", index + 1);
-            std::process::exit(2);
+            usage(json, format!("source {}: {error}", index + 1));
         }
     }
     let kind = if a.video {
@@ -90,33 +163,43 @@ async fn main() {
     } else {
         DownloadKind::Auto
     };
-    let limit = util::parse_size(&a.limit).unwrap_or_else(|| {
-        eprintln!("invalid --limit");
-        std::process::exit(2)
-    });
+    let limit = util::parse_size(&a.limit).unwrap_or_else(|| usage(json, "invalid --limit".into()));
     let v = a.checksum.clone().unwrap_or_else(|| a.verify.clone());
     let auto_verify = v != "off";
     let checksum = if v == "auto" || v == "off" {
         None
     } else {
         Some(Checksum::guess(&v).unwrap_or_else(|| {
-            eprintln!("--verify must be auto, off, or a 32/40/64/128-character hex digest");
-            std::process::exit(2)
+            usage(
+                json,
+                "--verify must be auto, off, or a 32/40/64/128-character hex digest".into(),
+            )
         }))
     };
+    let headers: Vec<(String, String)> = a
+        .headers
+        .iter()
+        .map(|raw| parse_header(raw).unwrap_or_else(|e| usage(json, e)))
+        .collect();
+    if let Err(error) = dlcore::task::validate_headers(&headers) {
+        usage(json, error);
+    }
     let settings = Settings {
         proxy: a.proxy.clone(),
         ..Default::default()
     };
-    let client = settings.build_client().unwrap_or_else(|e| {
-        eprintln!("{e}");
-        std::process::exit(2)
+    let client = settings
+        .build_client()
+        .unwrap_or_else(|e| usage(json, e.to_string()));
+    let registry = a.modules_dir.as_deref().map(|dir| {
+        let mut modules = approved_modules(json);
+        modules.enabled = true;
+        Registry::load(&modules, dir)
     });
     let cancel = CancellationToken::new();
-    let protocol_client = settings.build_protocol_client().unwrap_or_else(|e| {
-        eprintln!("{e}");
-        std::process::exit(2)
-    });
+    let protocol_client = settings
+        .build_protocol_client()
+        .unwrap_or_else(|e| usage(json, e.to_string()));
     {
         let c = cancel.clone();
         tokio::spawn(async move {
@@ -126,6 +209,7 @@ async fn main() {
     }
     let global = Arc::new(RateLimiter::new(0));
     let mut code = 0;
+    let (mut completed, mut failed) = (0u32, 0u32);
     for url in &a.urls {
         let sp = state_path(&a.dir, url);
         let task = std::fs::read(&sp)
@@ -143,13 +227,29 @@ async fn main() {
                 ..Default::default()
             });
         let resumed = task.downloaded();
+        // Flags are authoritative on every run; nothing from an earlier state file leaks in.
         let task = Arc::new(Mutex::new(Task {
             connections: a.connections.clamp(1, 32),
             checksum: checksum.clone(),
             status: Status::Downloading,
             verify_retried: false,
+            headers: headers.clone(),
+            user_agent: a.user_agent.clone(),
+            referer: a.referer.clone(),
+            conflict: a.on_conflict.into(),
             ..task
         }));
+        let prepared = match &registry {
+            Some(registry) => registry.prepare(&task, &cancel).await,
+            None => Ok(()),
+        };
+        if let Err(error) = prepared {
+            let error = CliError::from(error);
+            failed += 1;
+            code = code.max(error.exit_code());
+            report_url_error(json, url, &error);
+            continue;
+        }
         if resumed > 0 && !a.quiet {
             eprintln!("resuming at {}", util::human_size(resumed));
         }
@@ -162,9 +262,13 @@ async fn main() {
             cancel: cancel.clone(),
             verify: auto_verify,
         };
+        if json {
+            print_json(&json!({"event":"start","url":url,"resumed_bytes":resumed}));
+        }
         let start = Instant::now();
         let job = tokio::spawn(engine::run(task.clone(), ctx));
         let mut last_save = Instant::now();
+        let mut last_json = Instant::now();
         while !job.is_finished() {
             tokio::time::sleep(Duration::from_millis(250)).await;
             let t = task.lock().unwrap().clone();
@@ -175,7 +279,7 @@ async fn main() {
             if !a.quiet {
                 let d = t.downloaded();
                 let el = start.elapsed().as_secs_f64().max(0.01);
-                let sp = (d.saturating_sub(resumed)) as f64 / el;
+                let rate = (d.saturating_sub(resumed)) as f64 / el;
                 let pct = t
                     .total
                     .map(|n| format!("{:5.1}%", d as f64 * 100.0 / n.max(1) as f64))
@@ -186,9 +290,20 @@ async fn main() {
                     t.display_name(),
                     util::human_size(d),
                     t.total.map(util::human_size).unwrap_or("?".into()),
-                    util::human_size(sp as u64)
+                    util::human_size(rate as u64)
                 );
                 let _ = std::io::stderr().flush();
+                if json && last_json.elapsed() >= Duration::from_secs(1) {
+                    last_json = Instant::now();
+                    print_json(&json!({
+                        "event": "progress",
+                        "url": url,
+                        "downloaded": d,
+                        "total": t.total,
+                        "bytes_per_sec": rate as u64,
+                        "connections": conns,
+                    }));
+                }
             }
         }
         let r = match job.await {
@@ -197,8 +312,10 @@ async fn main() {
                 if !a.quiet {
                     eprintln!();
                 }
-                eprintln!("error: {url}: download task failed: {e}");
-                code = 1;
+                let error = CliError::new("error", format!("download task failed: {e}"));
+                failed += 1;
+                code = code.max(error.exit_code());
+                report_url_error(json, url, &error);
                 continue;
             }
         };
@@ -214,18 +331,39 @@ async fn main() {
                 }
                 let el = start.elapsed().as_secs_f64();
                 let total = t.total.unwrap_or_else(|| t.downloaded());
-                println!(
-                    "{}  {} in {:.2}s ({}/s)",
-                    t.final_path().display(),
-                    util::human_size(total),
-                    el,
-                    util::human_size((total.saturating_sub(resumed) as f64 / el.max(0.001)) as u64)
-                );
+                completed += 1;
+                if json {
+                    print_json(&json!({
+                        "event": "done",
+                        "url": url,
+                        "path": t.final_path().display().to_string(),
+                        "size": total,
+                        "seconds": el,
+                        "verification": t.verification,
+                    }));
+                } else {
+                    println!(
+                        "{}  {} in {:.2}s ({}/s)",
+                        t.final_path().display(),
+                        util::human_size(total),
+                        el,
+                        util::human_size(
+                            (total.saturating_sub(resumed) as f64 / el.max(0.001)) as u64
+                        )
+                    );
+                }
             }
             Ok(Outcome::Cancelled) => {
                 let _ = std::fs::write(&sp, serde_json::to_vec(&t).unwrap());
-                eprintln!("interrupted; run the same command again to resume");
-                std::process::exit(130);
+                let message = "interrupted; run the same command again to resume";
+                if json {
+                    print_json(
+                        &json!({"event":"error","url":url,"code":"interrupted","message":message}),
+                    );
+                } else {
+                    eprintln!("{message}");
+                }
+                finish(json, completed, failed, cli::INTERRUPTED);
             }
             Err(e) => {
                 if !a.quiet {
@@ -234,12 +372,14 @@ async fn main() {
                 if t.resumable {
                     let _ = std::fs::write(&sp, serde_json::to_vec(&t).unwrap());
                 }
-                eprintln!("error: {url}: {e}");
-                code = 1;
+                let error = CliError::from(e);
+                failed += 1;
+                code = code.max(error.exit_code());
+                report_url_error(json, url, &error);
             }
         }
     }
-    std::process::exit(code);
+    finish(json, completed, failed, code);
 }
 
 fn report_verification(t: &Task) {

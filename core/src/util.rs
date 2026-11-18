@@ -158,6 +158,37 @@ pub fn unique_name(dir: &Path, name: &str) -> String {
         .unwrap()
 }
 
+/// Free bytes available to the current user on the volume holding `dir` (or its nearest existing
+/// parent). Only measured on Windows; `None` elsewhere or when it cannot be determined.
+pub fn free_space(dir: &Path) -> Option<u64> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        #[link(name = "kernel32")]
+        unsafe extern "system" {
+            fn GetDiskFreeSpaceExW(
+                directory: *const u16,
+                available: *mut u64,
+                total: *mut u64,
+                free: *mut u64,
+            ) -> i32;
+        }
+        let existing = dir.ancestors().find(|p| p.exists())?;
+        let wide: Vec<u16> = existing.as_os_str().encode_wide().chain([0]).collect();
+        let mut available = 0u64;
+        let (mut total, mut free) = (0u64, 0u64);
+        // SAFETY: `wide` is NUL-terminated and the out pointers are valid for the call.
+        let ok =
+            unsafe { GetDiskFreeSpaceExW(wide.as_ptr(), &mut available, &mut total, &mut free) };
+        (ok != 0).then_some(available)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = dir;
+        None
+    }
+}
+
 /// Name to save `name` under in `dir` according to `p`.
 pub fn resolve_conflict(
     dir: &Path,

@@ -1,13 +1,29 @@
 //! Queue control and local management utilities. Settings edits apply on next manager start.
+#[path = "shared/cli.rs"]
+mod cli;
+
+#[path = "dlxctl/modules.rs"]
+mod modules;
+#[path = "dlxctl/settings.rs"]
+mod settings;
+
+use modules::{ModuleCommand, modules_command};
+use settings::{APPLIES, APPLIES_SAVED, read_settings, save_settings, saved};
+
 use clap::{Parser, Subcommand};
+use cli::{CliError, ConflictArg, envelope_err, envelope_ok, parse_header, print_json};
 use dlcore::{
-    Manager, Settings,
+    Checksum, Manager, Settings,
     automation::{Action, ScheduledAction},
     grabber::{self, GrabOptions},
     remote::{self, RemoteSettings},
     site::SiteRule,
+    task::{ConflictPolicy, validate_headers},
 };
-use std::path::{Path, PathBuf};
+use serde_json::{Value, json};
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 #[derive(Parser)]
 #[command(
@@ -23,6 +39,10 @@ struct Args {
     token: Option<String>,
     #[arg(long)]
     data_dir: Option<PathBuf>,
+    /// Machine output: {"ok":true,"data":..} or {"ok":false,"error":{"code","message"}} on stdout.
+    /// Exit codes: 0 ok, 1 failed, 2 usage, 3 network, 4 auth, 5 verification, 6 conflict or duplicate, 7 module.
+    #[arg(long, global = true)]
+    json: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -30,6 +50,18 @@ struct Args {
 #[derive(Subcommand)]
 enum Command {
     List,
+    /// One download as JSON.
+    Status {
+        id: u64,
+    },
+    /// Wait until downloads complete. Exit status is the most severe failure.
+    Wait {
+        #[arg(required = true)]
+        ids: Vec<u64>,
+        /// Give up after this many seconds (exit 1).
+        #[arg(long)]
+        timeout: Option<u64>,
+    },
     Add {
         url: String,
         #[arg(short, long)]
@@ -38,6 +70,20 @@ enum Command {
         paused: bool,
         #[arg(long)]
         video: bool,
+        /// Refuse (exit 6) when this URL is already queued or active.
+        #[arg(long)]
+        unique: bool,
+        #[arg(long, allow_hyphen_values = true)]
+        priority: Option<i32>,
+        /// Expected digest: hex (MD5, SHA-1, SHA-256, SHA-512 by length) or b2:<hex>.
+        #[arg(long)]
+        checksum: Option<String>,
+        /// Extra request header "Name: value" (repeatable).
+        #[arg(long = "header", value_name = "NAME: VALUE")]
+        headers: Vec<String>,
+        /// When the file exists: rename, overwrite or skip.
+        #[arg(long, value_enum)]
+        on_conflict: Option<ConflictArg>,
     },
     Start {
         id: u64,
@@ -50,6 +96,15 @@ enum Command {
     },
     StartAll,
     PauseAll,
+    /// Queue as JSON (no cookies, credentials or logs).
+    Export,
+    /// Add the downloads in an export file.
+    Import {
+        file: PathBuf,
+        /// Start the imported downloads (default: add them paused).
+        #[arg(long)]
+        start: bool,
+    },
     /// Run a headless queue manager with authenticated HTTP control until Ctrl+C.
     Serve {
         #[arg(long)]
@@ -89,6 +144,11 @@ enum Command {
     Automation {
         #[command(subcommand)]
         command: AutomationCommand,
+    },
+    /// Installed modules and approvals. Edits settings while the manager is stopped.
+    Modules {
+        #[command(subcommand)]
+        command: ModuleCommand,
     },
     GenerateToken,
 }
@@ -136,19 +196,211 @@ enum AutomationCommand {
 }
 
 fn main() {
-    if let Err(error) = run(Args::parse()) {
-        eprintln!("{error}");
-        std::process::exit(1);
+    let args = Args::parse();
+    let json = args.json;
+    if let Err(error) = run(args) {
+        if json {
+            print_json(&envelope_err(&error));
+        } else {
+            eprintln!("{}", error.message);
+        }
+        std::process::exit(error.exit_code());
     }
 }
 
-fn run(args: Args) -> Result<(), String> {
+fn print_envelope(data: Value) {
+    print_json(&envelope_ok(data));
+}
+
+/// Human text, or the JSON envelope around the data.
+fn output(json: bool, human: &str, data: Value) {
+    if json {
+        print_envelope(data);
+    } else {
+        println!("{human}");
+    }
+}
+
+fn require_token(token: Option<String>) -> Result<String, CliError> {
+    token.ok_or_else(|| CliError::new("auth", "provide --token or DOWNLOADER_REMOTE_TOKEN"))
+}
+
+fn parse_endpoint(text: &str) -> Result<reqwest::Url, CliError> {
+    let endpoint =
+        reqwest::Url::parse(text).map_err(|e| CliError::new("invalid", e.to_string()))?;
+    if !matches!(endpoint.scheme(), "http" | "https")
+        || !endpoint.username().is_empty()
+        || endpoint.password().is_some()
+    {
+        return Err(CliError::new(
+            "invalid",
+            "endpoint must be HTTP(S) without embedded credentials",
+        ));
+    }
+    Ok(endpoint)
+}
+
+/// Server errors keep their text ("HTTP <status>: <body>"). The class comes from the body's
+/// "code" when the server sends one, otherwise from the status.
+fn http_error(status: reqwest::StatusCode, body: &str) -> CliError {
+    let code = serde_json::from_str::<Value>(body)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("code")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| {
+            match status.as_u16() {
+                401 | 403 => "auth",
+                400 | 422 => "invalid",
+                408 => "network",
+                409 => "conflict",
+                _ => "error",
+            }
+            .to_string()
+        });
+    CliError {
+        code,
+        message: format!("HTTP {status}: {body}"),
+    }
+}
+
+async fn call(
+    endpoint: &reqwest::Url,
+    token: &str,
+    method: reqwest::Method,
+    path: &str,
+    body: Option<String>,
+) -> Result<String, CliError> {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut request = client
+        .request(method, endpoint.join(path).map_err(|e| e.to_string())?)
+        .bearer_auth(token);
+    if let Some(body) = body {
+        request = request
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body);
+    }
+    let response = request
+        .send()
+        .await
+        .map_err(|e| CliError::new("network", e.without_url().to_string()))?;
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .map_err(|e| CliError::new("network", e.without_url().to_string()))?;
+    if !status.is_success() {
+        return Err(http_error(status, &text));
+    }
+    Ok(text)
+}
+
+/// Response text as JSON when it parses; otherwise the raw text.
+fn parse_body(text: String) -> Value {
+    serde_json::from_str(&text).unwrap_or(Value::String(text))
+}
+
+/// Polls each download until it completes or fails. Returns the most severe failure.
+fn wait_for(
+    endpoint: &reqwest::Url,
+    token: &str,
+    ids: &[u64],
+    timeout: Option<u64>,
+) -> Result<Vec<(u64, String)>, CliError> {
+    let runtime = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    let started = Instant::now();
+    let mut pending: Vec<u64> = ids.to_vec();
+    let mut done: BTreeMap<u64, Result<String, CliError>> = BTreeMap::new();
+    runtime.block_on(async {
+        while !pending.is_empty() {
+            let mut still = Vec::new();
+            for id in pending {
+                let path = format!("/downloads/{id}");
+                match call(endpoint, token, reqwest::Method::GET, &path, None).await {
+                    Err(error) => {
+                        done.insert(id, Err(error));
+                    }
+                    Ok(text) => {
+                        let snapshot = parse_body(text);
+                        let status = snapshot["status"].as_str().unwrap_or("").to_string();
+                        match status.as_str() {
+                            "Completed" => {
+                                done.insert(id, Ok(status));
+                            }
+                            "Error" => {
+                                let message = snapshot["error"]
+                                    .as_str()
+                                    .unwrap_or("download failed")
+                                    .to_string();
+                                done.insert(id, Err(CliError::from(message)));
+                            }
+                            _ => still.push(id),
+                        }
+                    }
+                }
+            }
+            if still.is_empty() {
+                break;
+            }
+            if timeout.is_some_and(|secs| started.elapsed() >= Duration::from_secs(secs)) {
+                for id in still {
+                    done.insert(
+                        id,
+                        Err(CliError::new(
+                            "timeout",
+                            format!("timed out waiting for download {id}"),
+                        )),
+                    );
+                }
+                break;
+            }
+            pending = still;
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    });
+    let mut results = Vec::new();
+    let mut failures: Vec<(u64, CliError)> = Vec::new();
+    for (id, result) in done {
+        match result {
+            Ok(status) => results.push((id, status)),
+            Err(error) => failures.push((id, error)),
+        }
+    }
+    if failures.is_empty() {
+        return Ok(results);
+    }
+    let worst = failures
+        .iter()
+        .max_by_key(|(_, error)| error.exit_code())
+        .map(|(_, error)| error.code.clone())
+        .unwrap_or_default();
+    let message = failures
+        .iter()
+        .map(|(id, error)| format!("#{id}: {}", error.message))
+        .collect::<Vec<_>>()
+        .join("; ");
+    Err(CliError::new(&worst, message))
+}
+
+fn run(args: Args) -> Result<(), CliError> {
+    let json = args.json;
     let dir = args.data_dir.unwrap_or_else(dlcore::ipc::default_state_dir);
     let token = args
         .token
         .or_else(|| std::env::var("DOWNLOADER_REMOTE_TOKEN").ok());
+    let endpoint_text = args.endpoint;
     match args.command {
-        Command::GenerateToken => println!("{}", remote::generate_token()?),
+        Command::GenerateToken => {
+            let token = remote::generate_token()?;
+            output(json, &token, json!({"token": token}));
+        }
         Command::Crawl {
             url,
             depth,
@@ -161,15 +413,20 @@ fn run(args: Args) -> Result<(), String> {
             }
             .build_crawl_client()?;
             let runtime = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-            for link in runtime.block_on(grabber::crawl(
+            let links = runtime.block_on(grabber::crawl(
                 &client,
                 &url,
                 GrabOptions {
                     max_depth: depth,
                     max_pages: pages,
                 },
-            ))? {
-                println!("{link}");
+            ))?;
+            if json {
+                print_envelope(json!(links));
+            } else {
+                for link in &links {
+                    println!("{link}");
+                }
             }
         }
         Command::Ftp {
@@ -185,10 +442,14 @@ fn run(args: Args) -> Result<(), String> {
                 .transpose()?
                 .unwrap_or_default();
             let runtime = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-            for entry in
-                runtime.block_on(dlcore::protocols::list_ftp(&url, &username, &password))?
-            {
-                println!("{entry}");
+            let entries =
+                runtime.block_on(dlcore::protocols::list_ftp(&url, &username, &password))?;
+            if json {
+                print_envelope(json!(entries));
+            } else {
+                for entry in &entries {
+                    println!("{entry}");
+                }
             }
         }
         Command::Serve {
@@ -217,6 +478,9 @@ fn run(args: Args) -> Result<(), String> {
             }
             let mut server = remote::serve(manager.clone(), settings.remote)?;
             eprintln!("Remote control listening on {}", server.address());
+            if json {
+                print_envelope(json!({"listening": server.address().to_string()}));
+            }
             manager
                 .runtime()
                 .block_on(tokio::signal::ctrl_c())
@@ -228,10 +492,20 @@ fn run(args: Args) -> Result<(), String> {
         Command::Site { command } => {
             let mut settings = read_settings(&dir)?;
             match command {
-                SiteCommand::List => println!(
-                    "{}",
-                    serde_json::to_string_pretty(&settings.site_rules).map_err(|e| e.to_string())?
-                ),
+                SiteCommand::List => {
+                    if json {
+                        print_envelope(
+                            serde_json::to_value(&settings.site_rules)
+                                .map_err(|e| e.to_string())?,
+                        );
+                    } else {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&settings.site_rules)
+                                .map_err(|e| e.to_string())?
+                        );
+                    }
+                }
                 SiteCommand::Set {
                     origin,
                     username,
@@ -243,12 +517,17 @@ fn run(args: Args) -> Result<(), String> {
                         dlcore::site::origin(&rule.host).ok().as_ref() != Some(&origin)
                     });
                     settings.site_rules.push(SiteRule {
-                        host: origin,
+                        host: origin.clone(),
                         username,
                         max_concurrent: concurrent,
                         connections,
                     });
                     save_settings(&dir, &settings)?;
+                    saved(
+                        json,
+                        APPLIES_SAVED,
+                        json!({"saved": true, "origin": origin, "applies": APPLIES}),
+                    );
                 }
                 SiteCommand::Remove { origin } => {
                     let origin = dlcore::site::origin(&origin)?;
@@ -256,17 +535,29 @@ fn run(args: Args) -> Result<(), String> {
                         dlcore::site::origin(&rule.host).ok().as_ref() != Some(&origin)
                     });
                     save_settings(&dir, &settings)?;
+                    saved(
+                        json,
+                        APPLIES_SAVED,
+                        json!({"saved": true, "applies": APPLIES}),
+                    );
                 }
             }
         }
         Command::Automation { command } => {
             let mut settings = read_settings(&dir)?;
             if matches!(command, AutomationCommand::List) {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&settings.scheduled_actions)
-                        .map_err(|e| e.to_string())?
-                );
+                if json {
+                    print_envelope(
+                        serde_json::to_value(&settings.scheduled_actions)
+                            .map_err(|e| e.to_string())?,
+                    );
+                } else {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&settings.scheduled_actions)
+                            .map_err(|e| e.to_string())?
+                    );
+                }
             } else {
                 let id = settings
                     .scheduled_actions
@@ -298,24 +589,85 @@ fn run(args: Args) -> Result<(), String> {
                     });
                 }
                 save_settings(&dir, &settings)?;
+                saved(
+                    json,
+                    APPLIES_SAVED,
+                    json!({"saved": true, "applies": APPLIES}),
+                );
+            }
+        }
+        Command::Modules { command } => modules_command(&dir, json, command)?,
+        Command::Wait { ids, timeout } => {
+            let token = require_token(token)?;
+            let endpoint = parse_endpoint(&endpoint_text)?;
+            let results = wait_for(&endpoint, &token, &ids, timeout)?;
+            if json {
+                let rows: Vec<Value> = results
+                    .iter()
+                    .map(|(id, status)| json!({"id": id, "status": status}))
+                    .collect();
+                print_envelope(json!(rows));
+            } else {
+                for (id, status) in &results {
+                    println!("{id} {status}");
+                }
             }
         }
         command => {
-            let token = token.ok_or("provide --token or DOWNLOADER_REMOTE_TOKEN")?;
+            let token = require_token(token)?;
             let (method, path, body) = match command {
                 Command::List => (reqwest::Method::GET, "/downloads".into(), None),
+                Command::Status { id } => (reqwest::Method::GET, format!("/downloads/{id}"), None),
                 Command::Add {
                     url,
                     dir,
                     paused,
                     video,
-                } => (
-                    reqwest::Method::POST,
-                    "/downloads".into(),
-                    Some(
-                        serde_json::json!({"url":url,"dir":dir,"start":!paused,"kind":if video {"Video"} else {"Auto"}}),
-                    ),
-                ),
+                    unique,
+                    priority,
+                    checksum,
+                    headers,
+                    on_conflict,
+                } => {
+                    let mut body = json!({
+                        "url": url,
+                        "dir": dir,
+                        "start": !paused,
+                        "kind": if video { "Video" } else { "Auto" },
+                    });
+                    if unique {
+                        body["unique"] = json!(true);
+                    }
+                    if let Some(priority) = priority {
+                        body["priority"] = json!(priority);
+                    }
+                    if let Some(checksum) = checksum {
+                        if Checksum::guess(&checksum).is_none() {
+                            return Err(CliError::new(
+                                "invalid",
+                                "--checksum must be a 32/40/64/128-character hex digest, optionally prefixed b2:",
+                            ));
+                        }
+                        body["checksum"] = json!(checksum);
+                    }
+                    if !headers.is_empty() {
+                        let pairs = headers
+                            .iter()
+                            .map(|raw| parse_header(raw))
+                            .collect::<Result<Vec<_>, _>>()
+                            .map_err(|e| CliError::new("invalid", e))?;
+                        validate_headers(&pairs).map_err(|e| CliError::new("invalid", e))?;
+                        body["headers"] = json!(pairs);
+                    }
+                    if let Some(policy) = on_conflict {
+                        body["conflict"] = json!(ConflictPolicy::from(policy));
+                    }
+                    (
+                        reqwest::Method::POST,
+                        "/downloads".into(),
+                        Some(body.to_string()),
+                    )
+                }
                 Command::Start { id } => (
                     reqwest::Method::POST,
                     format!("/downloads/{id}/start"),
@@ -331,70 +683,31 @@ fn run(args: Args) -> Result<(), String> {
                 }
                 Command::StartAll => (reqwest::Method::POST, "/start-all".into(), None),
                 Command::PauseAll => (reqwest::Method::POST, "/pause-all".into(), None),
+                Command::Export => (reqwest::Method::GET, "/export".into(), None),
+                Command::Import { file, start } => {
+                    let text = std::fs::read_to_string(&file).map_err(|e| {
+                        CliError::new("invalid", format!("{}: {e}", file.display()))
+                    })?;
+                    serde_json::from_str::<Value>(&text).map_err(|e| {
+                        CliError::new("invalid", format!("{}: {e}", file.display()))
+                    })?;
+                    (
+                        reqwest::Method::POST,
+                        format!("/import?start={start}"),
+                        Some(text),
+                    )
+                }
                 _ => unreachable!(),
             };
-            let endpoint = reqwest::Url::parse(&args.endpoint).map_err(|e| e.to_string())?;
-            if !matches!(endpoint.scheme(), "http" | "https")
-                || !endpoint.username().is_empty()
-                || endpoint.password().is_some()
-            {
-                return Err("endpoint must be HTTP(S) without embedded credentials".into());
-            }
+            let endpoint = parse_endpoint(&endpoint_text)?;
             let runtime = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
-            runtime.block_on(async {
-                let client = reqwest::Client::builder()
-                    .redirect(reqwest::redirect::Policy::none())
-                    .timeout(std::time::Duration::from_secs(10))
-                    .build()
-                    .map_err(|e| e.to_string())?;
-                let mut request = client
-                    .request(method, endpoint.join(&path).map_err(|e| e.to_string())?)
-                    .bearer_auth(token);
-                if let Some(body) = body {
-                    request = request
-                        .header(reqwest::header::CONTENT_TYPE, "application/json")
-                        .body(body.to_string());
-                }
-                let response = request
-                    .send()
-                    .await
-                    .map_err(|e| e.without_url().to_string())?;
-                let status = response.status();
-                let body = response
-                    .text()
-                    .await
-                    .map_err(|e| e.without_url().to_string())?;
-                if !status.is_success() {
-                    return Err(format!("HTTP {status}: {body}"));
-                }
+            let body = runtime.block_on(call(&endpoint, &token, method, &path, body))?;
+            if json {
+                print_envelope(parse_body(body));
+            } else {
                 println!("{body}");
-                Ok(())
-            })?;
+            }
         }
     }
-    Ok(())
-}
-
-fn read_settings(dir: &Path) -> Result<Settings, String> {
-    match std::fs::read(dir.join("settings.json")) {
-        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| e.to_string()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default()),
-        Err(error) => Err(error.to_string()),
-    }
-}
-
-fn save_settings(dir: &Path, settings: &Settings) -> Result<(), String> {
-    use std::io::Write;
-    settings.validate()?;
-    std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-    let json = serde_json::to_vec_pretty(settings).map_err(|e| e.to_string())?;
-    let temporary = dir.join("settings.json.tmp");
-    let mut file = std::fs::File::create(&temporary).map_err(|e| e.to_string())?;
-    file.write_all(&json)
-        .and_then(|_| file.sync_all())
-        .map_err(|e| e.to_string())?;
-    drop(file);
-    std::fs::rename(&temporary, dir.join("settings.json")).map_err(|e| e.to_string())?;
-    println!("Saved. Settings changes apply when the manager next starts.");
     Ok(())
 }

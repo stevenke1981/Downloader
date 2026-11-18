@@ -20,6 +20,11 @@ path = "src/bin/host.rs"
 name = "dlxctl"
 path = "src/bin/dlxctl.rs"
 
+# Example external module (docs/modules.md); not part of the installed app.
+[[bin]]
+name = "dlx-module-example"
+path = "src/bin/module_example.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net", "io-util", "signal", "fs", "process"] }
 tokio-util = "0.7"

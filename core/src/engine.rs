@@ -17,7 +17,7 @@ use crate::category::Category;
 use crate::checksum;
 use crate::google_drive;
 use crate::limiter::RateLimiter;
-use crate::task::{Seg, Status, Task};
+use crate::task::{ConflictPolicy, Seg, Status, Task};
 use crate::util;
 use futures_util::StreamExt;
 use reqwest::header::{CONTENT_DISPOSITION, CONTENT_RANGE, ETAG, IF_RANGE, LAST_MODIFIED, RANGE};
@@ -86,11 +86,19 @@ async fn probe_retry(
     referer: Option<&str>,
     cookie: Option<&str>,
     authorization: Option<&str>,
+    headers: &[(String, String)],
+    user_agent: Option<&str>,
 ) -> Result<Probe, String> {
+    // Custom headers need a client that does not follow redirects by itself.
+    let client = if headers.is_empty() {
+        &ctx.client
+    } else {
+        &ctx.protocol_client
+    };
     let mut attempt = 0;
     loop {
         let r = tokio::select! {
-            r = probe(&ctx.client, url, referer, cookie, authorization) => r,
+            r = probe(client, url, referer, cookie, authorization, headers, user_agent) => r,
             _ = ctx.cancel.cancelled() => return Err(String::new()),
         };
         match r {
@@ -152,24 +160,36 @@ pub async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
 }
 
 async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
-    let (url, referer, cookie, had_cookie, authorization) = {
+    let (task_url, url, referer, cookie, had_cookie, authorization, headers, user_agent) = {
         let mut t = task.lock().unwrap();
         t.append_log("HTTP probe started");
         (
             t.url.clone(),
+            // A resolver module may have pointed this download somewhere else.
+            t.resolved_url.clone().unwrap_or_else(|| t.url.clone()),
             t.referer.clone(),
             t.cookie.clone().filter(|c| !c.trim().is_empty()),
             t.had_cookie,
             t.authorization.clone(),
+            t.headers.clone(),
+            t.user_agent.clone(),
         )
     };
     let lost_cookie = had_cookie && cookie.is_none();
+    // Credentials belong to the URL the user gave, not to wherever a module sent us.
+    let (cookie, authorization) = if same_origin(&task_url, &url) {
+        (cookie, authorization)
+    } else {
+        (None, None)
+    };
     let p = match probe_retry(
         &ctx,
         &url,
         referer.as_deref(),
         cookie.as_deref(),
         authorization.as_deref(),
+        &headers,
+        user_agent.as_deref(),
     )
     .await
     {
@@ -187,6 +207,11 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         c => c,
     };
     let authorization = authorization.filter(|_| same_origin(&url, &p.url));
+    let headers = if same_origin(&url, &p.url) {
+        headers
+    } else {
+        Vec::new()
+    };
 
     let (part, conns) = {
         let mut t = task.lock().unwrap();
@@ -206,7 +231,14 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
             let name = suggested
                 .or_else(|| p.name.clone())
                 .unwrap_or_else(|| "download".into());
-            t.file_name = util::unique_name(&t.dir, &name);
+            // A leftover .part is never overwritten, whatever the policy.
+            let policy = match t.conflict {
+                ConflictPolicy::Overwrite if t.dir.join(format!("{name}.part")).exists() => {
+                    ConflictPolicy::Rename
+                }
+                other => other,
+            };
+            t.file_name = util::resolve_conflict(&t.dir, &name, policy)?;
             t.category = Category::from_name(&t.file_name);
         }
         let changed = (t.etag.is_some() && p.etag.is_some() && t.etag != p.etag)
@@ -249,6 +281,24 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
 
     std::fs::create_dir_all(part.parent().unwrap())
         .map_err(|e| format!("cannot create folder: {e}"))?;
+    let need: u64 = task
+        .lock()
+        .unwrap()
+        .segments
+        .iter()
+        .filter(|s| s.end != u64::MAX)
+        .map(Seg::remaining)
+        .sum();
+    if need > 0
+        && let Some(free) = util::free_space(part.parent().unwrap())
+        && need > free
+    {
+        return Err(format!(
+            "not enough disk space: need {}, {} free",
+            util::human_size(need),
+            util::human_size(free)
+        ));
+    }
     let fresh = task.lock().unwrap().downloaded() == 0;
     let file = std::fs::OpenOptions::new()
         .create(true)
@@ -270,6 +320,8 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
         referer,
         cookie,
         authorization,
+        headers,
+        user_agent,
         ctx: ctx.clone(),
     });
     let mut set = tokio::task::JoinSet::new();
@@ -326,9 +378,18 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, String> {
     }
     let final_path = if final_path.exists() {
         let mut t = task.lock().unwrap();
-        let n = util::unique_name(&t.dir, &t.file_name);
-        t.file_name = n;
-        t.final_path()
+        match t.conflict {
+            // rename() replaces the old file in one step.
+            ConflictPolicy::Overwrite => final_path,
+            ConflictPolicy::Skip => {
+                return Err(format!("file exists: {}", final_path.display()));
+            }
+            ConflictPolicy::Rename => {
+                let n = util::unique_name(&t.dir, &t.file_name);
+                t.file_name = n;
+                t.final_path()
+            }
+        }
     } else {
         final_path
     };

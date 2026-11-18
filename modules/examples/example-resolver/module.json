@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "id": "example-resolver",
+  "name": "Example resolver",
+  "version": "1.0.0",
+  "kinds": [
+    "resolver",
+    "hook"
+  ],
+  "match": {
+    "schemes": [
+      "https"
+    ],
+    "hosts": [
+      "example.com",
+      "*.example.org"
+    ]
+  },
+  "command": [
+    "dlx-module-example",
+    "--base",
+    "https://downloads.example.net/files/",
+    "--log",
+    "requests.log"
+  ],
+  "timeout_ms": 10000,
+  "events": [
+    "completed",
+    "failed"
+  ]
+}
