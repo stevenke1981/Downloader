@@ -34,6 +34,10 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 - **剪貼簿監看**（可選）：複製下載連結時自動跳出新增視窗；亦可設為直接自動下載、不跳視窗。
 - **多國語言**：繁體中文、簡體中文、English、日本語、한국어、Español、Deutsch、Français，在設定裡切換立即生效。系統語言是中文時預設繁體中文（簡體中文系統預設簡體）。
 - **命令列工具 `dlx`**：不需要介面的下載，可續傳。
+- **檔案已存在時**：預設另存為 `name (1).ext`；也可以覆蓋（新檔驗證完成後才替換），或直接略過。
+- **自訂標頭與 User-Agent**：新增下載時可設定額外的 HTTP 標頭與 User-Agent（不能設定 Cookie、Authorization 等會影響連線的標頭）。
+- **佇列匯出／匯入**：未完成的下載可匯出成 JSON 再匯入（不含 Cookie 與密碼）。Windows 上開始下載前會先檢查磁碟空間。
+- **模組（選用，預設關閉）**：外部小程式可解析連結，或在下載完成／失敗時接手。請在 **工具 > Modules** 啟用，並逐一核准。詳見 [模組說明](docs/modules.md)。
 
 ### 瀏覽器擴充功能（Chrome / Brave / Edge）
 `extension/` 是 Manifest V3 擴充功能，Chrome、Edge、Brave 都能用：
@@ -68,6 +72,9 @@ Downloader 是用 Rust 寫的多連線下載加速／管理工具，介面用 Sl
 dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha256>
 ```
 按 Ctrl+C 中斷後，再執行同一個指令就會續傳。
+
+### 給 AI 代理與腳本
+`dlx --json` 與 `dlxctl --json` 輸出機器可讀的結果，退出碼 0–7 與 130 有固定意義。開發與腳本指引請見 [AGENTS.md](AGENTS.md)、[命令列參考](docs/cli.md) 與 [模組](docs/modules.md)。
 
 ### Google Drive
 公開的單一檔案分享連結可直接加入 Downloader，會解析下載確認頁並使用伺服器回傳的檔名。需要登入的檔案請先在瀏覽器登入，再從 Drive 按「下載」；擴充功能會保留已解析的檔案網址與該網址的 Cookie。Google 登入頁不會被當成檔案儲存。
@@ -115,6 +122,9 @@ The **Tools** window adds configurable traffic presets, site/folder rules, bound
 - **8 languages** switchable at runtime: 繁體中文, 简体中文, English, 日本語, 한국어, Español, Deutsch, Français. Traditional Chinese is the default on Chinese systems (Simplified on zh-CN/zh-SG).
 - **`dlx` CLI** for headless, resumable downloads.
 - **Usability (0.6.0)**: search by name or URL, right-click menu, common shortcuts, and "Clear completed" that removes list entries but keeps files. Guide (in Traditional Chinese): [usability guide](docs/usability.zh-TW.md).
+- **Modules** (optional, off by default): external programs can resolve links or act when a download completes or fails. Enable them in **Tools > Modules** and approve each one. See [modules](docs/modules.md).
+- **File exists**: save as `name (1).ext` (default), overwrite (only after the new file verifies), or skip.
+- **Custom headers and User-Agent** per download; **queue export/import** as JSON (no cookies or passwords); **duplicate detection** via `dlxctl add --unique` and the remote API; a **disk-space precheck** on Windows.
 
 ### Browser extension (Chrome / Brave / Edge)
 `extension/` is a Manifest V3 extension for Chrome, Edge and Brave: context-menu items for links, images, video/audio, the page and "download all links"; automatic interception of browser downloads (the site's cookies are forwarded to the app by default so downloads that need a login work — sent only over the local connection, kept in memory, never written to disk; can be turned off); options for enabling interception, minimum size, include/exclude file types, Alt+click bypass and falling back to the browser when the app can't be reached. Localized in the same 8 languages.
@@ -136,6 +146,9 @@ Open folder links in the browser and select files to download; recursive folder 
 FTP/listing, Metalink, BitTorrent/magnet, HLS, RTSP H.264/G.711 and MMS-over-HTTP run in process using Rust libraries. No aria2, FFmpeg, yt-dlp or curl installation is required. `dlx --tools` lists embedded engines. Add `.m3u8` directly; use `--video` for direct media/HLS exposed by a webpage. DRM and JavaScript signature deciphering are unsupported. RTSP writes H.264 Annex B or audio-only G.711 decoded to PCM16 WAV, without audio/video remuxing; legacy MMST is unsupported. See the [engine guide](docs/fdm-tools.zh-TW.md) for protocol limits.
 
 Preview displays images/text inside Downloader and metadata for other supported media/documents; audio/video playback and PDF/EPUB rendering are not implemented. Open folder and explicitly configured scheduled programs remain OS integration features. The system tray icon remains Windows-only.
+
+### For AI agents and scripts / 給 AI 代理與腳本
+`dlx --json` and `dlxctl --json` print machine-readable results, and exit codes 0–7 and 130 have fixed meanings. See [AGENTS.md](AGENTS.md), the [CLI reference](docs/cli.md) and [modules](docs/modules.md).
 
 ### License
 MIT. This is an independent project; it is not affiliated with Free Download Manager, and all icons are original.

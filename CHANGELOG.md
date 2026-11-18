@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.7.0 — 2026-11-18
+
+### Added
+- **Modules** ([docs/modules.md](docs/modules.md)): built-in protocols now sit behind one registry, unchanged in behaviour. Optional external modules live in `<state dir>/modules/<id>/module.json`. A *resolver* can turn a link into the real download link and add headers, a file name or mirrors. A *hook* is told in the background when a download completes or fails. Modules are off by default: enable them in **Tools > Modules** or with `dlxctl modules enable`, then approve each module. An approval is the SHA-256 of that module's `module.json`; editing the file disables the module. Programs start from an argument list, never a shell, with a timeout and a bounded output. An example resolver is in `modules/examples/example-resolver`.
+- **File-exists policy**: when the name is taken, save as `name (1).ext` (default), **overwrite** (the old file is replaced only after the new one verifies), or **skip** (fails before transferring when the name is known in advance). Set it per download (`--on-conflict`, the `conflict` field) or as the default in **Tools > Sites / folders**.
+- **Custom headers and User-Agent** for downloads (`dlx --header`, `--user-agent`, and the same fields in the remote API). Cookie, Authorization, Host, Range, If-Range and Content-Length are refused. Custom headers go only to the download's own origin and are dropped on a cross-origin redirect.
+- **Duplicate detection**: `dlxctl add --unique` or `unique: true` in the remote API refuses a URL that is already queued or active.
+- **Disk-space precheck** (Windows): a download stops before writing when the space it still needs is larger than the free space.
+- **Queue export and import**: `dlxctl export` / `import`, `GET /export` and `POST /import`. Only unfinished downloads are exported, with no cookies, credentials or logs. Imports are added paused unless started.
+- **Remote API**: `GET /downloads/{id}`, `GET /export`, `POST /import`, `GET /modules`, `GET /version`. Adding a download accepts `priority`, `checksum`, `referer`, `headers`, `user_agent`, `unique` and `conflict`. Errors are `{"error", "code"}`; duplicates and conflicts return 409.
+- **Tools > Modules** tab (enable switch, module list, Approve / Revoke, Open modules folder) and the file-exists policy combo.
+
+### Changed
+- `settings.json` gains `conflict` and `modules`. Existing 0.6.x `settings.json` and `downloads.json` files load unchanged.
+- Modules run only through `dlx --modules-dir <state dir>/modules` or the app; approvals are never accepted from the remote API, an import file or a settings form.
+
+### Fixed
+- A module's resolved link and extra headers are never saved, so a revoked or disabled module cannot leave stale state behind.
+
+### For agents & scripts
+- `dlx --json` writes one NDJSON event per line on stdout (`start`, `progress`, `done`, `error`, `summary`); human text stays on stderr. `dlx --tools --json` lists the embedded engines.
+- `dlxctl --json` prints `{"ok":true,"data":...}` or `{"ok":false,"error":{"code","message"}}`.
+- Stable exit codes: 0 success, 1 failed, 2 usage or invalid input, 3 network, 4 auth, 5 verification, 6 conflict or duplicate, 7 module, 130 interrupted. Error codes match the `code` field.
+- New `dlxctl` commands: `status`, `wait` (with `--timeout`), `export`, `import`, `modules list | approve | revoke | enable | disable`.
+- [AGENTS.md](AGENTS.md) for coding agents and [docs/cli.md](docs/cli.md) for the CLI reference.
+
+### Known limits
+- HTTP mirror fallback is not implemented. Mirrors a resolver returns are stored but never tried.
+- The disk-space precheck is Windows-only; other systems start the download and fail on write.
+- `dlx` does not deliver completion events to hook modules. A running app or `dlxctl serve` does.
+- The development-only `dlx-module-example` binary is not included in the Windows packages or the installer.
+
 ## 0.6.2 — 2026-11-01
 
 ### Added

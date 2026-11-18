@@ -67,6 +67,14 @@ Example:
 
 ### Modules in dlx
 
+To run modules from `dlx`, all three must hold:
+
+1. `--modules-dir` is the state directory's `modules` folder (for example `%APPDATA%\Downloader\modules`, or `$DOWNLOADER_STATE_DIR/modules`). Any other folder is refused with exit 2.
+2. Modules are enabled: `dlxctl modules enable`. Otherwise dlx prints a warning and runs no module.
+3. Each module is approved: `dlxctl modules approve ID`, or `dlxctl modules approve ID --sha256 HEX` to approve only the `module.json` you checked.
+
+dlx reads approvals from the default state directory's `settings.json`, so run `dlxctl` without a different `--data-dir` when you approve modules for `dlx`.
+
 With `--modules-dir`, dlx runs approved resolver modules before each download. Approvals come from the default settings file (`settings.json` in the state folder, or `DOWNLOADER_STATE_DIR` when set). An approval is bound to the SHA-256 of the module's `module.json`, so an edited module stops running. dlx does not deliver completion events to hook modules; a running manager (the app, or `dlxctl serve`) does.
 
 ## dlxctl
@@ -107,7 +115,7 @@ Remote errors keep the server's text in `message` (for example `HTTP 401 Unautho
 | `crawl URL`, `ftp URL` | (local) | Lists links or FTP entries |
 | `site …`, `automation …` | (local) | Edit settings directly. Stop the app or `serve` first |
 | `modules list` | (local) | Modules in `<data-dir>/modules`, with approval state and problems |
-| `modules approve ID` | (local) | Stores the SHA-256 of `<data-dir>/modules/ID/module.json`. Any later edit to that file disables the module |
+| `modules approve ID [--sha256 HEX]` | (local) | Stores the SHA-256 of `<data-dir>/modules/ID/module.json`. With `--sha256`, approval is refused unless the file has that hash (as `modules list` shows it). Any later edit to that file disables the module |
 | `modules revoke ID`, `modules enable`, `modules disable` | (local) | Edit settings. A running app notices on its next settings save: a revocation or disable on disk wins, so it is not undone. The app applies it fully after a restart |
 | `generate-token` | (local) | Prints a new 256-bit token |
 
@@ -121,4 +129,5 @@ dlxctl --json add https://example.com/a.iso --unique --checksum sha256:...
 dlxctl --json wait 4 --timeout 600
 dlxctl --json export > queue.json
 dlxctl modules approve example-resolver
+dlxctl modules approve example-resolver --sha256 <hex>   # only if module.json has this hash
 ```

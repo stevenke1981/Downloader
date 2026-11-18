@@ -52,6 +52,7 @@ Set `CARGO_TARGET_DIR` if you want the build output outside `target/`; nothing e
 - **Human output is stable.** `dlx` and `dlxctl` default output must not change. New machine output goes behind `--json` and is additive.
 - **Stable error prefixes.** Messages starting with `file exists:`, `duplicate:`, `not enough disk space:`, `module <id>:` or containing `verification failed` drive `util::error_code` and so the exit codes. Keep those prefixes when you reword a message.
 - **Module approval** happens only through `dlxctl modules approve` or the app's Approve button. Never add approval to a remote route, an import file or a settings form.
+- **Running modules from `dlx`:** `--modules-dir` must be the state directory's `modules` folder, modules must be enabled (`dlxctl modules enable`) and approved (`dlxctl modules approve ID`, optionally `--sha256 HEX`). See [docs/cli.md](docs/cli.md#modules-in-dlx).
 - **Tokens and credentials** never go in logs, state files, JSON output or docs. Use `DOWNLOADER_REMOTE_TOKEN`.
 - **Git:** commit or push only when the user asks.
 
