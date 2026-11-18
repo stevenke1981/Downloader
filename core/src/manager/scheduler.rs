@@ -135,7 +135,12 @@ impl Inner {
                             event: "failed",
                             id: t.id,
                             url: t.url.clone(),
-                            path: t.final_path(),
+                            // Never point at a pre-existing file the task did not create.
+                            path: if err.starts_with("file exists:") || t.file_name.is_empty() {
+                                std::path::PathBuf::new()
+                            } else {
+                                t.final_path()
+                            },
                             size: t.total,
                             error: Some(err.clone()),
                         }),

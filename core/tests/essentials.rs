@@ -349,7 +349,21 @@ fn module_approvals_only_change_through_approve_and_revoke() {
     let (d, m) = new_manager();
     let mdir = d.path().join("modules/demo");
     std::fs::create_dir_all(&mdir).unwrap();
+    std::fs::write(mdir.join("demo-bin"), b"x").unwrap();
+    assert!(
+        m.approve_module("demo").is_err(),
+        "a missing manifest cannot be approved"
+    );
     std::fs::write(mdir.join("module.json"), b"{}").unwrap();
+    assert!(
+        m.approve_module("demo").is_err(),
+        "an invalid manifest cannot be approved"
+    );
+    std::fs::write(
+        mdir.join("module.json"),
+        br#"{"schema":1,"id":"demo","name":"Demo","version":"1.0.0","kinds":["resolver"],"match":{"schemes":["https"],"hosts":["example.com"]},"command":["demo-bin"]}"#,
+    )
+    .unwrap();
     m.approve_module("demo").unwrap();
     let hash = m.settings().modules.approved["demo"].clone();
     assert_eq!(hash.len(), 64);
@@ -431,4 +445,127 @@ fn remote_routes_and_error_codes() {
     let (st, rep) = call(a, "POST", "/import", &queue.to_string());
     assert_eq!(st, 200);
     assert_eq!(rep["skipped"].as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn overwrite_keeps_the_old_file_when_verification_fails() {
+    let s = serve(data(50_000), None);
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("v.bin"), b"precious").unwrap();
+    let t = task(s.url("v.bin"), dir.path(), ConflictPolicy::Overwrite);
+    t.lock().unwrap().checksum = Some(dlcore::checksum::Checksum {
+        algo: dlcore::checksum::Algo::Sha256,
+        expected: "0".repeat(64),
+        source: "user".into(),
+    });
+    let e = engine::run(t, ctx()).await.unwrap_err();
+    assert!(
+        e.contains("verification failed") || e.contains("mismatch"),
+        "{e}"
+    );
+    assert_eq!(
+        std::fs::read(dir.path().join("v.bin")).unwrap(),
+        b"precious"
+    );
+}
+
+#[tokio::test]
+async fn skip_and_overwrite_never_share_a_part_file() {
+    let s = serve(data(1000), None);
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("c.bin.part"), b"someone else").unwrap();
+    let t = task(s.url("c.bin"), dir.path(), ConflictPolicy::Skip);
+    engine::run(t.clone(), ctx()).await.unwrap();
+    assert_eq!(t.lock().unwrap().file_name, "c (1).bin");
+    assert_eq!(
+        std::fs::read(dir.path().join("c.bin.part")).unwrap(),
+        b"someone else"
+    );
+}
+
+#[tokio::test]
+async fn segment_workers_do_not_follow_redirects_with_custom_headers() {
+    let target = serve(data(200_000), None);
+    let l = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = l.local_addr().unwrap().port();
+    let to = target.port;
+    std::thread::spawn(move || {
+        for s in l.incoming() {
+            let Ok(mut s) = s else { break };
+            let mut buf = [0u8; 4096];
+            let n = s.read(&mut buf).unwrap_or(0);
+            let head = String::from_utf8_lossy(&buf[..n]).to_ascii_lowercase();
+            let reply = if head.contains("range: bytes=0-0") {
+                "HTTP/1.1 206 Partial Content\r\nContent-Length: 1\r\nContent-Range: bytes 0-0/200000\r\nConnection: close\r\n\r\nx".to_string()
+            } else {
+                format!(
+                    "HTTP/1.1 302 Found\r\nLocation: http://localhost:{to}/files/x.bin\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+            };
+            let _ = s.write_all(reply.as_bytes());
+        }
+    });
+    let dir = tempfile::tempdir().unwrap();
+    let t = task(
+        format!("http://127.0.0.1:{port}/files/x.bin"),
+        dir.path(),
+        ConflictPolicy::Rename,
+    );
+    t.lock().unwrap().headers = vec![("X-Token".into(), "abc123".into())];
+    let e = engine::run(t, ctx()).await.unwrap_err();
+    assert!(e.contains("redirect"), "{e}");
+    assert!(
+        target.heads.lock().unwrap().is_empty(),
+        "the redirect target must never be contacted"
+    );
+}
+
+#[test]
+fn dlxctl_revocations_on_disk_survive_a_settings_save() {
+    let (d, m) = new_manager();
+    let mdir = d.path().join("modules/demo");
+    std::fs::create_dir_all(&mdir).unwrap();
+    std::fs::write(mdir.join("demo-bin"), b"x").unwrap();
+    std::fs::write(
+        mdir.join("module.json"),
+        br#"{"schema":1,"id":"demo","name":"Demo","version":"1.0.0","kinds":["resolver"],"match":{"schemes":["https"],"hosts":["example.com"]},"command":["demo-bin"]}"#,
+    )
+    .unwrap();
+    let mut s = m.settings();
+    s.modules.enabled = true;
+    m.set_settings(s).unwrap();
+    m.approve_module("demo").unwrap();
+    // dlxctl revokes and disables by editing settings.json while the app runs.
+    let path = d.path().join("settings.json");
+    let mut v: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    v["modules"]["approved"] = serde_json::json!({});
+    v["modules"]["enabled"] = serde_json::json!(false);
+    std::fs::write(&path, serde_json::to_vec(&v).unwrap()).unwrap();
+    // The app then saves its (stale) settings form.
+    let mut stale = m.settings();
+    stale.modules.enabled = true;
+    m.set_settings(stale).unwrap();
+    let s = m.settings();
+    assert!(s.modules.approved.is_empty(), "revocation was undone");
+    assert!(!s.modules.enabled, "disable was undone");
+}
+
+#[test]
+fn import_limit_ignores_the_query_string() {
+    let (_d, m) = new_manager();
+    let server = dlcore::remote::serve(
+        m,
+        dlcore::remote::RemoteSettings {
+            enabled: true,
+            bind: "127.0.0.1:0".into(),
+            token: "0123456789abcdef0123".into(),
+        },
+    )
+    .unwrap();
+    let body = format!(
+        r#"{{"schema":1,"downloads":[],"pad":"{}"}}"#,
+        "x".repeat(100_000)
+    );
+    let (st, v) = call(server.address(), "POST", "/import?start=0", &body);
+    assert_eq!(st, 200, "{v}");
 }

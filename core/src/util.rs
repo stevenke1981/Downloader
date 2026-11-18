@@ -210,26 +210,19 @@ pub fn resolve_conflict(
     }
 }
 
-/// Whether `s` contains `num` not adjacent to other digits.
-fn has_number(s: &str, num: &str) -> bool {
-    s.match_indices(num).any(|(i, _)| {
-        let before = s[..i].bytes().last();
-        let after = s[i + num.len()..].bytes().next();
-        !before.is_some_and(|b| b.is_ascii_digit()) && !after.is_some_and(|b| b.is_ascii_digit())
-    })
-}
-
-/// "http 404", "status 503", "status code 500", "server returned 403".
-fn has_http_status(s: &str) -> bool {
+/// First "http 404", "status 503", "status code 500", "server returned 403" status in `s`.
+fn http_status(s: &str) -> Option<u16> {
     ["http ", "status ", "status code ", "server returned "]
         .iter()
-        .any(|p| {
-            s.match_indices(p).any(|(i, _)| {
+        .find_map(|p| {
+            s.match_indices(p).find_map(|(i, _)| {
                 let rest = &s.as_bytes()[i + p.len()..];
-                rest.len() >= 3
+                (rest.len() >= 3
                     && rest[..3].iter().all(u8::is_ascii_digit)
                     && (b'1'..=b'5').contains(&rest[0])
-                    && rest.get(3).is_none_or(|b| !b.is_ascii_digit())
+                    && rest.get(3).is_none_or(|b| !b.is_ascii_digit()))
+                .then(|| s[i + p.len()..i + p.len() + 3].parse().ok())
+                .flatten()
             })
         })
 }
@@ -248,9 +241,12 @@ pub fn error_code(msg: &str) -> &'static str {
         "module"
     } else if m.contains("verification failed") || m.contains("checksum mismatch") {
         "verify"
-    } else if m.contains("token") || m.contains("unauthorized") || has_number(&m, "401") {
+    } else if m.contains("token")
+        || m.contains("unauthorized")
+        || matches!(http_status(&m), Some(401 | 403))
+    {
         "auth"
-    } else if has_http_status(&m) {
+    } else if http_status(&m).is_some() {
         "http"
     } else if [
         "connect",
@@ -447,6 +443,9 @@ mod tests {
             ("HTTP 404 Not Found", "http"),
             ("server returned status 503", "http"),
             ("HTTP 401 Unauthorized", "auth"),
+            ("HTTP 403 Forbidden", "auth"),
+            ("error sending request: connection refused", "network"),
+            ("HTTP 404 Not Found", "http"),
             ("missing or wrong token", "auth"),
             ("unauthorized", "auth"),
             ("error sending request: connection refused", "network"),

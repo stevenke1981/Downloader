@@ -207,7 +207,7 @@ async fn unsafe_or_malformed_answers_are_rejected() {
         let (result, t) = resolve(&registry, &url).await;
         if id == "torrent-out" {
             result.unwrap();
-            assert_eq!(t.headers, [("X-A".to_string(), "1".to_string())]);
+            assert_eq!(t.module_headers, [("X-A".to_string(), "1".to_string())]);
             continue;
         }
         let err = result.unwrap_err();
@@ -215,7 +215,7 @@ async fn unsafe_or_malformed_answers_are_rejected() {
             err.starts_with(&format!("module {id}: ")) && err.contains(expected),
             "{id}: {err}"
         );
-        assert!(t.resolved_url.is_none() && t.headers.is_empty() && t.module.is_none());
+        assert!(t.resolved_url.is_none() && t.module_headers.is_empty() && t.module.is_none());
         assert_eq!(dlcore::util::error_code(&err), "module", "{err}");
     }
     let (result, _) = resolve(&registry, "http://torrent-out.test/a.torrent").await;
@@ -285,7 +285,14 @@ async fn resolver_rewrites_a_download_end_to_end() {
         let t = t.lock().unwrap();
         assert_eq!(t.resolved_url.as_deref(), Some(s.url("big.bin").as_str()));
         assert_eq!(t.url, HOST_URL, "the original link is kept");
-        assert_eq!(t.headers, [("X-Token".to_string(), "abc".to_string())]);
+        assert!(
+            t.headers.is_empty(),
+            "module headers stay out of the user's headers"
+        );
+        assert_eq!(
+            t.module_headers,
+            [("X-Token".to_string(), "abc".to_string())]
+        );
         assert_eq!(t.suggested_name.as_deref(), Some("named.bin"));
         assert!(t.log.iter().any(|l| l.contains("example-resolver")));
     }
@@ -344,4 +351,81 @@ async fn hooks_fire_once_per_subscribed_event() {
     assert_eq!(lines[0]["event"], "completed");
     assert_eq!(lines[0]["id"], 3);
     assert_eq!(lines[0]["size"], 10);
+}
+
+#[tokio::test]
+async fn resolutions_never_outlive_the_module_or_persist() {
+    let data = server::test_data(16 << 10);
+    let s = server::start(data, true, 0).await;
+    let base = s.url("");
+    let root = tempfile::tempdir().unwrap();
+    install(
+        root.path(),
+        "res",
+        &["--base", &base, "--header", "X-Token:secret-token"],
+        json!({}),
+    );
+    let settings = approved(root.path(), &["res"]);
+    let registry = Registry::load(&settings, root.path());
+    let t = task(HOST_URL);
+    t.lock().unwrap().headers = vec![("X-User".into(), "1".into())];
+    registry
+        .prepare(&t, &CancellationToken::new())
+        .await
+        .unwrap();
+    {
+        let t = t.lock().unwrap();
+        assert!(t.resolved_url.is_some());
+        assert_eq!(t.module.as_deref(), Some("res"));
+        assert_eq!(t.headers, [("X-User".to_string(), "1".to_string())]);
+        // Saved state (downloads.json) never carries the module's headers.
+        let saved = serde_json::to_string(&*t).unwrap();
+        assert!(!saved.contains("secret-token"), "{saved}");
+        assert!(!saved.contains("module_headers"), "{saved}");
+        let restored: Task = serde_json::from_str(&saved).unwrap();
+        assert!(restored.module_headers.is_empty() && restored.resolved_url.is_none());
+    }
+    // Disabled, revoked or no longer matching: the next run uses the original link.
+    let disabled = ModuleSettings {
+        enabled: false,
+        ..settings.clone()
+    };
+    let revoked = ModuleSettings {
+        enabled: true,
+        approved: Default::default(),
+    };
+    for registry in [
+        Registry::empty(),
+        Registry::load(&disabled, root.path()),
+        Registry::load(&revoked, root.path()),
+    ] {
+        Registry::load(&settings, root.path())
+            .prepare(&t, &CancellationToken::new())
+            .await
+            .unwrap();
+        assert!(t.lock().unwrap().resolved_url.is_some());
+        registry
+            .prepare(&t, &CancellationToken::new())
+            .await
+            .unwrap();
+        let t = t.lock().unwrap();
+        assert_eq!(t.resolved_url, None);
+        assert!(t.module_headers.is_empty());
+        assert_eq!(t.module, None);
+        assert_eq!(t.headers, [("X-User".to_string(), "1".to_string())]);
+    }
+    // A module that now answers "skip" also clears the earlier resolution.
+    Registry::load(&settings, root.path())
+        .prepare(&t, &CancellationToken::new())
+        .await
+        .unwrap();
+    install(root.path(), "res", &["--skip"], json!({}));
+    let skipping = Registry::load(&approved(root.path(), &["res"]), root.path());
+    skipping
+        .prepare(&t, &CancellationToken::new())
+        .await
+        .unwrap();
+    let t = t.lock().unwrap();
+    assert_eq!(t.resolved_url, None);
+    assert!(t.module_headers.is_empty());
 }

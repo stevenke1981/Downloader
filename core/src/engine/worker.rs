@@ -53,7 +53,13 @@ impl Shared {
         if pos >= end {
             return Ok(());
         }
-        let mut req = self.ctx.client.get(&self.url);
+        // reqwest would carry custom headers across a redirect, so they get a client that never follows one.
+        let client = if self.headers.is_empty() {
+            &self.ctx.client
+        } else {
+            &self.ctx.protocol_client
+        };
+        let mut req = client.get(&self.url);
         if let Some(r) = &self.referer {
             req = req.header(reqwest::header::REFERER, r);
         }
@@ -85,6 +91,11 @@ impl Shared {
             _ = self.ctx.cancel.cancelled() => return Err(FetchErr::Cancelled),
         };
         let st = resp.status();
+        if st.is_redirection() && !self.headers.is_empty() {
+            return Err(FetchErr::Fatal(format!(
+                "HTTP {st}: redirected during the transfer; custom headers are not sent to another address"
+            )));
+        }
         google_drive::validate_file_response(&resp, self.drive_download)
             .map_err(FetchErr::Fatal)?;
         if self.range && st.as_u16() != 206 {

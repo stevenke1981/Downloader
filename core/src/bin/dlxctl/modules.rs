@@ -3,9 +3,8 @@ use crate::cli::CliError;
 use crate::print_envelope;
 use crate::settings::{APPLIES, read_settings, save_settings, saved};
 use clap::Subcommand;
-use dlcore::modules::Registry;
+use dlcore::modules::{ManifestSummary, Registry, inspect_manifest, valid_id};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::path::Path;
 
 #[derive(Subcommand)]
@@ -15,6 +14,9 @@ pub enum ModuleCommand {
     /// Approve the module's current module.json (stores its SHA-256). Any later edit disables it.
     Approve {
         id: String,
+        /// Approve only if module.json has this SHA-256 (as shown by "modules list")
+        #[arg(long, value_name = "HEX")]
+        sha256: Option<String>,
     },
     /// Remove the approval.
     Revoke {
@@ -25,29 +27,32 @@ pub enum ModuleCommand {
     Disable,
 }
 
-fn valid_module_id(id: &str) -> bool {
-    (1..=40).contains(&id.len())
-        && id
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-}
-
-/// SHA-256 (lowercase hex) of the module's module.json bytes, as stored in settings.
-fn module_hash(modules_dir: &Path, id: &str) -> Result<String, CliError> {
-    if !valid_module_id(id) {
+/// The validated manifest (size-capped, same checks as the app) the user is about to approve.
+fn inspect(
+    modules_dir: &Path,
+    id: &str,
+    expected: Option<&str>,
+) -> Result<ManifestSummary, CliError> {
+    if !valid_id(id) {
         return Err(CliError::new(
             "invalid",
             format!("invalid module id {id:?}: use 1–40 characters a-z, 0-9 or -"),
         ));
     }
-    let path = modules_dir.join(id).join("module.json");
-    let bytes = std::fs::read(&path).map_err(|e| {
-        CliError::new(
+    let summary = inspect_manifest(modules_dir, id).map_err(|e| CliError::new("module", e))?;
+    if let Some(expected) = expected
+        && !expected.trim().eq_ignore_ascii_case(&summary.sha256)
+    {
+        return Err(CliError::new(
             "module",
-            format!("module {id}: cannot read {}: {e}", path.display()),
-        )
-    })?;
-    Ok(hex::encode(Sha256::digest(&bytes)))
+            format!(
+                "module {id}: module.json has sha256 {}, not the expected {}; not approved",
+                summary.sha256,
+                expected.trim()
+            ),
+        ));
+    }
+    Ok(summary)
 }
 
 pub fn modules_command(dir: &Path, json: bool, command: ModuleCommand) -> Result<(), CliError> {
@@ -82,20 +87,41 @@ pub fn modules_command(dir: &Path, json: bool, command: ModuleCommand) -> Result
                         },
                         module.kinds.join(",")
                     );
+                    if !module.manifest_sha256.is_empty() {
+                        println!("    sha256: {}", module.manifest_sha256);
+                    }
                     if let Some(error) = &module.error {
                         println!("    error: {error}");
                     }
                 }
             }
         }
-        ModuleCommand::Approve { id } => {
-            let hash = module_hash(&modules_dir, &id)?;
-            settings.modules.approved.insert(id.clone(), hash.clone());
+        ModuleCommand::Approve { id, sha256 } => {
+            let m = inspect(&modules_dir, &id, sha256.as_deref())?;
+            settings
+                .modules
+                .approved
+                .insert(id.clone(), m.sha256.clone());
             save_settings(dir, &settings)?;
             saved(
                 json,
-                &format!("Approved module {id} (sha256 {hash}). {APPLIES}"),
-                json!({"module": id, "approved": true, "sha256": hash}),
+                &format!(
+                    "Approved module {id} {} (sha256 {}).\n  runs: {} {}\n  command: {:?}\n{APPLIES}",
+                    m.version,
+                    m.sha256,
+                    m.program.display(),
+                    m.command[1..].join(" "),
+                    m.command,
+                ),
+                json!({
+                    "module": id,
+                    "approved": true,
+                    "sha256": m.sha256,
+                    "version": m.version,
+                    "kinds": m.kinds,
+                    "command": m.command,
+                    "program": m.program.display().to_string(),
+                }),
             );
         }
         ModuleCommand::Revoke { id } => {

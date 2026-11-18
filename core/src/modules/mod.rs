@@ -126,16 +126,43 @@ fn builtin_infos() -> Vec<ModuleInfo> {
         .collect()
 }
 
-/// Hash of `<dir>/<id>/module.json` for approval. Fails when the manifest is missing or invalid,
-/// so only a module that could run can be approved.
-pub fn manifest_hash(dir: &Path, id: &str) -> Result<String, String> {
+/// What a user approves: the manifest's hash and the program it will start.
+#[derive(Debug, Clone, Serialize)]
+pub struct ManifestSummary {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub kinds: Vec<String>,
+    /// `command` exactly as written in module.json.
+    pub command: Vec<String>,
+    /// Canonical path of the program `command[0]` resolves to.
+    pub program: PathBuf,
+    pub sha256: String,
+}
+
+/// Validate `<dir>/<id>/module.json` (size-capped) and describe it for approval.
+/// Fails when the manifest is missing or invalid, so only a module that could run can be approved.
+pub fn inspect_manifest(dir: &Path, id: &str) -> Result<ManifestSummary, String> {
     if !valid_id(id) {
         return Err(format!("module {id}: invalid id"));
     }
     let folder = dir.join(id);
     let bytes = manifest::read(&folder).map_err(|e| format!("module {id}: {e}"))?;
     let checked = manifest::check(&folder, &bytes).map_err(|e| format!("module {id}: {e}"))?;
-    Ok(checked.sha256)
+    Ok(ManifestSummary {
+        id: checked.manifest.id,
+        name: checked.manifest.name,
+        version: checked.manifest.version,
+        kinds: checked.manifest.kinds,
+        command: checked.manifest.command,
+        program: checked.program,
+        sha256: checked.sha256,
+    })
+}
+
+/// Hash of `<dir>/<id>/module.json` for approval (see [`inspect_manifest`]).
+pub fn manifest_hash(dir: &Path, id: &str) -> Result<String, String> {
+    inspect_manifest(dir, id).map(|m| m.sha256)
 }
 
 const CHANGED: &str = "module.json changed since it was approved; approve it again";
@@ -259,13 +286,18 @@ impl Registry {
         task: &Arc<Mutex<Task>>,
         cancel: &CancellationToken,
     ) -> Result<(), String> {
+        // A resolution never outlives the run that made it: a module revoked, disabled or
+        // answering "skip" since must not keep steering the download.
+        let (url, kind, referer) = {
+            let mut t = task.lock().unwrap();
+            t.resolved_url = None;
+            t.module_headers.clear();
+            t.module = None;
+            (t.url.trim().to_string(), t.kind, t.referer.clone())
+        };
         if self.runnable.is_empty() {
             return Ok(());
         }
-        let (url, kind, referer) = {
-            let t = task.lock().unwrap();
-            (t.url.trim().to_string(), t.kind, t.referer.clone())
-        };
         if crate::protocols::handles(&url, kind) {
             return Ok(());
         }
@@ -282,7 +314,7 @@ impl Registry {
         let id = &module.manifest.id;
         let fail = |e: String| format!("module {id}: {e}");
         let request = serde_json::json!({"v": 1, "op": "resolve", "url": url, "referer": referer});
-        let Some(line) = external::call(module, &request.to_string(), &self.permits, Some(cancel))
+        let Some(line) = external::call(module, &request.to_string(), &self.permits, cancel)
             .await
             .map_err(fail)?
         else {
@@ -318,13 +350,15 @@ impl Registry {
             .map(|f| crate::util::sanitize(&f))
             .filter(|f| !f.is_empty());
         let mut t = task.lock().unwrap();
-        let mut headers = t.headers.clone();
-        for (name, value) in added {
-            headers.retain(|(n, _)| !n.eq_ignore_ascii_case(&name));
-            headers.push((name, value));
+        // The combined set sent to the resolved origin must pass the same limits.
+        let mut combined = t.headers.clone();
+        for (name, _) in &added {
+            combined.retain(|(n, _)| !n.eq_ignore_ascii_case(name));
         }
-        crate::task::validate_headers(&headers).map_err(fail)?;
-        t.headers = headers;
+        combined.extend(added.iter().cloned());
+        crate::task::validate_headers(&combined).map_err(fail)?;
+        // Kept apart from the user's (persisted) headers so they never reach the original site.
+        t.module_headers = added;
         for mirror in response.mirrors {
             let mirror = mirror.trim().to_string();
             if !t.mirrors.contains(&mirror) {
@@ -370,7 +404,7 @@ impl Registry {
             let pending = self.hooks_pending.clone();
             rt.spawn(async move {
                 // Hook output and failures are ignored by design.
-                let _ = external::call(&module, &line, &permits, None).await;
+                let _ = external::deliver(&module, &line, &permits).await;
                 pending.fetch_sub(1, Ordering::SeqCst);
             });
         }

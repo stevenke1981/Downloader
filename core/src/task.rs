@@ -127,6 +127,10 @@ pub struct Task {
     /// URL a resolver module produced. Never persisted.
     #[serde(skip)]
     pub resolved_url: Option<String>,
+    /// Headers a resolver module asked for. Never persisted, and meant only for requests to
+    /// the origin of `resolved_url` (they override `headers` of the same name there).
+    #[serde(skip)]
+    pub module_headers: Vec<(String, String)>,
     /// Id of the module that resolved this download.
     pub module: Option<String>,
     /// Bytes hashed so far while verifying (not persisted).

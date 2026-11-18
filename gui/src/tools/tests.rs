@@ -70,6 +70,7 @@ fn tools_tabs_expose_typed_controls_and_pinned_close() {
         (2, "Collect links"),
         (3, "Schedule action"),
         (4, "Apply remote API"),
+        (5, "Open modules folder"),
     ] {
         ui.set_tab(index);
         assert!(
@@ -86,11 +87,51 @@ fn tools_tabs_expose_typed_controls_and_pinned_close() {
         assert!(position.y >= 0.0 && position.y + size.height <= 480.5);
     }
     assert!(!ui.get_remote_enabled());
+    ui.set_tab(4);
     ui.set_busy(true);
     let apply = ElementHandle::find_by_accessible_label(&ui, "Apply remote API")
         .next()
         .unwrap();
     assert_eq!(apply.accessible_enabled(), Some(false));
+}
+
+#[test]
+fn modules_tab_mirrors_manager_state_and_conflict_policy() {
+    use slint::Model;
+    let state = tempfile::tempdir().unwrap();
+    let dir = state.path().join("modules").join("demo-mod");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("module.json"),
+        r#"{"schema":1,"id":"demo-mod","name":"Demo","version":"1.0.0","kinds":["resolver"],"match":{"schemes":["https"],"hosts":["example.com"]},"command":["demo"]}"#,
+    )
+    .unwrap();
+    std::fs::write(dir.join("demo"), b"x").unwrap();
+    let manager = Manager::new(state.path());
+    let mut settings = manager.settings();
+    settings.conflict = dlcore::task::ConflictPolicy::Skip;
+    manager.set_settings(settings).unwrap();
+    i_slint_backend_testing::init_no_event_loop();
+    let ui = ToolsWindow::new().unwrap();
+    modules::populate(&ui, &manager);
+    assert_eq!(ui.get_conflict_index(), 2);
+    assert!(!ui.get_modules_enabled());
+    let listed = manager.modules();
+    assert_eq!(ui.get_module_names().row_count(), listed.len());
+    assert_eq!(ui.get_module_status().row_count(), listed.len());
+    let position = listed.iter().position(|m| m.id == "demo-mod").unwrap();
+    assert_eq!(ui.get_module_state().row_data(position), Some(1));
+    manager.approve_module("demo-mod").unwrap();
+    modules::populate(&ui, &manager);
+    assert_eq!(ui.get_module_state().row_data(position), Some(2));
+    assert_eq!(
+        modules::module_id(&manager, position as i32).as_deref(),
+        Some("demo-mod")
+    );
+    manager.revoke_module("demo-mod").unwrap();
+    modules::populate(&ui, &manager);
+    assert_eq!(ui.get_module_state().row_data(position), Some(1));
+    manager.shutdown();
 }
 
 #[test]

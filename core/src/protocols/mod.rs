@@ -93,6 +93,16 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     if ctx.cancel.is_cancelled() {
         return Ok(Outcome::Cancelled);
     }
+    // Skip is decided before transferring whenever the name is known up front.
+    if snapshot.conflict == ConflictPolicy::Skip
+        && let Some(name) = snapshot
+            .suggested_name
+            .as_deref()
+            .map(util::sanitize)
+            .filter(|n| !n.is_empty())
+    {
+        util::resolve_conflict(&snapshot.dir, &name, ConflictPolicy::Skip)?;
+    }
     let stage = staging_path(&snapshot);
     std::fs::create_dir_all(stage.join("payload"))
         .map_err(|e| format!("cannot create protocol staging folder: {e}"))?;
@@ -185,11 +195,7 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     };
     let name = publish_target(&snapshot.dir, &name, snapshot.conflict)?;
     let destination = snapshot.dir.join(&name);
-    if destination.is_file() {
-        // Overwrite: the verified staged output replaces the old file only now.
-        std::fs::remove_file(&destination)
-            .map_err(|e| format!("cannot replace existing file: {e}"))?;
-    }
+    // Overwrite: rename replaces an old file in one step, so a failure keeps it.
     let source = if files.len() == 1 {
         &files[0].0
     } else {

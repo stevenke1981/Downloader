@@ -57,6 +57,9 @@ msgstr "新增收集到的連結"
 msgid "Add download"
 msgstr "新增下載"
 
+msgid "Add-on modules extend what Downloader can fetch. They are off by default."
+msgstr "附加模組可擴充 Downloader 能下載的內容，預設為關閉。"
+
 msgid "Added {} downloads."
 msgstr "已新增 {} 個下載。"
 
@@ -77,6 +80,15 @@ msgstr "套用遠端 API"
 
 msgid "Apply traffic limits"
 msgstr "套用流量限制"
+
+msgid "Approve"
+msgstr "核准"
+
+msgid "Approved"
+msgstr "已核准"
+
+msgid "Approving an external module lets that program run on this computer. Approve only modules you trust. Editing a module disables it again."
+msgstr "核准外部模組後，該程式即可在這台電腦上執行。請只核准你信任的模組。模組一經修改就會再次停用。"
 
 msgid "Archives"
 msgstr "壓縮檔"
@@ -104,6 +116,9 @@ msgstr "瀏覽器設定操作會立即生效。「儲存」僅套用 App 偏好�
 
 msgid "Browse…"
 msgstr "瀏覽…"
+
+msgid "Built-in"
+msgstr "內建"
 
 msgid "Built-in Rust"
 msgstr "內建 Rust"
@@ -291,6 +306,9 @@ msgstr "仍有排程中、下載中或驗證中的項目。確定要退出並暫
 msgid "Drop torrent / Metalink files here to add downloads."
 msgstr "將 torrent／Metalink 檔案拖放到此處即可新增下載。"
 
+msgid "Enable add-on modules"
+msgstr "啟用附加模組"
+
 msgid "Enable remote API"
 msgstr "啟用遠端 API"
 
@@ -302,6 +320,9 @@ msgstr "請至少輸入一個下載連結。"
 
 msgid "Error"
 msgstr "錯誤"
+
+msgid "Error: {}"
+msgstr "錯誤：{}"
 
 msgid "Exit"
 msgstr "退出"
@@ -393,6 +414,9 @@ msgstr "中速上限"
 msgid "Minimize to tray"
 msgstr "縮小至系統匣"
 
+msgid "Modules"
+msgstr "模組"
+
 msgid "Music"
 msgstr "音樂"
 
@@ -429,8 +453,14 @@ msgstr "無校驗檔"
 msgid "No downloads in this view"
 msgstr "這個分類目前沒有下載"
 
+msgid "No modules found."
+msgstr "找不到模組。"
+
 msgid "Normal"
 msgstr "一般"
+
+msgid "Not approved"
+msgstr "未核准"
 
 msgid "Not checked yet."
 msgstr "尚未檢查。"
@@ -459,6 +489,9 @@ msgstr "開啟檔案"
 msgid "Open folder"
 msgstr "開啟資料夾"
 
+msgid "Open modules folder"
+msgstr "開啟模組資料夾"
+
 msgid "Opened the browser extension manager."
 msgstr "已開啟瀏覽器擴充功能管理頁。"
 
@@ -467,6 +500,9 @@ msgstr "已開啟擴充功能資料夾。"
 
 msgid "Other"
 msgstr "其他"
+
+msgid "Overwrite"
+msgstr "覆寫"
 
 msgid "Page URL"
 msgstr "網頁網址"
@@ -555,6 +591,9 @@ msgstr "移除排程動作"
 msgid "Remove site profile"
 msgstr "移除網站設定"
 
+msgid "Rename"
+msgstr "自動重新命名"
+
 msgid "Restore main window"
 msgstr "還原主視窗"
 
@@ -566,6 +605,9 @@ msgstr "重試次數"
 
 msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
 msgstr "請先檢查下方的連結再新增。需要驗證的下載，請在「網站／資料夾」儲存本次登入資料。"
+
+msgid "Revoke"
+msgstr "撤銷核准"
 
 msgid "Run a program"
 msgstr "執行程式"
@@ -626,6 +668,9 @@ msgstr "網站／資料夾"
 
 msgid "Size"
 msgstr "大小"
+
+msgid "Skip"
+msgstr "略過"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "依分類存到子資料夾（影片、音樂…）"
@@ -752,6 +797,9 @@ msgstr "網頁／FTP"
 
 msgid "Webpage media (Rust)"
 msgstr "網頁影音（Rust）"
+
+msgid "When a file already exists"
+msgstr "檔案已存在時"
 
 msgid "Working…"
 msgstr "處理中…"

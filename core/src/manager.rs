@@ -165,8 +165,32 @@ impl Manager {
 
     /// Approvals are never taken from `s`: only `approve_module` / `revoke_module` change them.
     pub fn set_settings(&self, mut s: Settings) -> Result<(), String> {
-        s.modules.approved = self.settings().modules.approved;
+        s.modules = self.synced_modules(Some(s.modules.enabled));
         self.apply_settings(s)
+    }
+
+    /// The module settings to build on: what is in memory, minus whatever a CLI (dlxctl) revoked or
+    /// disabled in settings.json since the last save. Revocation on disk always wins.
+    /// `enabled` is the caller's wish for the master switch (None: keep the current one).
+    fn synced_modules(&self, enabled: Option<bool>) -> crate::modules::ModuleSettings {
+        let mut m = self.settings().modules;
+        let on_disk = std::fs::read(self.inner.dir.join("settings.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Settings>(&b).ok());
+        let wish = enabled.unwrap_or(m.enabled);
+        if let Some(disk) = on_disk {
+            m.approved
+                .retain(|id, hash| disk.modules.approved.get(id) == Some(hash));
+            // The app writes settings.json itself, so a difference means an outside change.
+            m.enabled = if disk.modules.enabled != m.enabled && !disk.modules.enabled {
+                false
+            } else {
+                wish
+            };
+        } else {
+            m.enabled = wish;
+        }
+        m
     }
 
     fn apply_settings(&self, mut s: Settings) -> Result<(), String> {
@@ -213,20 +237,17 @@ impl Manager {
 
     /// Trust the module's current `module.json`. Editing it later revokes the approval.
     pub fn approve_module(&self, id: &str) -> Result<(), String> {
-        use sha2::{Digest, Sha256};
-        if !crate::modules::valid_id(id) {
-            return Err(format!("invalid module id {id:?}"));
-        }
-        let path = self.inner.dir.join("modules").join(id).join("module.json");
-        let bytes = std::fs::read(&path).map_err(|e| format!("module {id}: {e}"))?;
-        let hash = hex::encode(Sha256::digest(&bytes));
+        // Validates the manifest and caps its size, like the loader does.
+        let hash = crate::modules::manifest_hash(&self.inner.dir.join("modules"), id)?;
         let mut s = self.settings();
+        s.modules = self.synced_modules(None);
         s.modules.approved.insert(id.to_string(), hash);
         self.apply_settings(s)
     }
 
     pub fn revoke_module(&self, id: &str) -> Result<(), String> {
         let mut s = self.settings();
+        s.modules = self.synced_modules(None);
         s.modules.approved.remove(id);
         self.apply_settings(s)
     }

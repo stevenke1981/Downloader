@@ -339,6 +339,8 @@ async fn dlxctl_modules_approve_records_manifest_hash() {
     std::fs::create_dir_all(&module).unwrap();
     let manifest = br#"{"schema":1,"id":"example-resolver","name":"Example","version":"1.0.0","kinds":["resolver"],"match":{"schemes":["https"],"hosts":["example.com"]},"command":["example-resolver","--stdio"]}"#;
     std::fs::write(module.join("module.json"), manifest).unwrap();
+    // Approval validates the manifest, so command[0] must exist inside the folder.
+    std::fs::write(module.join("example-resolver"), b"").unwrap();
     let expected = hex::encode(Sha256::digest(manifest));
 
     let approve = finish(dlxctl(
@@ -425,4 +427,106 @@ async fn dlx_modules_dir_is_opt_in_and_never_breaks_plain_downloads() {
     assert_eq!(run.code, 0, "stderr: {}", run.stderr);
     assert_eq!(run.events().last().unwrap()["exit_code"], 0);
     assert_eq!(std::fs::read(out.path().join("plain.bin")).unwrap(), data);
+}
+
+/// A resolver for the fixture host that always fails, so whether it ran shows in the exit code.
+fn failing_resolver(modules: &Path) -> String {
+    let module = modules.join("res");
+    std::fs::create_dir_all(&module).unwrap();
+    let manifest = json!({
+        "schema": 1, "id": "res", "name": "Res", "version": "1.0.0", "kinds": ["resolver"],
+        "match": {"schemes": ["http"], "hosts": ["127.0.0.1"]},
+        "command": [env!("CARGO_BIN_EXE_dlx-module-example"), "--fail", "boom"]
+    });
+    std::fs::write(module.join("module.json"), manifest.to_string()).unwrap();
+    dlcore::modules::manifest_hash(modules, "res").unwrap()
+}
+
+#[tokio::test]
+async fn dlx_modules_honour_the_enable_switch_and_only_the_state_folder() {
+    let data = server::test_data(16 << 10);
+    let s = server::start(data.clone(), true, 0).await;
+    let state = tempfile::tempdir().unwrap();
+    let modules = state.path().join("modules");
+    let hash = failing_resolver(&modules);
+    let url = s.url("m.bin");
+    let run = |enabled: bool, dir: &Path| {
+        let settings = json!({"modules": {"enabled": enabled, "approved": {"res": hash}}});
+        std::fs::write(state.path().join("settings.json"), settings.to_string()).unwrap();
+        let out = tempfile::tempdir().unwrap();
+        let command = dlx(
+            state.path(),
+            &[
+                "--json",
+                "-q",
+                "--modules-dir",
+                dir.to_str().unwrap(),
+                "-o",
+                out.path().to_str().unwrap(),
+                &url,
+            ],
+        );
+        async move { (finish(command).await, out) }
+    };
+    // Approved but modules switched off: the resolver must not run.
+    let (off, out) = run(false, &modules).await;
+    assert_eq!(off.code, 0, "stderr: {}", off.stderr);
+    assert_eq!(std::fs::read(out.path().join("m.bin")).unwrap(), data);
+    // Switched on: it runs (and fails the download with a module error).
+    let (on, _out) = run(true, &modules).await;
+    assert_eq!(on.code, 7, "stdout: {}", on.stdout);
+    assert!(
+        event(&on.events(), "error")
+            .iter()
+            .any(|e| e["code"] == "module"),
+        "{}",
+        on.stdout
+    );
+    // The same approved module copied elsewhere is refused: approvals bind to the state folder.
+    let elsewhere = tempfile::tempdir().unwrap();
+    failing_resolver(elsewhere.path());
+    let (other, _out) = run(true, elsewhere.path()).await;
+    assert_eq!(other.code, 2, "stdout: {}", other.stdout);
+}
+
+#[tokio::test]
+async fn dlxctl_modules_approve_validates_and_shows_the_command() {
+    let state = tempfile::tempdir().unwrap();
+    let dir = state.path().to_str().unwrap();
+    let modules = state.path().join("modules");
+    let hash = failing_resolver(&modules);
+    let approve = |extra: &[&str]| {
+        let mut args = vec!["--json", "--data-dir", dir, "modules", "approve", "res"];
+        args.extend_from_slice(extra);
+        finish(dlxctl(state.path(), &args))
+    };
+    let wrong = approve(&["--sha256", &"0".repeat(64)]).await;
+    assert_eq!(wrong.code, 7, "stdout: {}", wrong.stdout);
+    assert!(!state.path().join("settings.json").exists());
+
+    let ok = approve(&["--sha256", &hash.to_uppercase()]).await;
+    assert_eq!(ok.code, 0, "stderr: {}", ok.stderr);
+    let data = &ok.envelope()["data"];
+    assert_eq!(data["sha256"], hash.as_str());
+    assert_eq!(data["command"][1], "--fail");
+    assert!(
+        data["program"]
+            .as_str()
+            .unwrap()
+            .contains("dlx-module-example")
+    );
+
+    let human = finish(dlxctl(
+        state.path(),
+        &["--data-dir", dir, "modules", "approve", "res"],
+    ))
+    .await;
+    assert_eq!(human.code, 0);
+    assert!(human.stdout.contains(&hash), "{}", human.stdout);
+    assert!(human.stdout.contains("--fail boom"), "{}", human.stdout);
+
+    // An invalid manifest cannot be approved (same validation as the app).
+    std::fs::write(modules.join("res").join("module.json"), b"{not json").unwrap();
+    let invalid = approve(&[]).await;
+    assert_eq!(invalid.code, 7, "stdout: {}", invalid.stdout);
 }

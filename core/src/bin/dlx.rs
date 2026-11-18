@@ -45,7 +45,8 @@ struct Args {
     /// When the file exists: rename (default), overwrite, or skip (exit 6)
     #[arg(long, value_enum, default_value = "rename")]
     on_conflict: ConflictArg,
-    /// Load modules from DIR. Only modules approved with "dlxctl modules approve" run
+    /// Use external modules. DIR must be the modules folder of the state directory: modules run
+    /// only when enabled and approved there ("dlxctl modules enable" / "dlxctl modules approve")
     #[arg(long, value_name = "DIR")]
     modules_dir: Option<PathBuf>,
     /// Output directory
@@ -124,6 +125,30 @@ fn approved_modules(json: bool) -> ModuleSettings {
     }
 }
 
+/// Approvals bind a module id and manifest hash to the state directory's modules folder, so
+/// another folder is refused, and the global enable switch is honoured.
+fn load_modules(json: bool, quiet: bool, dir: &Path) -> Arc<Registry> {
+    let home = dlcore::modules::modules_dir();
+    let same = match (std::fs::canonicalize(dir), std::fs::canonicalize(&home)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => false,
+    };
+    if !same {
+        usage(
+            json,
+            format!(
+                "--modules-dir must be the modules folder {}: approvals are only valid there",
+                home.display()
+            ),
+        );
+    }
+    let modules = approved_modules(json);
+    if !modules.enabled && !quiet {
+        eprintln!("modules are disabled; run \"dlxctl modules enable\" to use them");
+    }
+    Registry::load(&modules, &home)
+}
+
 #[tokio::main]
 async fn main() {
     let a = Args::parse();
@@ -191,11 +216,10 @@ async fn main() {
     let client = settings
         .build_client()
         .unwrap_or_else(|e| usage(json, e.to_string()));
-    let registry = a.modules_dir.as_deref().map(|dir| {
-        let mut modules = approved_modules(json);
-        modules.enabled = true;
-        Registry::load(&modules, dir)
-    });
+    let registry = a
+        .modules_dir
+        .as_deref()
+        .map(|dir| load_modules(json, a.quiet, dir));
     let cancel = CancellationToken::new();
     let protocol_client = settings
         .build_protocol_client()

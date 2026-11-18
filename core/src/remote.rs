@@ -234,7 +234,7 @@ async fn read_request(stream: &mut tokio::net::TcpStream) -> Result<Request, &'s
     }
     let length = length.unwrap_or(0);
     if length
-        > if path == "/import" {
+        > if path.split('?').next() == Some("/import") {
             IMPORT_LIMIT
         } else {
             BODY_LIMIT

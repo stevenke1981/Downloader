@@ -38,7 +38,8 @@ From the command line:
 ```
 dlxctl modules list                # every module, approved or not, with problems
 dlxctl modules enable              # or: disable
-dlxctl modules approve <id>
+dlxctl modules approve <id>         # prints the program, arguments and sha256 it approves
+dlxctl modules approve <id> --sha256 <hex>   # approve only that exact module.json
 dlxctl modules revoke <id>
 ```
 
@@ -53,7 +54,9 @@ The list shows a reason next to any module that cannot run (for example an inval
    scheme and host is asked to resolve it. It may return a new link, extra request headers,
    a file name and mirrors, or leave the link unchanged.
 3. The download runs against the resolved link. The original link stays in the list; the
-   resolved one is not saved and is resolved again after a restart.
+   resolved link and the module's extra headers are not saved, and are dropped at the start of
+   every run: after a restart, or once the module is disabled, revoked or answers `skip`,
+   the module is asked again or the original link is used.
 4. When the download completes or fails, every approved hook subscribed to that event is told
    in the background. Hooks cannot change or delay the download.
 
@@ -77,7 +80,11 @@ Errors from a module fail the download with a message starting `module <id>:`.
   passwords. Answers are capped at 64 KiB. A resolved link must be plain `http(s)` without
   credentials, cannot be another built-in protocol link, headers must pass the same rules as
   user headers (no `Cookie`, `Authorization`, `Host`, `Range`, ...), and file names are
-  sanitized. Extra headers are sent only to the resolved link's origin.
+  sanitized. Extra headers are kept apart from your own headers, are never saved, and are sent
+  only to the resolved link's origin.
+- **One modules folder.** `dlx --modules-dir` accepts only the state directory's modules
+  folder (the table above) and honours `dlxctl modules enable` / `disable`; approvals do not
+  carry over to a copy of a module in another folder.
 
 ## Writing a module
 
@@ -118,9 +125,11 @@ Unknown fields are rejected. The file may be at most 64 KiB.
 
 - One process per request. Downloader writes one UTF-8 JSON line plus `\n` to stdin and
   closes it.
-- The module writes **one** JSON line to stdout (first line only is read, at most 64 KiB) and
+- A resolver writes **one** JSON line to stdout (first line only is read, at most 64 KiB) and
   exits. Stderr is discarded. The process is killed after the answer, on timeout, or when the
   download is cancelled.
+- A hook may write anything (it is read and discarded) and runs until it exits or its
+  `timeout_ms` passes, when it is killed.
 - Working directory is the module folder. Environment: only `PATH`, `SystemRoot`, `TEMP`, `TMP`.
 
 ### Resolve
@@ -157,7 +166,9 @@ Request:
 {"v":1,"op":"event","event":"failed","id":13,"url":"https://example.com/b.zip","path":"C:\\Downloads\\b.zip","size":null,"error":"http 404"}
 ```
 
-Output is ignored; exit when done. Delivery is best effort and never retried.
+`path` is the downloaded file; it is empty (`""`) when the download did not create a file
+(for example a failure because the file already existed). Output is ignored; exit when done
+(within `timeout_ms`). Delivery is best effort and never retried.
 
 ### Checking a module by hand
 

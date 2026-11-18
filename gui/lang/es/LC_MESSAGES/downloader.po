@@ -57,6 +57,9 @@ msgstr "Añadir enlaces recopilados"
 msgid "Add download"
 msgstr "Añadir descarga"
 
+msgid "Add-on modules extend what Downloader can fetch. They are off by default."
+msgstr "Los módulos adicionales amplían lo que Downloader puede descargar. Están desactivados de forma predeterminada."
+
 msgid "Added {} downloads."
 msgstr "Se añadieron {} descargas."
 
@@ -77,6 +80,15 @@ msgstr "Aplicar API remota"
 
 msgid "Apply traffic limits"
 msgstr "Aplicar límites de tráfico"
+
+msgid "Approve"
+msgstr "Aprobar"
+
+msgid "Approved"
+msgstr "Aprobado"
+
+msgid "Approving an external module lets that program run on this computer. Approve only modules you trust. Editing a module disables it again."
+msgstr "Aprobar un módulo externo permite que ese programa se ejecute en este equipo. Aprueba solo módulos de confianza. Si se edita un módulo, se desactiva de nuevo."
 
 msgid "Archives"
 msgstr "Comprimidos"
@@ -104,6 +116,9 @@ msgstr "Las acciones del navegador se aplican de inmediato. Guardar solo afecta 
 
 msgid "Browse…"
 msgstr "Examinar…"
+
+msgid "Built-in"
+msgstr "Integrado"
 
 msgid "Built-in Rust"
 msgstr "Rust integrado"
@@ -291,6 +306,9 @@ msgstr "Aún hay descargas en cola, en curso o verificándose. ¿Salir y pausarl
 msgid "Drop torrent / Metalink files here to add downloads."
 msgstr "Arrastra aquí archivos torrent / Metalink para añadir descargas."
 
+msgid "Enable add-on modules"
+msgstr "Activar módulos adicionales"
+
 msgid "Enable remote API"
 msgstr "Activar API remota"
 
@@ -302,6 +320,9 @@ msgstr "Introduce al menos un enlace de descarga."
 
 msgid "Error"
 msgstr "Error"
+
+msgid "Error: {}"
+msgstr "Error: {}"
 
 msgid "Exit"
 msgstr "Salir"
@@ -393,6 +414,9 @@ msgstr "Límite medio"
 msgid "Minimize to tray"
 msgstr "Minimizar a la bandeja"
 
+msgid "Modules"
+msgstr "Módulos"
+
 msgid "Music"
 msgstr "Música"
 
@@ -429,8 +453,14 @@ msgstr "Sin suma"
 msgid "No downloads in this view"
 msgstr "No hay descargas en esta vista"
 
+msgid "No modules found."
+msgstr "No se encontraron módulos."
+
 msgid "Normal"
 msgstr "Normal"
+
+msgid "Not approved"
+msgstr "No aprobado"
 
 msgid "Not checked yet."
 msgstr "Aún no se ha comprobado."
@@ -459,6 +489,9 @@ msgstr "Abrir archivo"
 msgid "Open folder"
 msgstr "Abrir carpeta"
 
+msgid "Open modules folder"
+msgstr "Abrir carpeta de módulos"
+
 msgid "Opened the browser extension manager."
 msgstr "Gestor de extensiones del navegador abierto."
 
@@ -467,6 +500,9 @@ msgstr "Carpeta de la extensión abierta."
 
 msgid "Other"
 msgstr "Otros"
+
+msgid "Overwrite"
+msgstr "Sobrescribir"
 
 msgid "Page URL"
 msgstr "URL de la página"
@@ -555,6 +591,9 @@ msgstr "Quitar acción programada"
 msgid "Remove site profile"
 msgstr "Quitar perfil de sitio"
 
+msgid "Rename"
+msgstr "Renombrar"
+
 msgid "Restore main window"
 msgstr "Restaurar ventana principal"
 
@@ -566,6 +605,9 @@ msgstr "Reintentos"
 
 msgid "Review links below before adding. For authenticated downloads, save session credentials in Sites / folders."
 msgstr "Revisa los enlaces de abajo antes de añadirlos. Para descargas con autenticación, guarda las credenciales de sesión en Sitios / carpetas."
+
+msgid "Revoke"
+msgstr "Revocar"
 
 msgid "Run a program"
 msgstr "Ejecutar un programa"
@@ -626,6 +668,9 @@ msgstr "Sitios / carpetas"
 
 msgid "Size"
 msgstr "Tamaño"
+
+msgid "Skip"
+msgstr "Omitir"
 
 msgid "Sort into category sub-folders (Video, Music, …)"
 msgstr "Ordenar en subcarpetas por categoría (Vídeo, Música…)"
@@ -752,6 +797,9 @@ msgstr "Web / FTP"
 
 msgid "Webpage media (Rust)"
 msgstr "Multimedia web (Rust)"
+
+msgid "When a file already exists"
+msgstr "Cuando el archivo ya existe"
 
 msgid "Working…"
 msgstr "Procesando…"

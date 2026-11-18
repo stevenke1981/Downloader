@@ -14,20 +14,8 @@ pub(super) const MAX_CONCURRENT: usize = 4;
 /// Variables passed through to modules; everything else is cleared.
 const ENV_KEEP: [&str; 4] = ["PATH", "SystemRoot", "TEMP", "TMP"];
 
-/// Run one request. Returns the first stdout line (without the newline), or `None` when
-/// `cancel` fired first. The process is killed when this returns.
-pub(super) async fn call(
-    module: &Checked,
-    request: &str,
-    permits: &Semaphore,
-    cancel: Option<&CancellationToken>,
-) -> Result<Option<String>, String> {
-    let never = CancellationToken::new();
-    let cancel = cancel.unwrap_or(&never);
-    let _permit = tokio::select! {
-        p = permits.acquire() => p.map_err(|_| "module host is shutting down".to_string())?,
-        _ = cancel.cancelled() => return Ok(None),
-    };
+/// Start the module with a clean environment and piped stdin/stdout.
+fn spawn(module: &Checked) -> Result<tokio::process::Child, String> {
     // The manifest may have changed since it was approved and loaded: re-check the bytes.
     let bytes = manifest::read(&module.dir)?;
     if manifest::sha256_hex(&bytes) != module.sha256 {
@@ -49,7 +37,22 @@ pub(super) async fn call(
     }
     #[cfg(windows)]
     command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    let mut child = command.spawn().map_err(|e| format!("cannot start: {e}"))?;
+    command.spawn().map_err(|e| format!("cannot start: {e}"))
+}
+
+/// Run one request. Returns the first stdout line (without the newline), or `None` when
+/// `cancel` fired first. The process is killed when this returns.
+pub(super) async fn call(
+    module: &Checked,
+    request: &str,
+    permits: &Semaphore,
+    cancel: &CancellationToken,
+) -> Result<Option<String>, String> {
+    let _permit = tokio::select! {
+        p = permits.acquire() => p.map_err(|_| "module host is shutting down".to_string())?,
+        _ = cancel.cancelled() => return Ok(None),
+    };
+    let mut child = spawn(module)?;
     let mut stdin = child.stdin.take().ok_or("no stdin")?;
     let mut stdout = child.stdout.take().ok_or("no stdout")?;
     let line = format!("{request}\n");
@@ -65,6 +68,39 @@ pub(super) async fn call(
         r = exchange => r.map(Some),
         _ = tokio::time::sleep(timeout) => Err(format!("timed out after {} ms", timeout.as_millis())),
         _ = cancel.cancelled() => Ok(None),
+    };
+    let _ = child.start_kill();
+    let _ = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
+    result
+}
+
+/// Deliver one hook event and let the module finish: stdout is drained and discarded, and
+/// the process is killed only when it outlives its timeout.
+pub(super) async fn deliver(
+    module: &Checked,
+    request: &str,
+    permits: &Semaphore,
+) -> Result<(), String> {
+    let _permit = permits
+        .acquire()
+        .await
+        .map_err(|_| "module host is shutting down".to_string())?;
+    let mut child = spawn(module)?;
+    let mut stdin = child.stdin.take().ok_or("no stdin")?;
+    let mut stdout = child.stdout.take().ok_or("no stdout")?;
+    let line = format!("{request}\n");
+    let run = async {
+        let _ = stdin.write_all(line.as_bytes()).await;
+        let _ = stdin.shutdown().await;
+        drop(stdin);
+        let _ = tokio::io::copy(&mut stdout, &mut tokio::io::sink()).await;
+        child.wait().await
+    };
+    let timeout = module.timeout();
+    let result = match tokio::time::timeout(timeout, run).await {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(e)) => Err(format!("cannot wait for the module: {e}")),
+        Err(_) => Err(format!("timed out after {} ms", timeout.as_millis())),
     };
     let _ = child.start_kill();
     let _ = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;

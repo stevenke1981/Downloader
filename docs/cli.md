@@ -9,9 +9,9 @@ Human output is the default and is kept stable. Add `--json` for machine-readabl
 | Code | Meaning |
 |---|---|
 | 0 | Success |
-| 1 | Failed (HTTP error status, disk, timeout, other) |
+| 1 | Failed (HTTP error status, disk, other) |
 | 2 | Usage or invalid input (bad flag, URL, checksum or header; server rejected the request) |
-| 3 | Network failure or server unreachable |
+| 3 | Network failure, timeout or server unreachable |
 | 4 | Authentication: missing or wrong token (HTTP 401/403) |
 | 5 | Integrity verification failed |
 | 6 | Conflict: file exists with `skip`, or a duplicate download |
@@ -38,7 +38,7 @@ Downloads resume from the partial state kept in the output folder. Progress and 
 | `--header "NAME: VALUE"` | Extra request header, repeatable. `Cookie`, `Authorization`, `Host`, `Range`, `If-Range` and `Content-Length` are refused; at most 16 headers and 4 KiB in total |
 | `--user-agent TEXT` | User-Agent for every request |
 | `--referer URL` | Referer for every request |
-| `--on-conflict rename|overwrite|skip` | Existing file: save as `name (1).ext` (default), replace it when complete, or fail with exit 6 before transferring |
+| `--on-conflict rename|overwrite|skip` | Existing file: save as `name (1).ext` (default), replace it when complete, or fail with exit 6. `skip` fails before transferring when the name is known up front (URL name, `--out`, resolver filename); a name only the server or a protocol reveals is checked right after the transfer. `overwrite` publishes beside the old file and replaces it only after verification |
 | `--modules-dir DIR` | Load modules from DIR. Only modules approved with `dlxctl modules approve` run (approvals are read from the default settings file, see below) |
 | `--video` | Extract webpage media or HLS |
 | `--proxy URL`, `--retries N`, `-q` | As named |
@@ -108,7 +108,7 @@ Remote errors keep the server's text in `message` (for example `HTTP 401 Unautho
 | `site …`, `automation …` | (local) | Edit settings directly. Stop the app or `serve` first |
 | `modules list` | (local) | Modules in `<data-dir>/modules`, with approval state and problems |
 | `modules approve ID` | (local) | Stores the SHA-256 of `<data-dir>/modules/ID/module.json`. Any later edit to that file disables the module |
-| `modules revoke ID`, `modules enable`, `modules disable` | (local) | Edit settings |
+| `modules revoke ID`, `modules enable`, `modules disable` | (local) | Edit settings. A running app notices on its next settings save: a revocation or disable on disk wins, so it is not undone. The app applies it fully after a restart |
 | `generate-token` | (local) | Prints a new 256-bit token |
 
 Local commands that edit settings write `settings.json` and apply the next time the manager starts. Approvals are never accepted from the remote API or from an import file.

@@ -19,6 +19,17 @@ export global ToolTr {
         return @tr("Start all");
     }
     pure public function scheduled(id: int, action: string, minutes: int) -> string { return @tr("#{} {} — in {} min", id, action, minutes); }
+    pure public function module-status(state: int, error: string) -> string {
+        if state == 0 { return @tr("Built-in"); }
+        if state == 2 { return @tr("Approved"); }
+        if state == 3 { return @tr("Error: {}", error); }
+        return @tr("Not approved");
+    }
+    pure public function conflict-name(index: int) -> string {
+        if index == 1 { return @tr("Overwrite"); }
+        if index == 2 { return @tr("Skip"); }
+        return @tr("Rename");
+    }
     pure public function consumed(id: int, action: string) -> string { return @tr("#{} {} — finished", id, action); }
 }
 
@@ -110,6 +121,16 @@ export component ToolsWindow inherits Window {
     in-out property <string> bind-address;
     in-out property <string> token;
     in property <string> remote-status;
+    in-out property <int> conflict-index;
+    in-out property <bool> modules-enabled;
+    in property <[string]> module-names;
+    in property <[string]> module-status;
+    in property <[int]> module-state;
+    callback conflict-save();
+    callback modules-save();
+    callback module-approve(int);
+    callback module-revoke(int);
+    callback modules-open-folder();
     callback traffic-save();
     callback site-load();
     callback site-save();
@@ -144,6 +165,7 @@ export component ToolsWindow inherits Window {
             Button { text: @tr("Web / FTP"); primary: root.tab == 2; clicked => { root.tab = 2; } }
             Button { text: @tr("Actions"); primary: root.tab == 3; clicked => { root.tab = 3; } }
             Button { text: @tr("Remote API"); primary: root.tab == 4; clicked => { root.tab = 4; } }
+            Button { text: @tr("Modules"); primary: root.tab == 5; clicked => { root.tab = 5; } }
         }
         ScrollView {
             content-width: self.width;
@@ -179,6 +201,7 @@ export component ToolsWindow inherits Window {
                         Button { text: @tr("Save site profile"); enabled: !root.busy; clicked => { root.site-save(); } }
                         Button { text: @tr("Remove site profile"); enabled: !root.busy && root.site-index >= 0; clicked => { root.site-remove(); } }
                     }
+                    Field { label: @tr("When a file already exists"); ComboBox { model: [@tr("Rename"), @tr("Overwrite"), @tr("Skip")]; current-index <=> root.conflict-index; selected => { root.conflict-save(); } horizontal-stretch: 1; enabled: !root.busy; } }
                     Text { text: @tr("Custom folder rules (first match wins)"); font-weight: 600; }
                     ComboBox { model: root.folders; current-index <=> root.folder-index; selected => { root.folder-load(); } }
                     Field { label: @tr("Extensions (comma separated)"); LineEdit { text <=> root.extensions; placeholder-text: "zip,7z,rar"; horizontal-stretch: 1; } }
@@ -243,6 +266,24 @@ export component ToolsWindow inherits Window {
                     Text { text: @tr("Use a loopback address for access from this computer only. A network address makes the API reachable from other computers."); wrap: word-wrap; }
                     Button { text: @tr("Apply remote API"); enabled: !root.busy; clicked => { root.remote-save(); } }
                     Text { text: root.remote-status; wrap: word-wrap; }
+                }
+                if root.tab == 5: VerticalLayout {
+                    spacing: 10px;
+                    Text { text: @tr("Add-on modules extend what Downloader can fetch. They are off by default."); wrap: word-wrap; }
+                    CheckBox { text: @tr("Enable add-on modules"); checked <=> root.modules-enabled; enabled: !root.busy; toggled => { root.modules-save(); } }
+                    Text { text: @tr("Approving an external module lets that program run on this computer. Approve only modules you trust. Editing a module disables it again."); color: #a03020; wrap: word-wrap; }
+                    if root.module-names.length == 0: Text { text: @tr("No modules found."); }
+                    for name[index] in root.module-names: HorizontalLayout {
+                        spacing: 10px;
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            Text { text: name; font-weight: 600; wrap: word-wrap; }
+                            Text { text: root.module-status[index]; wrap: word-wrap; color: root.module-state[index] == 3 ? #a03020 : #245078; }
+                        }
+                        if root.module-state[index] == 1: Button { text: @tr("Approve"); enabled: !root.busy; clicked => { root.module-approve(index); } }
+                        if root.module-state[index] == 2 || root.module-state[index] == 3: Button { text: @tr("Revoke"); enabled: !root.busy; clicked => { root.module-revoke(index); } }
+                    }
+                    Button { text: @tr("Open modules folder"); clicked => { root.modules-open-folder(); } }
                 }
                 Rectangle { vertical-stretch: 1; min-height: 1px; }
             }
