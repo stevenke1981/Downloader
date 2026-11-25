@@ -290,7 +290,12 @@ impl Manager {
             return Err("invalid mirrors: at most 8 are allowed".into());
         }
         for m in &d.mirrors {
-            crate::util::validate_source(m.trim())?;
+            let m = m.trim();
+            crate::util::validate_source(m)?;
+            let lower = m.to_ascii_lowercase();
+            if !(lower.starts_with("http://") || lower.starts_with("https://")) {
+                return Err("invalid mirrors: only http(s) links are allowed".into());
+            }
         }
         if d.unique
             && let Some(other) = self.duplicate_of(&d.url, Some(d.kind))

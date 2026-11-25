@@ -115,3 +115,22 @@ fn state_read_retries_then_gives_up() {
     assert_eq!(r.unwrap(), None);
     assert_eq!(calls, 1, "a missing file is not retried");
 }
+
+#[test]
+fn mirrors_must_be_http() {
+    let state = tempfile::tempdir().unwrap();
+    let manager = Manager::new(state.path());
+    let add = |mirror: &str| {
+        manager.try_add(NewDownload {
+            url: "https://example.invalid/file.bin".into(),
+            dir: Some(state.path().to_path_buf()),
+            mirrors: vec![mirror.into()],
+            start: false,
+            ..Default::default()
+        })
+    };
+    let err = add("ftp://example.invalid/file.bin").unwrap_err();
+    assert!(err.starts_with("invalid mirrors:"), "{err}");
+    assert!(add(" https://mirror.invalid/file.bin ").is_ok());
+    manager.shutdown();
+}

@@ -285,6 +285,9 @@ struct AddDownload {
     #[serde(default)]
     unique: bool,
     conflict: Option<crate::task::ConflictPolicy>,
+    /// Alternative http(s) sources for the same file.
+    #[serde(default)]
+    mirrors: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -354,6 +357,23 @@ fn route(manager: &Manager, request: Request) -> (u16, Value) {
                     json!({"error":"connections must be 1–32","code":"invalid"}),
                 );
             }
+            let mirrors: Vec<String> = download
+                .mirrors
+                .iter()
+                .map(|mirror| mirror.trim().to_string())
+                .collect();
+            let mirrors_ok = mirrors.len() <= 8
+                && mirrors.iter().all(|mirror| {
+                    reqwest::Url::parse(mirror)
+                        .is_ok_and(|url| matches!(url.scheme(), "http" | "https"))
+                        && crate::util::validate_source(mirror).is_ok()
+                });
+            if !mirrors_ok {
+                return (
+                    400,
+                    json!({"error":"mirrors must be at most 8 valid http(s) URLs","code":"invalid"}),
+                );
+            }
             let checksum = match download.checksum.as_deref() {
                 None | Some("") => None,
                 Some(text) => match crate::checksum::Checksum::guess(text) {
@@ -378,6 +398,7 @@ fn route(manager: &Manager, request: Request) -> (u16, Value) {
                 kind: download.kind,
                 start: download.start,
                 file_name: download.file_name,
+                mirrors,
                 ..Default::default()
             }) {
                 Ok(id) => (201, json!({"id":id})),

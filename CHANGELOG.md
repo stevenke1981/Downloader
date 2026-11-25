@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.0 — 2026-11-26
+
+### Added
+- **HTTP mirror fallback** ([docs/cli.md](docs/cli.md#mirrors)): when a download's link fails (network error, timeout, 408, 429, 5xx, 404 or 410), its mirrors are tried in order, at most 8, each with the usual retries. A mirror must report the same size; a partly downloaded file continues on a mirror only if it also supports range requests, otherwise the mirror is skipped and the partial file is kept. 401, 403, 407, file conflicts, a full disk, verification failures and cancels never switch to a mirror. When every source fails you get the main link's error, so exit codes are unchanged.
+- `dlx --mirror URL` and `dlxctl add --mirror URL` (repeatable, http(s) only); `mirrors` in the remote API's add body.
+- `dlx --modules-dir` delivers `completed` and `failed` events to hook modules and waits for them (bounded by each module's timeout) before exiting. Output and exit codes are unchanged; Ctrl+C still exits at once.
+
+### Changed
+- Mirrors returned by a resolver module are tried after your own and are no longer saved with the download or exported.
+- A write that fails because the disk is full now reports `not enough disk space:` (exit class `disk`) on every system, not only through the Windows precheck.
+- Mirrors that are not http(s) are refused when a download is added or imported.
+
+### Fixed
+- **Tools > Modules** no longer offers **Revoke** for a module that fails to load and was never approved; it shows only the error.
+
+### Isolation
+- Cookies and Basic credentials go to a mirror only on the main link's origin, custom headers and the referer only on the downloaded link's origin, and a resolver's headers only on its own origin. The User-Agent goes everywhere. Logs name a mirror by origin only.
+
+### Known limits
+- The disk-space precheck before a download starts is still Windows-only; elsewhere a full disk is reported when a write fails.
+- With no checksum, a same-size resume on a mirror mixes bytes from two sources. Give `--verify` / a checksum when a mirror is not fully trusted.
+
 ## 0.7.0 — 2026-11-18
 
 ### Added

@@ -429,3 +429,129 @@ async fn resolutions_never_outlive_the_module_or_persist() {
     assert_eq!(t.resolved_url, None);
     assert!(t.module_headers.is_empty());
 }
+
+fn completed_event() -> HookEvent {
+    HookEvent {
+        event: "completed",
+        id: 0,
+        url: "https://example.com/a.zip".into(),
+        path: PathBuf::from("C:/Downloads/a.zip"),
+        size: Some(10),
+        error: None,
+    }
+}
+
+#[tokio::test]
+async fn notify_wait_returns_after_the_hook_ran() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = install(
+        root.path(),
+        "hook",
+        &["--log", "events.log"],
+        json!({"kinds": ["hook"], "match": {}, "events": ["completed", "failed"]}),
+    );
+    let registry = Registry::load(&approved(root.path(), &["hook"]), root.path());
+    registry.notify_wait(completed_event()).await;
+    // No sleep: the line is there as soon as notify_wait returns.
+    let text = std::fs::read_to_string(dir.join("events.log")).unwrap();
+    assert_eq!(text.lines().count(), 1, "{text}");
+    let line: Value = serde_json::from_str(text.trim()).unwrap();
+    assert_eq!(
+        (line["op"].clone(), line["event"].clone()),
+        ("event".into(), "completed".into())
+    );
+    // Events nobody subscribed to, and registries without modules, return at once.
+    let mut other = completed_event();
+    other.event = "paused";
+    registry.notify_wait(other).await;
+    Registry::empty().notify_wait(completed_event()).await;
+    assert_eq!(
+        std::fs::read_to_string(dir.join("events.log"))
+            .unwrap()
+            .lines()
+            .count(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn notify_wait_is_bounded_by_the_module_timeout() {
+    let root = tempfile::tempdir().unwrap();
+    install(
+        root.path(),
+        "sleepy",
+        &["--sleep"],
+        json!({"kinds": ["hook"], "match": {}, "timeout_ms": 1000}),
+    );
+    let registry = Registry::load(&approved(root.path(), &["sleepy"]), root.path());
+    let started = Instant::now();
+    registry.notify_wait(completed_event()).await;
+    assert!(
+        started.elapsed() < Duration::from_secs(10),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+#[tokio::test]
+async fn resolver_mirrors_are_per_run_and_never_persist() {
+    let root = tempfile::tempdir().unwrap();
+    install(
+        root.path(),
+        "res",
+        &[
+            "--base",
+            "http://127.0.0.1:9/",
+            "--mirror",
+            "http://127.0.0.1:10/m.bin",
+        ],
+        json!({}),
+    );
+    let registry = Registry::load(&approved(root.path(), &["res"]), root.path());
+    let t = task(HOST_URL);
+    t.lock().unwrap().mirrors = vec!["http://user.test/u.bin".into()];
+    for _ in 0..2 {
+        registry
+            .prepare(&t, &CancellationToken::new())
+            .await
+            .unwrap();
+        let t = t.lock().unwrap();
+        assert_eq!(t.module_mirrors, ["http://127.0.0.1:10/m.bin"]);
+        assert_eq!(t.mirrors, ["http://user.test/u.bin"]);
+        let saved = serde_json::to_string(&*t).unwrap();
+        assert!(!saved.contains("127.0.0.1:10"), "{saved}");
+    }
+    // The next prepare without a resolver clears them.
+    Registry::empty()
+        .prepare(&t, &CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(t.lock().unwrap().module_mirrors.is_empty());
+    assert_eq!(t.lock().unwrap().mirrors, ["http://user.test/u.bin"]);
+}
+
+#[test]
+fn for_result_builds_the_scheduler_events() {
+    let t = Task {
+        id: 4,
+        url: "https://example.com/a.zip".into(),
+        file_name: "a.zip".into(),
+        total: Some(9),
+        ..Default::default()
+    };
+    let done = HookEvent::for_result(&t, &Ok(Outcome::Completed)).unwrap();
+    assert_eq!((done.event, done.id, done.size), ("completed", 4, Some(9)));
+    assert_eq!(done.path, t.final_path());
+    assert!(HookEvent::for_result(&t, &Ok(Outcome::Cancelled)).is_none());
+    let failed = HookEvent::for_result(&t, &Err("HTTP 404 Not Found".into())).unwrap();
+    assert_eq!(failed.event, "failed");
+    assert_eq!(failed.path, t.final_path());
+    let exists = HookEvent::for_result(&t, &Err("file exists: a.zip".into())).unwrap();
+    assert!(exists.path.as_os_str().is_empty());
+    let unnamed = Task {
+        file_name: String::new(),
+        ..t.clone()
+    };
+    let early = HookEvent::for_result(&unnamed, &Err("module x: boom".into())).unwrap();
+    assert!(early.path.as_os_str().is_empty());
+}

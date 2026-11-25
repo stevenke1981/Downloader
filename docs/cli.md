@@ -39,6 +39,7 @@ Downloads resume from the partial state kept in the output folder. Progress and 
 | `--user-agent TEXT` | User-Agent for every request |
 | `--referer URL` | Referer for every request |
 | `--on-conflict rename|overwrite|skip` | Existing file: save as `name (1).ext` (default), replace it when complete, or fail with exit 6. `skip` fails before transferring when the name is known up front (URL name, `--out`, resolver filename); a name only the server or a protocol reveals is checked right after the transfer. `overwrite` publishes beside the old file and replaces it only after verification |
+| `--mirror URL` | Alternative `http(s)` source for the one URL, repeatable, at most 8. Tried in order when the main URL fails (see [Mirrors](#mirrors)). Allowed only with exactly one URL; anything else, or a non-http(s) URL, exits 2 |
 | `--modules-dir DIR` | Load modules from DIR. Only modules approved with `dlxctl modules approve` run (approvals are read from the default settings file, see below) |
 | `--video` | Extract webpage media or HLS |
 | `--proxy URL`, `--retries N`, `-q` | As named |
@@ -65,6 +66,23 @@ Example:
 {"event":"summary","completed":1,"failed":0,"exit_code":0}
 ```
 
+### Mirrors
+
+`--mirror` (dlx) and `dlxctl add --mirror` give the same file from other `http(s)` URLs. Modules can add mirrors too: a resolver's mirrors are tried after yours, only for the run that resolved them, and are never saved or exported. Mirrors are never used for FTP, torrent, Metalink or media downloads.
+
+When the main URL fails, the mirrors are tried in order (at most 8, duplicates and invalid entries skipped silently), each with the usual `--retries`. The main URL's error is what you see when every source fails, so exit codes do not change.
+
+- A mirror is tried after: network errors, timeouts, 408, 429, 5xx, and 404 or 410 on the main URL.
+- A mirror is never tried after: 401, 403 or 407, a `file exists:` conflict, `not enough disk space:`, a local file error, a verification failure, or a cancel.
+- R1: when the size is known, a mirror must report exactly that size; otherwise it is skipped, never restarted.
+- R2: a resumable partial download continues on a mirror only if it reports the same size and supports range requests; otherwise it is skipped and the partial file is kept.
+- R3: with nothing downloaded yet, or an unknown size, the mirror starts from byte 0.
+- The main URL's ETag and Last-Modified are kept, so a later run resumes against the main URL.
+
+Isolation: a mirror receives your cookies and Basic credentials only if it has the same origin as the main URL. Custom `--header` values and the referer go only to a mirror on the same origin as the URL being downloaded, and a resolver's headers only to its own origin. The User-Agent goes everywhere. Logs name a mirror by origin only, never its path or query.
+
+With no checksum, bytes from two sources are mixed on a same-size resume. Use `--verify HASH` when the mirror is not fully trusted.
+
 ### Modules in dlx
 
 To run modules from `dlx`, all three must hold:
@@ -75,7 +93,7 @@ To run modules from `dlx`, all three must hold:
 
 dlx reads approvals from the default state directory's `settings.json`, so run `dlxctl` without a different `--data-dir` when you approve modules for `dlx`.
 
-With `--modules-dir`, dlx runs approved resolver modules before each download. Approvals come from the default settings file (`settings.json` in the state folder, or `DOWNLOADER_STATE_DIR` when set). An approval is bound to the SHA-256 of the module's `module.json`, so an edited module stops running. dlx does not deliver completion events to hook modules; a running manager (the app, or `dlxctl serve`) does.
+With `--modules-dir`, dlx runs approved resolver modules before each download. Approvals come from the default settings file (`settings.json` in the state folder, or `DOWNLOADER_STATE_DIR` when set). An approval is bound to the SHA-256 of the module's `module.json`, so an edited module stops running. After each URL finishes, dlx tells the approved hook modules subscribed to `completed` or `failed` (the download `id` is 0 in dlx; a resolver failure `module <id>: ...` is a `failed` event; a cancelled download sends nothing). dlx waits for the hooks before it exits, at most each hook's `timeout_ms` plus 5 seconds, so a hook's own output is complete when dlx returns. Hooks add nothing to stdout or stderr, `summary` stays the last NDJSON line, and exit codes ignore hook results. Ctrl+C stops waiting, kills the hook processes and exits 130.
 
 ## dlxctl
 
@@ -105,7 +123,7 @@ Remote errors keep the server's text in `message` (for example `HTTP 401 Unautho
 | Command | Remote route | Notes |
 |---|---|---|
 | `list`, `status ID` | `GET /downloads`, `GET /downloads/{id}` | |
-| `add URL` | `POST /downloads` | `-d DIR`, `--paused`, `--video`, `--unique`, `--priority N`, `--checksum DIGEST`, `--header "NAME: VALUE"`, `--on-conflict rename\|overwrite\|skip`. `--unique` returns exit 6 when the URL is already queued or active |
+| `add URL` | `POST /downloads` | `-d DIR`, `--paused`, `--video`, `--unique`, `--priority N`, `--checksum DIGEST`, `--header "NAME: VALUE"`, `--on-conflict rename\|overwrite\|skip`, `--mirror URL` (repeatable, max 8, http(s) only; see [Mirrors](#mirrors)). `--unique` returns exit 6 when the URL is already queued or active |
 | `start ID`, `pause ID`, `remove ID` | `POST …/start`, `POST …/pause`, `DELETE /downloads/{id}` | |
 | `start-all`, `pause-all` | `POST /start-all`, `POST /pause-all` | |
 | `wait ID...` [--timeout SECS] | polls `GET /downloads/{id}` | Waits until each download completes. Exit code is the most severe failure. Paused downloads wait until `--timeout` (if given) |

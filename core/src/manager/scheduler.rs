@@ -120,33 +120,7 @@ impl Inner {
                     Err(_) if ctx.cancel.is_cancelled() => Ok(Outcome::Cancelled),
                     Err(e) => Err(e),
                 };
-                let event = {
-                    let t = task.lock().unwrap();
-                    match &r {
-                        Ok(Outcome::Completed) => Some(HookEvent {
-                            event: "completed",
-                            id: t.id,
-                            url: t.url.clone(),
-                            path: t.final_path(),
-                            size: t.total,
-                            error: None,
-                        }),
-                        Err(err) => Some(HookEvent {
-                            event: "failed",
-                            id: t.id,
-                            url: t.url.clone(),
-                            // Never point at a pre-existing file the task did not create.
-                            path: if err.starts_with("file exists:") || t.file_name.is_empty() {
-                                std::path::PathBuf::new()
-                            } else {
-                                t.final_path()
-                            },
-                            size: t.total,
-                            error: Some(err.clone()),
-                        }),
-                        Ok(Outcome::Cancelled) => None,
-                    }
-                };
+                let event = HookEvent::for_result(&task.lock().unwrap(), &r);
                 if let Some(event) = event {
                     registry.notify(&rt, event);
                 }

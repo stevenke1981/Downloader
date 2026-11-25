@@ -22,7 +22,7 @@ export global ToolTr {
     pure public function module-status(state: int, error: string) -> string {
         if state == 0 { return @tr("Built-in"); }
         if state == 2 { return @tr("Approved"); }
-        if state == 3 { return @tr("Error: {}", error); }
+        if state >= 3 { return @tr("Error: {}", error); }
         return @tr("Not approved");
     }
     pure public function conflict-name(index: int) -> string {
@@ -278,7 +278,7 @@ export component ToolsWindow inherits Window {
                         VerticalLayout {
                             horizontal-stretch: 1;
                             Text { text: name; font-weight: 600; wrap: word-wrap; }
-                            Text { text: root.module-status[index]; wrap: word-wrap; color: root.module-state[index] == 3 ? #a03020 : #245078; }
+                            Text { text: root.module-status[index]; wrap: word-wrap; color: root.module-state[index] >= 3 ? #a03020 : #245078; }
                         }
                         if root.module-state[index] == 1: Button { text: @tr("Approve"); enabled: !root.busy; clicked => { root.module-approve(index); } }
                         if root.module-state[index] == 2 || root.module-state[index] == 3: Button { text: @tr("Revoke"); enabled: !root.busy; clicked => { root.module-revoke(index); } }

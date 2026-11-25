@@ -291,6 +291,7 @@ impl Registry {
         let (url, kind, referer) = {
             let mut t = task.lock().unwrap();
             t.resolved_url = None;
+            t.module_mirrors.clear();
             t.module_headers.clear();
             t.module = None;
             (t.url.trim().to_string(), t.kind, t.referer.clone())
@@ -359,10 +360,11 @@ impl Registry {
         crate::task::validate_headers(&combined).map_err(fail)?;
         // Kept apart from the user's (persisted) headers so they never reach the original site.
         t.module_headers = added;
+        // Never persisted and never merged into the user's mirrors: they end with this run.
         for mirror in response.mirrors {
             let mirror = mirror.trim().to_string();
-            if !t.mirrors.contains(&mirror) {
-                t.mirrors.push(mirror);
+            if !t.module_mirrors.contains(&mirror) {
+                t.module_mirrors.push(mirror);
             }
         }
         t.resolved_url = Some(resolved);
@@ -379,20 +381,11 @@ impl Registry {
 
     /// Deliver `event` to hook modules in the background (bounded).
     pub fn notify(self: &Arc<Self>, rt: &tokio::runtime::Handle, event: HookEvent) {
-        let targets: Vec<&Checked> = self
-            .runnable
-            .iter()
-            .filter(|m| m.has_kind("hook") && m.manifest.events.iter().any(|e| e == event.event))
-            .collect();
+        let targets = self.hook_targets(event.event);
         if targets.is_empty() {
             return;
         }
-        let mut message = serde_json::to_value(&event).unwrap_or_default();
-        if let Some(object) = message.as_object_mut() {
-            object.insert("v".into(), 1.into());
-            object.insert("op".into(), "event".into());
-        }
-        let line = message.to_string();
+        let line = self.hook_line(&event);
         for module in targets {
             if self.hooks_pending.fetch_add(1, Ordering::SeqCst) >= MAX_PENDING_HOOKS {
                 self.hooks_pending.fetch_sub(1, Ordering::SeqCst);
@@ -407,6 +400,69 @@ impl Registry {
                 let _ = external::deliver(&module, &line, &permits).await;
                 pending.fetch_sub(1, Ordering::SeqCst);
             });
+        }
+    }
+}
+
+impl Registry {
+    /// Deliver `event` to every subscribed hook and wait until all of them ended (bounded by
+    /// each module's timeout). Failures are ignored. Used by `dlx`, which exits right after.
+    pub async fn notify_wait(&self, event: HookEvent) {
+        let line = self.hook_line(&event);
+        let deliveries = self
+            .hook_targets(event.event)
+            .into_iter()
+            .map(|module| external::deliver(module, &line, &self.permits));
+        // Hook output and failures are ignored by design.
+        let _ = futures_util::future::join_all(deliveries).await;
+    }
+
+    fn hook_targets(&self, event: &str) -> Vec<&Checked> {
+        self.runnable
+            .iter()
+            .filter(|m| m.has_kind("hook") && m.manifest.events.iter().any(|e| e == event))
+            .collect()
+    }
+
+    fn hook_line(&self, event: &HookEvent) -> String {
+        let mut message = serde_json::to_value(event).unwrap_or_default();
+        if let Some(object) = message.as_object_mut() {
+            object.insert("v".into(), 1.into());
+            object.insert("op".into(), "event".into());
+        }
+        message.to_string()
+    }
+}
+
+impl HookEvent {
+    /// The event for a finished download, or `None` when it was cancelled.
+    pub fn for_result(
+        task: &Task,
+        result: &Result<crate::engine::Outcome, String>,
+    ) -> Option<HookEvent> {
+        match result {
+            Ok(crate::engine::Outcome::Completed) => Some(HookEvent {
+                event: "completed",
+                id: task.id,
+                url: task.url.clone(),
+                path: task.final_path(),
+                size: task.total,
+                error: None,
+            }),
+            Err(err) => Some(HookEvent {
+                event: "failed",
+                id: task.id,
+                url: task.url.clone(),
+                // Never point at a pre-existing file the task did not create.
+                path: if err.starts_with("file exists:") || task.file_name.is_empty() {
+                    PathBuf::new()
+                } else {
+                    task.final_path()
+                },
+                size: task.total,
+                error: Some(err.clone()),
+            }),
+            Ok(crate::engine::Outcome::Cancelled) => None,
         }
     }
 }

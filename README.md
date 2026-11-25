@@ -125,6 +125,7 @@ The **Tools** window adds configurable traffic presets, site/folder rules, bound
 - **Modules** (optional, off by default): external programs can resolve links or act when a download completes or fails. Enable them in **Tools > Modules** and approve each one. See [modules](docs/modules.md).
 - **File exists**: save as `name (1).ext` (default), overwrite (only after the new file verifies), or skip.
 - **Custom headers and User-Agent** per download; **queue export/import** as JSON (no cookies or passwords); **duplicate detection** via `dlxctl add --unique` and the remote API; a **disk-space precheck** on Windows.
+- **Mirrors (0.8.0)**: give a download alternative `http(s)` links (`dlx --mirror`, `dlxctl add --mirror`, or a resolver module); they are tried in order when the main link fails, only for a file of the same size. See [Mirrors](docs/cli.md#mirrors).
 
 ### Browser extension (Chrome / Brave / Edge)
 `extension/` is a Manifest V3 extension for Chrome, Edge and Brave: context-menu items for links, images, video/audio, the page and "download all links"; automatic interception of browser downloads (the site's cookies are forwarded to the app by default so downloads that need a login work — sent only over the local connection, kept in memory, never written to disk; can be turned off); options for enabling interception, minimum size, include/exclude file types, Alt+click bypass and falling back to the browser when the app can't be reached. Localized in the same 8 languages.

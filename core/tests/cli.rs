@@ -530,3 +530,199 @@ async fn dlxctl_modules_approve_validates_and_shows_the_command() {
     let invalid = approve(&[]).await;
     assert_eq!(invalid.code, 7, "stdout: {}", invalid.stdout);
 }
+
+/// A hook module for completed and failed events that logs every request line to events.log.
+fn hook_module(state: &Path) -> std::path::PathBuf {
+    let modules = state.join("modules");
+    let module = modules.join("hook");
+    std::fs::create_dir_all(&module).unwrap();
+    let manifest = json!({
+        "schema": 1, "id": "hook", "name": "Hook", "version": "1.0.0", "kinds": ["hook"],
+        "events": ["completed", "failed"], "match": {}, "timeout_ms": 10000,
+        "command": [env!("CARGO_BIN_EXE_dlx-module-example"), "--log", "events.log"]
+    });
+    std::fs::write(module.join("module.json"), manifest.to_string()).unwrap();
+    let hash = dlcore::modules::manifest_hash(&modules, "hook").unwrap();
+    let settings = json!({"modules": {"enabled": true, "approved": {"hook": hash}}});
+    std::fs::write(state.join("settings.json"), settings.to_string()).unwrap();
+    module.join("events.log")
+}
+
+fn hook_lines(log: &Path) -> Vec<Value> {
+    std::fs::read_to_string(log)
+        .unwrap_or_default()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+#[tokio::test]
+async fn dlx_waits_for_hooks_and_reports_each_result_once() {
+    let data = server::test_data(32 << 10);
+    let s = server::start(data.clone(), true, 0).await;
+    let state = tempfile::tempdir().unwrap();
+    let log = hook_module(state.path());
+    let modules = state.path().join("modules");
+    let out = tempfile::tempdir().unwrap();
+    let args = |extra: &[&str], url: &str| {
+        let mut args = vec!["--json", "-q", "-o", out.path().to_str().unwrap()];
+        args.extend_from_slice(extra);
+        args.push(url);
+        args.iter().map(|a| a.to_string()).collect::<Vec<_>>()
+    };
+    let go = |args: Vec<String>| {
+        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        finish(dlx(state.path(), &refs))
+    };
+    // Without --modules-dir no hook runs.
+    let plain = go(args(&[], &s.url("plain.bin"))).await;
+    assert_eq!(plain.code, 0, "stderr: {}", plain.stderr);
+    assert!(hook_lines(&log).is_empty());
+
+    let with = ["--modules-dir", modules.to_str().unwrap()];
+    let ok = go(args(&with, &s.url("hooked.bin"))).await;
+    assert_eq!(ok.code, 0, "stderr: {}", ok.stderr);
+    // The log is complete the moment dlx has exited.
+    let lines = hook_lines(&log);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!(lines[0]["event"], "completed");
+    assert_eq!(lines[0]["id"], 0);
+    assert_eq!(lines[0]["size"], data.len());
+    assert!(lines[0]["path"].as_str().unwrap().ends_with("hooked.bin"));
+    let events = ok.events();
+    assert_eq!(events.last().unwrap()["event"], "summary");
+    assert_eq!(events.last().unwrap()["exit_code"], 0);
+
+    // A failing URL gives one failed event and the same exit code as without hooks.
+    let missing = s.url("missing.sha256");
+    let failed = go(args(&with, &missing)).await;
+    let baseline = go(args(&[], &missing)).await;
+    assert_ne!(failed.code, 0);
+    assert_eq!(failed.code, baseline.code);
+    let lines = hook_lines(&log);
+    assert_eq!(lines.len(), 2, "{lines:?}");
+    assert_eq!(lines[1]["event"], "failed");
+    assert!(lines[1]["error"].as_str().is_some_and(|e| !e.is_empty()));
+    assert_eq!(failed.events().last().unwrap()["event"], "summary");
+}
+
+#[tokio::test]
+async fn dlx_human_output_keeps_its_shape_with_hooks() {
+    let s = server::start(server::test_data(8 << 10), true, 0).await;
+    let state = tempfile::tempdir().unwrap();
+    let log = hook_module(state.path());
+    let modules = state.path().join("modules");
+    let out = tempfile::tempdir().unwrap();
+    let run = finish(dlx(
+        state.path(),
+        &[
+            "-q",
+            "--modules-dir",
+            modules.to_str().unwrap(),
+            "-o",
+            out.path().to_str().unwrap(),
+            &s.url("human.bin"),
+        ],
+    ))
+    .await;
+    assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    assert_eq!(run.stdout.lines().count(), 1, "{}", run.stdout);
+    assert!(run.stdout.contains("human.bin"), "{}", run.stdout);
+    assert!(run.stderr.is_empty(), "{}", run.stderr);
+    assert_eq!(hook_lines(&log).len(), 1);
+}
+
+#[tokio::test]
+async fn dlx_mirror_flag_is_validated_before_any_transfer() {
+    let state = tempfile::tempdir().unwrap();
+    let cases: [&[&str]; 3] = [
+        &[
+            "--mirror",
+            "https://b.test/a.bin",
+            "https://a.test/a.bin",
+            "https://c.test/c.bin",
+        ],
+        &["--mirror", "ftp://b.test/a.bin", "https://a.test/a.bin"],
+        &["--mirror", "not a url", "https://a.test/a.bin"],
+    ];
+    for case in cases {
+        let mut args = vec!["--json"];
+        args.extend_from_slice(case);
+        let run = finish(dlx(state.path(), &args)).await;
+        assert_eq!(run.code, 2, "{case:?}: {}", run.stdout);
+        assert_eq!(event(&run.events(), "error")[0]["code"], "invalid");
+    }
+    let nine: Vec<String> = (0..9).map(|i| format!("https://m{i}.test/a.bin")).collect();
+    let mut args = vec!["--json"];
+    for mirror in &nine {
+        args.extend(["--mirror", mirror]);
+    }
+    args.push("https://a.test/a.bin");
+    assert_eq!(finish(dlx(state.path(), &args)).await.code, 2);
+}
+
+#[tokio::test]
+async fn dlx_mirror_is_accepted_for_a_single_url() {
+    let data = server::test_data(16 << 10);
+    let s = server::start(data.clone(), true, 0).await;
+    let state = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let url = s.url("one.bin");
+    let run = finish(dlx(
+        state.path(),
+        &[
+            "--json",
+            "-q",
+            "--mirror",
+            "http://127.0.0.1:9/one.bin",
+            "-o",
+            out.path().to_str().unwrap(),
+            &url,
+        ],
+    ))
+    .await;
+    assert_eq!(run.code, 0, "stderr: {}", run.stderr);
+    assert_eq!(std::fs::read(out.path().join("one.bin")).unwrap(), data);
+}
+
+#[tokio::test]
+async fn dlxctl_add_mirror_is_stored_and_exported() {
+    let state = tempfile::tempdir().unwrap();
+    let out = tempfile::tempdir().unwrap();
+    let (mut serve, endpoint) = start_serve(state.path()).await;
+    let auth = ["--endpoint", endpoint.as_str(), "--token", TOKEN];
+    let dir = out.path().to_str().unwrap();
+    let call = |args: &[&str]| dlxctl(state.path(), &[&["--json"], &auth[..], args].concat());
+    let bad = finish(call(&[
+        "add",
+        "http://127.0.0.1:9/a.bin",
+        "--paused",
+        "--mirror",
+        "ftp://x.test/a.bin",
+    ]))
+    .await;
+    assert_eq!(bad.code, 2, "stdout: {}", bad.stdout);
+    let add = finish(call(&[
+        "add",
+        "http://127.0.0.1:9/a.bin",
+        "--dir",
+        dir,
+        "--paused",
+        "--mirror",
+        "http://127.0.0.1:10/a.bin",
+        "--mirror",
+        "https://mirror.test/a.bin",
+    ]))
+    .await;
+    assert_eq!(add.code, 0, "stdout: {}", add.stdout);
+    let export = finish(call(&["export"])).await;
+    let queue = export.envelope()["data"].clone();
+    let mirrors = &queue["downloads"][0]["mirrors"];
+    assert_eq!(
+        mirrors,
+        &json!(["http://127.0.0.1:10/a.bin", "https://mirror.test/a.bin"]),
+        "{queue}"
+    );
+    let _ = serve.start_kill();
+    let _ = serve.wait().await;
+}
