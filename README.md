@@ -124,7 +124,7 @@ The **Tools** window adds configurable traffic presets, site/folder rules, bound
 - **Usability (0.6.0)**: search by name or URL, right-click menu, common shortcuts, and "Clear completed" that removes list entries but keeps files. Guide (in Traditional Chinese): [usability guide](docs/usability.zh-TW.md).
 - **Modules** (optional, off by default): external programs can resolve links or act when a download completes or fails. Enable them in **Tools > Modules** and approve each one. See [modules](docs/modules.md).
 - **File exists**: save as `name (1).ext` (default), overwrite (only after the new file verifies), or skip.
-- **Custom headers and User-Agent** per download; **queue export/import** as JSON (no cookies or passwords); **duplicate detection** via `dlxctl add --unique` and the remote API; a **disk-space precheck** on Windows.
+- **Custom headers and User-Agent** per download; **queue export/import** as JSON (no cookies or passwords); **duplicate detection** via `dlxctl add --unique` and the remote API; a **disk-space precheck** before a download starts.
 - **Mirrors (0.8.0)**: give a download alternative `http(s)` links (`dlx --mirror`, `dlxctl add --mirror`, or a resolver module); they are tried in order when the main link fails, only for a file of the same size. See [Mirrors](docs/cli.md#mirrors).
 
 ### Browser extension (Chrome / Brave / Edge)

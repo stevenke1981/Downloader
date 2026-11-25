@@ -159,8 +159,9 @@ pub fn unique_name(dir: &Path, name: &str) -> String {
 }
 
 /// Free bytes available to the current user on the volume holding `dir` (or its nearest existing
-/// parent). Only measured on Windows; `None` elsewhere or when it cannot be determined.
+/// parent). `None` when it cannot be determined, so the caller skips the precheck.
 pub fn free_space(dir: &Path) -> Option<u64> {
+    let existing = dir.ancestors().find(|p| p.exists())?;
     #[cfg(windows)]
     {
         use std::os::windows::ffi::OsStrExt;
@@ -173,7 +174,6 @@ pub fn free_space(dir: &Path) -> Option<u64> {
                 free: *mut u64,
             ) -> i32;
         }
-        let existing = dir.ancestors().find(|p| p.exists())?;
         let wide: Vec<u16> = existing.as_os_str().encode_wide().chain([0]).collect();
         let mut available = 0u64;
         let (mut total, mut free) = (0u64, 0u64);
@@ -182,9 +182,32 @@ pub fn free_space(dir: &Path) -> Option<u64> {
             unsafe { GetDiskFreeSpaceExW(wide.as_ptr(), &mut available, &mut total, &mut free) };
         (ok != 0).then_some(available)
     }
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     {
-        let _ = dir;
+        use std::os::unix::ffi::OsStrExt;
+        let path = std::ffi::CString::new(existing.as_os_str().as_bytes()).ok()?;
+        // SAFETY: an all-zero `statvfs` is a valid value for this plain C struct.
+        let mut st: libc::statvfs = unsafe { std::mem::zeroed() };
+        // SAFETY: `path` is NUL-terminated and `st` is valid for writes for the call.
+        if unsafe { libc::statvfs(path.as_ptr(), &mut st) } != 0 {
+            return None;
+        }
+        // Field widths differ between systems (u32 on macOS, u64 on 64-bit Linux).
+        #[allow(clippy::useless_conversion)]
+        let (blocks, avail, frsize) = (
+            u64::from(st.f_blocks),
+            u64::from(st.f_bavail),
+            u64::from(st.f_frsize),
+        );
+        // Some virtual or network file systems report no size at all: don't block on those.
+        if blocks == 0 || frsize == 0 {
+            return None;
+        }
+        avail.checked_mul(frsize)
+    }
+    #[cfg(not(any(windows, unix)))]
+    {
+        let _ = existing;
         None
     }
 }
@@ -430,6 +453,17 @@ mod tests {
             "{e}"
         );
         assert_eq!(error_code(&e), "conflict");
+    }
+    #[test]
+    fn free_space_measures_the_volume() {
+        let tmp = tempfile::tempdir().unwrap();
+        let free = free_space(tmp.path()).expect("free space of a real directory");
+        assert!(free > 0);
+        // A folder that does not exist yet is measured on its nearest existing parent.
+        assert_eq!(
+            free_space(&tmp.path().join("not/made/yet")).map(|n| n > 0),
+            Some(true)
+        );
     }
     #[test]
     fn error_codes() {
