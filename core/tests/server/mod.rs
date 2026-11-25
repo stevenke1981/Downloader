@@ -35,6 +35,14 @@ pub struct Server {
     pub data_content_range: Mutex<Option<String>>,
     /// Return valid shorter prefixes of requested ranges (0 = no cap).
     pub max_range_bytes: AtomicU64,
+    /// Answer the main file with this HTTP status (0 = serve it).
+    pub fail_status: AtomicUsize,
+    /// When non-empty, `fail_status` applies only to this file name.
+    pub fail_name: Mutex<String>,
+    /// Close the connection after this many data bytes of a main-file response (0 = never).
+    pub fail_after: AtomicU64,
+    /// Raw request heads (request line and headers), in arrival order.
+    pub heads: Mutex<Vec<String>>,
 }
 
 fn is_meta(name: &str) -> bool {
@@ -104,6 +112,10 @@ pub async fn start(data: Vec<u8>, range: bool, per_conn_rate: u64) -> Arc<Server
         require_cookie: AtomicBool::new(false),
         data_content_range: Mutex::new(None),
         max_range_bytes: AtomicU64::new(0),
+        fail_status: AtomicUsize::new(0),
+        fail_name: Mutex::new(String::new()),
+        fail_after: AtomicU64::new(0),
+        heads: Mutex::new(vec![]),
     });
     let srv = s.clone();
     tokio::spawn(async move {
@@ -130,6 +142,10 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
     }
     s.requests.fetch_add(1, Ordering::SeqCst);
     let req = String::from_utf8_lossy(&buf).to_string();
+    s.heads
+        .lock()
+        .unwrap()
+        .push(req.split("\r\n\r\n").next().unwrap_or("").to_string());
     let header = |name: &str| {
         req.lines()
             .find(|l| {
@@ -164,6 +180,13 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
         let head = format!(
             "HTTP/1.1 302 Found\r\nLocation: {base}{name}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
         );
+        return sock.write_all(head.as_bytes()).await;
+    }
+    let fail = s.fail_status.load(Ordering::SeqCst);
+    let fail_name = s.fail_name.lock().unwrap().clone();
+    if fail > 0 && (fail_name.is_empty() || name.split('?').next() == Some(fail_name.as_str())) {
+        let head =
+            format!("HTTP/1.1 {fail} Failure\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         return sock.write_all(head.as_bytes()).await;
     }
     if s.require_cookie.load(Ordering::SeqCst) && header("Cookie").is_none() {
@@ -236,7 +259,12 @@ async fn handle(s: Arc<Server>, mut sock: tokio::net::TcpStream) -> std::io::Res
     let t0 = std::time::Instant::now();
     let mut sent = 0u64;
     let mut res = Ok(());
-    for chunk in data[start as usize..end as usize].chunks(16 * 1024) {
+    let mut body = &data[start as usize..end as usize];
+    let cut = s.fail_after.load(Ordering::SeqCst);
+    if cut > 0 && end - start > 1 && (body.len() as u64) > cut {
+        body = &body[..cut as usize];
+    }
+    for chunk in body.chunks(16 * 1024) {
         if s.per_conn_rate > 0 {
             let due = std::time::Duration::from_secs_f64(sent as f64 / s.per_conn_rate as f64);
             if let Some(w) = due.checked_sub(t0.elapsed()) {

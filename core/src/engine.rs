@@ -4,12 +4,14 @@
 //! connection finishes its segment it "steals" work by splitting the largest
 //! remaining segment in half, so slow connections never hold up the download.
 mod http;
+mod mirrors;
 mod segments;
 mod worker;
 
 #[cfg(test)]
 use http::content_range;
 use http::{Probe, probe, response_range, same_origin};
+use mirrors::{Fail, Source};
 pub use segments::{claim, plan_segments};
 use worker::Shared;
 
@@ -184,75 +186,77 @@ fn replace_existing(task: &Arc<Mutex<Task>>, name: &str) {
     }
 }
 
-/// One transfer. The second value is the wanted name when an existing file is to be overwritten once verified.
+/// One transfer, from the primary URL or, when it fails, from a mirror. The second value is the
+/// wanted name when an existing file is to be overwritten once verified.
 async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<String>), String> {
-    let mut wanted: Option<String> = None;
-    let (task_url, url, referer, cookie, had_cookie, authorization, headers, user_agent) = {
-        let mut t = task.lock().unwrap();
-        t.append_log("HTTP probe started");
-        (
-            t.url.clone(),
-            // A resolver module may have pointed this download somewhere else.
-            t.resolved_url.clone().unwrap_or_else(|| t.url.clone()),
-            t.referer.clone(),
-            t.cookie.clone().filter(|c| !c.trim().is_empty()),
-            t.had_cookie,
-            t.authorization.clone(),
-            // Module headers only travel with the URL the module chose.
-            t.headers
-                .iter()
-                .chain(
-                    t.resolved_url
-                        .is_some()
-                        .then_some(&t.module_headers)
-                        .into_iter()
-                        .flatten(),
-                )
-                .cloned()
-                .collect::<Vec<_>>(),
-            t.user_agent.clone(),
-        )
-    };
-    let lost_cookie = had_cookie && cookie.is_none();
-    // Credentials belong to the URL the user gave, not to wherever a module sent us.
-    let (cookie, authorization) = if same_origin(&task_url, &url) {
-        (cookie, authorization)
-    } else {
-        (None, None)
-    };
+    mirrors::run_sources(&task, &ctx).await
+}
+
+/// One transfer from one source. `wanted` is the name an existing file is to be replaced at; it
+/// is kept across sources, since the first source may pick the name and a mirror finish the file.
+/// A mirror is refused (before the task changes) when it cannot
+/// continue the task as it stands; see `mirrors::accepts`.
+async fn run_source(
+    task: &Arc<Mutex<Task>>,
+    ctx: &Ctx,
+    src: &Source,
+    wanted: &mut Option<String>,
+) -> Result<Outcome, Fail> {
+    let url = &src.url;
     let p = match probe_retry(
-        &ctx,
-        &url,
-        referer.as_deref(),
-        cookie.as_deref(),
-        authorization.as_deref(),
-        &headers,
-        user_agent.as_deref(),
+        ctx,
+        url,
+        src.referer.as_deref(),
+        src.cookie.as_deref(),
+        src.authorization.as_deref(),
+        &src.headers,
+        src.user_agent.as_deref(),
     )
     .await
     {
         Ok(p) => p,
-        Err(_) if ctx.cancel.is_cancelled() => return Ok((Outcome::Cancelled, None)),
-        Err(e) => return Err(with_cookie_hint(e, lost_cookie)),
+        Err(_) if ctx.cancel.is_cancelled() => return Ok(Outcome::Cancelled),
+        Err(e) => return Err(Fail::Source(e)),
     };
     // The probe follows redirects (reqwest drops Cookie on cross-origin hops), but the workers add the cookie
     // by hand to `p.url`. Only keep it when the redirect target is the same origin as the task URL.
-    let cookie = match cookie {
-        Some(_) if !same_origin(&url, &p.url) => {
-            eprintln!("login cookie not sent: the download was redirected to another origin");
+    let cookie = match src.cookie.clone() {
+        Some(_) if !same_origin(url, &p.url) => {
+            if src.mirror.is_none() {
+                eprintln!("login cookie not sent: the download was redirected to another origin");
+            }
             None
         }
         c => c,
     };
-    let authorization = authorization.filter(|_| same_origin(&url, &p.url));
-    let headers = if same_origin(&url, &p.url) {
-        headers
+    let authorization = src
+        .authorization
+        .clone()
+        .filter(|_| same_origin(url, &p.url));
+    let headers = if same_origin(url, &p.url) {
+        src.headers.clone()
     } else {
         Vec::new()
     };
 
     let (part, conns) = {
         let mut t = task.lock().unwrap();
+        if let Some(k) = src.mirror {
+            let partial = t.downloaded() > 0
+                && t.segments.iter().all(|s| s.end != u64::MAX)
+                && !t.file_name.is_empty()
+                && t.part_path().exists();
+            if !mirrors::accepts(t.total, partial, &p) {
+                t.append_log(format!(
+                    "HTTP mirror {k} skipped: size differs or no range support"
+                ));
+                return Err(Fail::Source(format!("mirror {k} skipped")));
+            }
+            if !partial {
+                // R3: start again from byte 0 with a fresh segment plan.
+                t.segments.clear();
+            }
+        }
         if t.file_name.is_empty() {
             let suggested = t
                 .suggested_name
@@ -266,9 +270,17 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
                             "identifier" | "uc" | "download" | "view" | "open"
                         )
                 });
-            let name = suggested
-                .or_else(|| p.name.clone())
-                .unwrap_or_else(|| "download".into());
+            // A mirror names the file after the URL the user asked for, if that URL has a name.
+            let server = match src.mirror {
+                Some(_) => {
+                    let effective = t.resolved_url.as_deref().unwrap_or(&t.url);
+                    Some(util::name_from_url(effective))
+                        .filter(|n| n != "download")
+                        .or_else(|| p.name.clone())
+                }
+                None => p.name.clone(),
+            };
+            let name = suggested.or(server).unwrap_or_else(|| "download".into());
             // A leftover .part (possibly another task's) is never reused, whatever the policy.
             let policy = if t.dir.join(format!("{name}.part")).exists() {
                 ConflictPolicy::Rename
@@ -277,23 +289,25 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
             };
             t.file_name = if policy == ConflictPolicy::Overwrite && t.dir.join(&name).exists() {
                 // Keep the old file until the new one is verified.
-                wanted = Some(name.clone());
+                *wanted = Some(name.clone());
                 util::unique_name(&t.dir, &name)
             } else {
-                util::resolve_conflict(&t.dir, &name, policy)?
+                util::resolve_conflict(&t.dir, &name, policy).map_err(Fail::Local)?
             };
             t.category = Category::from_name(&t.file_name);
         }
-        let changed = (t.etag.is_some() && p.etag.is_some() && t.etag != p.etag)
-            || (t.last_modified.is_some()
-                && p.last_modified.is_some()
-                && t.last_modified != p.last_modified)
-            || (t.total.is_some()
-                && p.total.is_some()
-                && t.total != p.total
-                && t.segments.iter().all(|s| s.end != u64::MAX))
-            || !p.range
-            || !t.part_path().exists();
+        // A mirror has its own validators; R1/R2 above replace this check for it.
+        let changed = src.mirror.is_none()
+            && ((t.etag.is_some() && p.etag.is_some() && t.etag != p.etag)
+                || (t.last_modified.is_some()
+                    && p.last_modified.is_some()
+                    && t.last_modified != p.last_modified)
+                || (t.total.is_some()
+                    && p.total.is_some()
+                    && t.total != p.total
+                    && t.segments.iter().all(|s| s.end != u64::MAX))
+                || !p.range
+                || !t.part_path().exists());
         if changed && t.downloaded() > 0 {
             t.segments.clear();
         }
@@ -308,22 +322,30 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
         for s in &mut t.segments {
             s.busy = false;
         }
-        t.etag = p.etag.clone();
+        // The primary's validators stay, so a later run can resume against the primary.
+        if src.mirror.is_none() {
+            t.etag = p.etag.clone();
+            t.last_modified = p.last_modified.clone();
+        }
         t.final_url = Some(p.url.clone());
-        t.header_checksums = p.checksums.clone();
-        t.last_modified = p.last_modified.clone();
+        // A mirror's (usually empty) list never hides a digest the primary advertised.
+        if src.mirror.is_none() || t.header_checksums.is_empty() {
+            t.header_checksums = p.checksums.clone();
+        }
         t.resumable = p.range;
         t.error = None;
         let conns = if p.range { t.connections.max(1) } else { 1 };
-        t.append_log(format!(
-            "HTTP transfer started ({conns} connection(s), ranges: {})",
-            p.range
-        ));
+        if src.mirror.is_none() {
+            t.append_log(format!(
+                "HTTP transfer started ({conns} connection(s), ranges: {})",
+                p.range
+            ));
+        }
         (t.part_path(), conns)
     };
 
     std::fs::create_dir_all(part.parent().unwrap())
-        .map_err(|e| format!("cannot create folder: {e}"))?;
+        .map_err(|e| Fail::Local(format!("cannot create folder: {e}")))?;
     // Space already reserved by an earlier set_len of this .part does not need to be found again.
     let fresh = task.lock().unwrap().downloaded() == 0;
     let have = if fresh {
@@ -339,18 +361,18 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
         && let Some(free) = util::free_space(part.parent().unwrap())
         && need > free
     {
-        return Err(format!(
+        return Err(Fail::Local(format!(
             "not enough disk space: need {}, {} free",
             util::human_size(need),
             util::human_size(free)
-        ));
+        )));
     }
     let file = std::fs::OpenOptions::new()
         .create(true)
         .write(true)
         .truncate(fresh)
         .open(&part)
-        .map_err(|e| format!("cannot open {}: {e}", part.display()))?;
+        .map_err(|e| Fail::Local(format!("cannot open {}: {e}", part.display())))?;
     if let (true, Some(n)) = (fresh, p.total) {
         let _ = file.set_len(n);
     }
@@ -361,21 +383,25 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
         url: p.url.clone(),
         drive_download: p.drive_download,
         range: p.range,
+        // If-Range uses this source's own validator.
         etag: p.etag.clone(),
-        referer,
+        referer: src.referer.clone(),
         cookie,
         authorization,
         headers,
-        user_agent,
+        user_agent: src.user_agent.clone(),
         ctx: ctx.clone(),
     });
     let mut set = tokio::task::JoinSet::new();
     for _ in 0..conns {
         set.spawn(sh.clone().worker());
     }
-    let mut last_err = None;
+    // A local failure (disk, write) wins over a server failure: no mirror can fix it.
+    let mut last_err: Option<Fail> = None;
     while let Some(r) = set.join_next().await {
-        if let Ok(Err(e)) = r {
+        if let Ok(Err(e)) = r
+            && !matches!(last_err, Some(Fail::Local(_)))
+        {
             last_err = Some(e);
         }
     }
@@ -384,7 +410,7 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
         task.lock()
             .unwrap()
             .append_log("HTTP transfer stopped; partial data retained");
-        return Ok((Outcome::Cancelled, None));
+        return Ok(Outcome::Cancelled);
     }
     let (complete, total, final_path) = {
         let t = task.lock().unwrap();
@@ -393,10 +419,7 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
         (complete, total, t.final_path())
     };
     if !complete {
-        return Err(with_cookie_hint(
-            last_err.unwrap_or_else(|| "download incomplete".into()),
-            lost_cookie,
-        ));
+        return Err(last_err.unwrap_or_else(|| Fail::Source("download incomplete".into())));
     }
     // Every byte of [0, total) must be covered by a finished segment.
     {
@@ -406,33 +429,40 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
         let mut covered = 0u64;
         for (a, b) in ranges {
             if a > covered {
-                return Err(format!("download incomplete: gap at byte {covered}"));
+                return Err(Fail::Local(format!(
+                    "download incomplete: gap at byte {covered}"
+                )));
             }
             covered = covered.max(b);
         }
         if covered < total {
-            return Err(format!("download incomplete: {covered} of {total} bytes"));
+            return Err(Fail::Local(format!(
+                "download incomplete: {covered} of {total} bytes"
+            )));
         }
     }
     {
         let f = std::fs::OpenOptions::new()
             .write(true)
             .open(&part)
-            .map_err(|e| e.to_string())?;
-        f.set_len(total).map_err(|e| e.to_string())?;
+            .map_err(|e| Fail::Local(e.to_string()))?;
+        f.set_len(total).map_err(|e| Fail::Local(e.to_string()))?;
     }
     let final_path = if final_path.exists() {
         let mut t = task.lock().unwrap();
         match t.conflict {
             // Publish beside the old file; it is replaced after verification.
             ConflictPolicy::Overwrite => {
-                wanted = Some(t.file_name.clone());
+                *wanted = Some(t.file_name.clone());
                 let n = util::unique_name(&t.dir, &t.file_name);
                 t.file_name = n;
                 t.final_path()
             }
             ConflictPolicy::Skip => {
-                return Err(format!("file exists: {}", final_path.display()));
+                return Err(Fail::Local(format!(
+                    "file exists: {}",
+                    final_path.display()
+                )));
             }
             ConflictPolicy::Rename => {
                 let n = util::unique_name(&t.dir, &t.file_name);
@@ -443,16 +473,20 @@ async fn run_once(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<(Outcome, Option<S
     } else {
         final_path
     };
-    let len = std::fs::metadata(&part).map_err(|e| e.to_string())?.len();
+    let len = std::fs::metadata(&part)
+        .map_err(|e| Fail::Local(e.to_string()))?
+        .len();
     if len != total || p.total.is_some_and(|n| n != total) {
-        return Err(format!(
+        return Err(Fail::Local(format!(
             "size mismatch: file has {len} bytes, server reported {}",
             p.total.unwrap_or(total)
-        ));
+        )));
     }
-    std::fs::rename(&part, &final_path).map_err(|e| format!("rename failed: {e}"))?;
-    task.lock().unwrap().append_log("HTTP output published");
-    Ok((Outcome::Completed, wanted))
+    std::fs::rename(&part, &final_path).map_err(|e| Fail::Local(format!("rename failed: {e}")))?;
+    if src.mirror.is_none() {
+        task.lock().unwrap().append_log("HTTP output published");
+    }
+    Ok(Outcome::Completed)
 }
 
 #[cfg(test)]

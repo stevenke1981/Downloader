@@ -97,3 +97,15 @@ fn plan_and_steal() {
     }];
     assert!(claim(small, true).is_none());
 }
+
+#[test]
+fn full_disk_write_gets_the_disk_class() {
+    let full = std::io::Error::from(std::io::ErrorKind::StorageFull);
+    let e = worker::write_error(&full);
+    assert!(e.starts_with("not enough disk space: write failed:"), "{e}");
+    assert_eq!(util::error_code(&e), "disk");
+    let other = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+    let e = worker::write_error(&other);
+    assert!(e.starts_with("write failed:"), "{e}");
+    assert_ne!(util::error_code(&e), "disk");
+}

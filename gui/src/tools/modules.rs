@@ -6,10 +6,11 @@ use dlcore::modules::ModuleInfo;
 use dlcore::task::ConflictPolicy;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
-/// 0 built-in, 1 external and not approved, 2 approved, 3 failed to load.
+/// 0 built-in, 1 external and not approved, 2 approved, 3 failed to load but approved
+/// (can be revoked), 4 failed to load and not approved (nothing to do until it is fixed).
 fn state(info: &ModuleInfo) -> i32 {
     if info.error.is_some() {
-        3
+        if info.approved { 3 } else { 4 }
     } else if info.builtin {
         0
     } else if info.approved {

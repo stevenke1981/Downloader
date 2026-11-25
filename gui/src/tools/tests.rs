@@ -131,6 +131,14 @@ fn modules_tab_mirrors_manager_state_and_conflict_policy() {
     manager.revoke_module("demo-mod").unwrap();
     modules::populate(&ui, &manager);
     assert_eq!(ui.get_module_state().row_data(position), Some(1));
+    // A module whose program is missing shows its error and, unless approved, no Revoke.
+    std::fs::remove_file(dir.join("demo")).unwrap();
+    manager.set_settings(manager.settings()).unwrap();
+    modules::populate(&ui, &manager);
+    let listed = manager.modules();
+    let position = listed.iter().position(|m| m.id == "demo-mod").unwrap();
+    assert!(listed[position].error.is_some());
+    assert_eq!(ui.get_module_state().row_data(position), Some(4));
     manager.shutdown();
 }
 

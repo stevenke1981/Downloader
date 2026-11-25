@@ -97,7 +97,9 @@ pub struct Task {
     pub referer: Option<String>,
     /// File name suggested by the browser; used instead of the server's name.
     pub suggested_name: Option<String>,
-    /// URL after redirects (used to find checksum files next to it).
+    /// URL after redirects (used to find checksum files next to it). Set again by every probe and
+    /// never persisted: it may be a module's resolved link or a mirror, query included.
+    #[serde(skip)]
     pub final_url: Option<String>,
     /// Checksum list / sidecar URLs seen on the page (from the browser extension).
     pub checksum_urls: Vec<String>,
@@ -131,6 +133,9 @@ pub struct Task {
     /// the origin of `resolved_url` (they override `headers` of the same name there).
     #[serde(skip)]
     pub module_headers: Vec<(String, String)>,
+    /// Mirrors a resolver module returned. Never persisted; tried only with `resolved_url`.
+    #[serde(skip)]
+    pub module_mirrors: Vec<String>,
     /// Id of the module that resolved this download.
     pub module: Option<String>,
     /// Bytes hashed so far while verifying (not persisted).

@@ -84,6 +84,9 @@ enum Command {
         /// When the file exists: rename, overwrite or skip.
         #[arg(long, value_enum)]
         on_conflict: Option<ConflictArg>,
+        /// Alternative http(s) source tried when the URL fails (repeatable, max 8).
+        #[arg(long = "mirror", value_name = "URL")]
+        mirrors: Vec<String>,
     },
     Start {
         id: u64,
@@ -628,6 +631,7 @@ fn run(args: Args) -> Result<(), CliError> {
                     checksum,
                     headers,
                     on_conflict,
+                    mirrors,
                 } => {
                     let mut body = json!({
                         "url": url,
@@ -658,6 +662,12 @@ fn run(args: Args) -> Result<(), CliError> {
                             .map_err(|e| CliError::new("invalid", e))?;
                         validate_headers(&pairs).map_err(|e| CliError::new("invalid", e))?;
                         body["headers"] = json!(pairs);
+                    }
+                    if !mirrors.is_empty() {
+                        body["mirrors"] = json!(
+                            cli::check_mirrors(&mirrors)
+                                .map_err(|e| CliError::new("invalid", e))?
+                        );
                     }
                     if let Some(policy) = on_conflict {
                         body["conflict"] = json!(ConflictPolicy::from(policy));

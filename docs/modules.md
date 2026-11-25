@@ -52,13 +52,15 @@ The list shows a reason next to any module that cannot run (for example an inval
    RTSP/MMS, website-video mode), no external module is asked.
 2. Otherwise the first approved resolver (by folder name) whose `match` covers the link's
    scheme and host is asked to resolve it. It may return a new link, extra request headers,
-   a file name and mirrors, or leave the link unchanged.
+   a file name and mirrors, or leave the link unchanged. Mirrors are tried after your own
+   when the resolved link fails (rules in [cli.md](cli.md#mirrors)) and are never saved.
 3. The download runs against the resolved link. The original link stays in the list; the
-   resolved link and the module's extra headers are not saved, and are dropped at the start of
+   resolved link, its mirrors and the module's extra headers are not saved, and are dropped at the start of
    every run: after a restart, or once the module is disabled, revoked or answers `skip`,
    the module is asked again or the original link is used.
 4. When the download completes or fails, every approved hook subscribed to that event is told
-   in the background. Hooks cannot change or delay the download.
+   in the background. Hooks cannot change or delay the download. `dlx` does the same, but it
+   waits for the hooks before it exits (each bounded by its `timeout_ms` plus 5 seconds).
 
 Errors from a module fail the download with a message starting `module <id>:`.
 

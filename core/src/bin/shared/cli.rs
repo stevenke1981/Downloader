@@ -107,3 +107,25 @@ pub fn parse_header(raw: &str) -> Result<(String, String), String> {
     }
     Ok((name.to_string(), value.trim().to_string()))
 }
+
+/// `--mirror` values: http(s), valid sources, at most 8. Returns them trimmed.
+pub fn check_mirrors(mirrors: &[String]) -> Result<Vec<String>, String> {
+    if mirrors.len() > 8 {
+        return Err("at most 8 --mirror URLs are allowed".into());
+    }
+    let mut out = Vec::new();
+    for (index, mirror) in mirrors.iter().enumerate() {
+        let mirror = mirror.trim();
+        let http =
+            reqwest::Url::parse(mirror).is_ok_and(|u| matches!(u.scheme(), "http" | "https"));
+        if !http {
+            return Err(format!(
+                "mirror {}: only http(s) URLs are allowed",
+                index + 1
+            ));
+        }
+        dlcore::util::validate_source(mirror).map_err(|e| format!("mirror {}: {e}", index + 1))?;
+        out.push(mirror.to_string());
+    }
+    Ok(out)
+}

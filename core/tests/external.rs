@@ -72,6 +72,7 @@ fn protocols_are_embedded_and_never_spawn_external_engines() {
     for source in [
         include_str!("../src/engine.rs"),
         include_str!("../src/engine/http.rs"),
+        include_str!("../src/engine/mirrors.rs"),
         include_str!("../src/engine/segments.rs"),
         include_str!("../src/engine/worker.rs"),
         include_str!("../src/protocols/mod.rs"),

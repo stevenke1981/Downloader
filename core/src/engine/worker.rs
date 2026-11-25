@@ -20,6 +20,17 @@ enum FetchErr {
     Cancelled,
     Fatal(String),
     Retry(String),
+    /// Writing to the local file failed; no other source can help.
+    Local(String),
+}
+
+/// A full disk gets the stable `not enough disk space:` prefix on every OS.
+pub(super) fn write_error(e: &std::io::Error) -> String {
+    if e.kind() == std::io::ErrorKind::StorageFull {
+        format!("not enough disk space: write failed: {e}")
+    } else {
+        format!("write failed: {e}")
+    }
 }
 
 pub(super) struct Shared {
@@ -187,7 +198,7 @@ impl Shared {
             let take = n.min(s.remaining()) as usize;
             if take > 0 {
                 write_at(&self.file, &chunk[..take], s.pos)
-                    .map_err(|e| FetchErr::Fatal(format!("write failed: {e}")))?;
+                    .map_err(|e| FetchErr::Local(write_error(&e)))?;
                 s.pos += take as u64;
             }
             if s.done() || response_remaining == Some(0) {
@@ -196,7 +207,8 @@ impl Shared {
         }
     }
 
-    pub(super) async fn worker(self: Arc<Self>) -> Result<(), String> {
+    /// Server failures (`Fail::Source`) may move on to a mirror; local ones never do.
+    pub(super) async fn worker(self: Arc<Self>) -> Result<(), Fail> {
         let sh = self;
         loop {
             let idx = {
@@ -212,7 +224,8 @@ impl Shared {
                 match sh.fetch(idx).await {
                     Ok(()) => break Ok(()),
                     Err(FetchErr::Cancelled) => break Err(None),
-                    Err(FetchErr::Fatal(e)) => break Err(Some(e)),
+                    Err(FetchErr::Fatal(e)) => break Err(Some(Fail::Source(e))),
+                    Err(FetchErr::Local(e)) => break Err(Some(Fail::Local(e))),
                     Err(FetchErr::Retry(e)) => {
                         // A connection that moved the segment forward was healthy, so only count consecutive
                         // failures without progress. Non-range fetches restart from the segment start every time,
@@ -222,7 +235,7 @@ impl Shared {
                         }
                         attempt += 1;
                         if attempt > sh.ctx.retries {
-                            break Err(Some(e));
+                            break Err(Some(Fail::Source(e)));
                         }
                         let backoff = Duration::from_millis(500u64 << attempt.min(6));
                         tokio::select! {

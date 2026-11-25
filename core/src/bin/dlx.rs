@@ -4,7 +4,7 @@ mod cli;
 
 use clap::Parser;
 use cli::{CliError, ConflictArg, parse_header, print_json};
-use dlcore::modules::{ModuleSettings, Registry};
+use dlcore::modules::{HookEvent, ModuleSettings, Registry};
 use dlcore::task::DownloadKind;
 use dlcore::{Checksum, Ctx, Outcome, RateLimiter, Settings, Status, Task, engine, util};
 use serde_json::{Value, json};
@@ -49,6 +49,9 @@ struct Args {
     /// only when enabled and approved there ("dlxctl modules enable" / "dlxctl modules approve")
     #[arg(long, value_name = "DIR")]
     modules_dir: Option<PathBuf>,
+    /// Alternative http(s) source tried when the main URL fails (repeatable, max 8, one URL only)
+    #[arg(long = "mirror", value_name = "URL")]
+    mirrors: Vec<String>,
     /// Output directory
     #[arg(short = 'o', long, default_value = ".")]
     dir: PathBuf,
@@ -183,6 +186,10 @@ async fn main() {
             usage(json, format!("source {}: {error}", index + 1));
         }
     }
+    if !a.mirrors.is_empty() && a.urls.len() != 1 {
+        usage(json, "--mirror needs exactly one URL".into());
+    }
+    let mirrors = cli::check_mirrors(&a.mirrors).unwrap_or_else(|e| usage(json, e));
     let kind = if a.video {
         DownloadKind::Video
     } else {
@@ -234,6 +241,8 @@ async fn main() {
     let global = Arc::new(RateLimiter::new(0));
     let mut code = 0;
     let (mut completed, mut failed) = (0u32, 0u32);
+    // Hook deliveries run beside the next download and are awaited before exit.
+    let mut hooks: Vec<tokio::task::JoinHandle<()>> = Vec::new();
     for url in &a.urls {
         let sp = state_path(&a.dir, url);
         let task = std::fs::read(&sp)
@@ -258,6 +267,7 @@ async fn main() {
             status: Status::Downloading,
             verify_retried: false,
             headers: headers.clone(),
+            mirrors: mirrors.clone(),
             user_agent: a.user_agent.clone(),
             referer: a.referer.clone(),
             conflict: a.on_conflict.into(),
@@ -272,6 +282,11 @@ async fn main() {
             failed += 1;
             code = code.max(error.exit_code());
             report_url_error(json, url, &error);
+            if let Some(event) =
+                HookEvent::for_result(&task.lock().unwrap(), &Err(error.message.clone()))
+            {
+                spawn_hook(&registry, &mut hooks, event);
+            }
             continue;
         }
         if resumed > 0 && !a.quiet {
@@ -347,6 +362,7 @@ async fn main() {
         if !a.quiet {
             eprintln!();
         }
+        let event = HookEvent::for_result(&t, &r);
         match r {
             Ok(Outcome::Completed) => {
                 let _ = std::fs::remove_file(&sp);
@@ -387,6 +403,7 @@ async fn main() {
                 } else {
                     eprintln!("{message}");
                 }
+                stop_hooks(hooks).await;
                 finish(json, completed, failed, cli::INTERRUPTED);
             }
             Err(e) => {
@@ -402,8 +419,58 @@ async fn main() {
                 report_url_error(json, url, &error);
             }
         }
+        if let Some(event) = event {
+            spawn_hook(&registry, &mut hooks, event);
+        }
+    }
+    if wait_hooks(&mut hooks, &cancel).await {
+        stop_hooks(hooks).await;
+        finish(json, completed, failed, cli::INTERRUPTED);
     }
     finish(json, completed, failed, code);
+}
+
+/// Deliver a hook event in the background; nothing is spawned without modules.
+fn spawn_hook(
+    registry: &Option<Arc<Registry>>,
+    hooks: &mut Vec<tokio::task::JoinHandle<()>>,
+    event: HookEvent,
+) {
+    if let Some(registry) = registry.clone() {
+        hooks.push(tokio::spawn(async move {
+            registry.notify_wait(event).await;
+        }));
+    }
+}
+
+/// Wait for every hook; true when Ctrl+C arrived first. Finished hooks win over a cancel.
+async fn wait_hooks(hooks: &mut [tokio::task::JoinHandle<()>], cancel: &CancellationToken) -> bool {
+    if hooks.is_empty() {
+        return false;
+    }
+    let all = async {
+        for hook in hooks.iter_mut() {
+            let _ = hook.await;
+        }
+    };
+    tokio::select! {
+        biased;
+        _ = all => false,
+        _ = cancel.cancelled() => true,
+    }
+}
+
+/// Abort running hook deliveries so their processes are dropped and killed.
+async fn stop_hooks(hooks: Vec<tokio::task::JoinHandle<()>>) {
+    for hook in &hooks {
+        hook.abort();
+    }
+    for hook in hooks {
+        // A handle already awaited by `wait_hooks` is finished and must not be polled again.
+        if !hook.is_finished() {
+            let _ = hook.await;
+        }
+    }
 }
 
 fn report_verification(t: &Task) {
