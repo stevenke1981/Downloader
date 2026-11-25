@@ -1,6 +1,6 @@
 [package]
 name = "downloader-core"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2024"
 license = "MIT"
 
@@ -49,6 +49,10 @@ retina = { version = "=0.4.20", default-features = false }
 aes = "=0.8.4"
 cbc = { version = "=0.1.2", features = ["alloc"] }
 scraper = { version = "=0.24.0", default-features = false }
+
+# statvfs for the disk-space precheck (already in the tree through tokio).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"

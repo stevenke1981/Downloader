@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 — 2026-11-26
+
+### Added
+- **Disk-space precheck on Linux and macOS**: a download now stops before writing when the space it still needs is larger than the free space, as on Windows (`not enough disk space: need ..., ... free`, exit class `disk`). Free space comes from `statvfs` through the `libc` crate, which was already in the build through tokio. A file system that reports no size (some virtual or network mounts) skips the check instead of blocking the download.
+
 ## 0.8.0 — 2026-11-26
 
 ### Added
