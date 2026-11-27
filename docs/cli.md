@@ -149,3 +149,47 @@ dlxctl --json export > queue.json
 dlxctl modules approve example-resolver
 dlxctl modules approve example-resolver --sha256 <hex>   # only if module.json has this hash
 ```
+
+## Diagnose and discover
+
+### `dlxctl doctor [--online]`
+
+Local checks, no manager needed. Each check is `{id, status, message, hint?}` with `status` `ok`, `warn` or `fail`.
+
+| id | Checks |
+|---|---|
+| `state-dir` | The state folder (`--data-dir` / `DOWNLOADER_STATE_DIR`) exists and is writable |
+| `settings` | `settings.json` parses (missing is fine: defaults apply) |
+| `download-dir` | The default download folder exists and is writable |
+| `disk-space` | Free space there (warn below 1 GiB) |
+| `token` | `DOWNLOADER_REMOTE_TOKEN` or `--token` is present. The value is never printed |
+| `remote` | `--endpoint` answers within 2 s and accepts the token. Not running is `warn`; a rejected token is `fail` |
+| `modules` | Enabled flag and counts of approved, unapproved and broken modules |
+| `native-host` | Browser Native Messaging connector registration (Chrome, Brave, Edge) |
+| `binaries` | `dlx`, `downloader-host` and the GUI next to `dlxctl`, and the version |
+| `net-youtube`, `net-twitter-syndication` | Only with `--online`: HTTPS reachability of `www.youtube.com` and `cdn.syndication.twimg.com` (5 s) |
+
+Human output is one line per check (`[ok]   state-dir  C:\...`) plus a summary line. With `--json`:
+
+```json
+{"ok":true,"data":{"version":"0.8.1","checks":[...],"summary":{"ok":7,"warn":2,"fail":0}}}
+```
+
+Exit status: 0 when no check is `fail`. With any `fail`, the exit status is 1 and the envelope is `{"ok":false,"error":{"code":"doctor","message":"N check(s) failed"},"data":{...same data...}}`, so `ok` always tells whether the setup is healthy and `data.checks` is present either way. `warn` never changes the exit status.
+
+### `dlx --schema`
+
+Prints one JSON object describing `dlx`: `name`, `version`, `about`, `args` (each with `name`, `long`, `short`, `value_name`, `takes_value`, `multiple`, `default`, `possible_values`, `help`, `required`), `exit_codes`, `error_classes`, `ndjson_events` (fields of each event), `env` and `capabilities` (protocol engines, as in `dlx --tools --json`). It is generated from the argument parser, so new flags appear automatically. `urls` are not required with `--schema`.
+
+### `dlxctl help [COMMAND...] [--json]` and `dlxctl schema`
+
+`dlxctl help add` prints exactly what `dlxctl add --help` prints. With `--json`, `dlxctl help` (or `dlxctl schema`) prints the envelope with the description of every command (nested subcommands, arguments, the remote route each command calls), the global options, exit codes, error classes, the envelope format, the remote routes and the capabilities. `dlxctl help add --json` describes only that command. An unknown command exits 2.
+
+## For agents
+
+1. Discover: `dlxctl help --json` and `dlx --schema`. No other documentation is needed.
+2. Diagnose: `dlxctl doctor --json` (add `--online` to test the download sites). Read each `hint`.
+3. Drive: use `--json` everywhere and branch on the exit code (see above) and on `error.code`.
+   - Headless download: `dlx --json URL` and read the NDJSON lines (`start`, `progress`, `done`, `error`, `summary`).
+   - Queue: `DOWNLOADER_REMOTE_TOKEN=... dlxctl --json add URL`, then `dlxctl --json wait ID --timeout 600`.
+4. Never print or log the token; pass it through `DOWNLOADER_REMOTE_TOKEN`.
