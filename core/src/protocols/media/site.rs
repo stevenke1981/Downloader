@@ -74,7 +74,9 @@ impl Transfer {
         Ok(false)
     }
 
-    /// Use a sanitized title as the payload file stem.
+    /// Use a sanitized title as the payload file stem. Until publication, the task
+    /// shows that name instead of the URL's last path segment (`1` for `/video/1`),
+    /// unless the user chose a name.
     fn name(&self, title: Option<&str>) {
         let Some(title) = title else {
             return;
@@ -88,9 +90,23 @@ impl Transfer {
             stem.truncate(end);
             stem = util::sanitize(&stem);
         }
-        if !stem.is_empty() {
-            let _ = self.stem.set(stem);
+        if stem.is_empty() || self.stem.set(stem.clone()).is_err() {
+            return;
         }
+        let mut task = self.task.lock().unwrap();
+        if task
+            .suggested_name
+            .as_deref()
+            .is_some_and(|name| !util::sanitize(name).is_empty())
+        {
+            return;
+        }
+        let extension = match self.snapshot.kind {
+            DownloadKind::Audio => "mp3",
+            _ => "mp4",
+        };
+        task.file_name = format!("{stem}.{extension}");
+        task.category = crate::category::Category::from_name(&task.file_name);
     }
 
     async fn youtube(&self, id: &str, audio: bool, sites: &Sites) -> Result<(), String> {

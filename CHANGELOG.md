@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- YouTube and X downloads show the title in the download list as soon as it is known, instead of the link's last path segment (for example `1` for `x.com/…/video/1`) until the file was published. The category (Video, Music) is set at the same time. A name you give is kept.
+
 ## 0.9.0 — 2026-11-27
 
 ### Added

@@ -195,12 +195,20 @@ impl Run {
 }
 
 async fn start(server: &Server, url: &str, kind: DownloadKind) -> Run {
+    start_task(
+        server,
+        Task {
+            url: url.into(),
+            kind,
+            ..Default::default()
+        },
+    )
+    .await
+}
+
+async fn start_task(server: &Server, task: Task) -> Run {
     let stage = tempfile::tempdir().unwrap();
-    let task = Arc::new(Mutex::new(Task {
-        url: url.into(),
-        kind,
-        ..Default::default()
-    }));
+    let task = Arc::new(Mutex::new(task));
     let client = reqwest::Client::builder()
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
@@ -357,6 +365,7 @@ async fn youtube_audio_mode_produces_mp3() {
     let files = run.payload();
     assert_eq!(files.len(), 1);
     assert_eq!(files[0].0, "My Clip_ part_1.mp3");
+    assert_eq!(run.task.lock().unwrap().file_name, "My Clip_ part_1.mp3");
     let mp3 = &files[0].1;
     assert!(mp3.starts_with(b"ID3") || (mp3[0] == 0xff && mp3[1] & 0xe0 == 0xe0));
     let seen = server.seen.lock().unwrap();
@@ -520,12 +529,48 @@ async fn x_post_video_is_downloaded_and_named() {
     .await;
     run.result.as_ref().unwrap();
     assert_eq!(run.payload(), [("Hello world.mp4".to_string(), clip)]);
+    // Set by the adapter before publication, so the list shows the title while
+    // downloading instead of the URL's last segment.
+    let task = run.task.lock().unwrap();
+    assert_eq!(task.file_name, "Hello world.mp4");
+    assert_eq!(task.category, crate::category::Category::Video);
+    drop(task);
     let seen = server.seen.lock().unwrap();
     assert!(
         seen[0]
             .0
             .starts_with("GET /tweet-result?id=1234567890123456789")
     );
+}
+
+#[tokio::test]
+async fn site_title_does_not_replace_a_chosen_name() {
+    let server = server().await;
+    let clip = [&[0, 0, 0, 12][..], b"ftypmp42", &[0; 4], b"x video bytes"].concat();
+    let tweet = json!({
+        "__typename": "Tweet",
+        "text": "Hello world",
+        "mediaDetails": [{
+            "type": "video",
+            "video_info": { "variants": [
+                { "content_type": "video/mp4", "bitrate": 832000, "url": server.url("/x.mp4") },
+            ]},
+        }],
+    });
+    server.route("/tweet-result", tweet.to_string(), 0);
+    server.route("/x.mp4", clip, 0);
+    let run = start_task(
+        &server,
+        Task {
+            url: "https://x.com/someone/status/1234567890123456789/video/1".into(),
+            file_name: "mine.mp4".into(),
+            suggested_name: Some("mine.mp4".into()),
+            ..Default::default()
+        },
+    )
+    .await;
+    run.result.as_ref().unwrap();
+    assert_eq!(run.task.lock().unwrap().file_name, "mine.mp4");
 }
 
 #[test]
