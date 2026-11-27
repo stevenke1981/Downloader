@@ -96,6 +96,9 @@ msgstr "Comprimidos"
 msgid "Arguments (one per line)"
 msgstr "Argumentos (uno por línea)"
 
+msgid "Audio as MP3 (YouTube)"
+msgstr "Audio como MP3 (YouTube)"
+
 msgid "Automatic"
 msgstr "Automático"
 

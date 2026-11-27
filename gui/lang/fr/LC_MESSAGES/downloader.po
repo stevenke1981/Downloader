@@ -96,6 +96,9 @@ msgstr "Archives"
 msgid "Arguments (one per line)"
 msgstr "Arguments (un par ligne)"
 
+msgid "Audio as MP3 (YouTube)"
+msgstr "Audio en MP3 (YouTube)"
+
 msgid "Automatic"
 msgstr "Automatique"
 

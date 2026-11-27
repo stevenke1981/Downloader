@@ -184,6 +184,28 @@ async fn dlx_usage_errors_exit_2_and_report_json() {
 }
 
 #[tokio::test]
+async fn audio_flag_conflicts_with_video() {
+    let state = tempfile::tempdir().unwrap();
+    let both = finish(dlx(
+        state.path(),
+        &["--json", "--audio", "--video", "https://example.com/a"],
+    ))
+    .await;
+    assert_eq!(both.code, 2);
+    let ctl = finish(dlxctl(
+        state.path(),
+        &["add", "--audio", "--video", "https://example.com/a"],
+    ))
+    .await;
+    assert_eq!(ctl.code, 2);
+    // --audio alone parses: help lists it on both binaries.
+    let help = finish(dlx(state.path(), &["--help"])).await;
+    assert!(help.stdout.contains("--audio"));
+    let help = finish(dlxctl(state.path(), &["add", "--help"])).await;
+    assert!(help.stdout.contains("--audio"));
+}
+
+#[tokio::test]
 async fn dlx_tools_json_is_one_document() {
     let state = tempfile::tempdir().unwrap();
     let run = finish(dlx(state.path(), &["--tools", "--json"])).await;

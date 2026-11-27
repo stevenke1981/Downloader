@@ -75,6 +75,9 @@ enum Command {
         paused: bool,
         #[arg(long)]
         video: bool,
+        /// Download the audio of a supported site (YouTube) as MP3.
+        #[arg(long, conflicts_with = "video")]
+        audio: bool,
         /// Refuse (exit 6) when this URL is already queued or active.
         #[arg(long)]
         unique: bool,
@@ -669,6 +672,7 @@ fn run(args: Args) -> Result<(), CliError> {
                     dir,
                     paused,
                     video,
+                    audio,
                     unique,
                     priority,
                     checksum,
@@ -680,7 +684,13 @@ fn run(args: Args) -> Result<(), CliError> {
                         "url": url,
                         "dir": dir,
                         "start": !paused,
-                        "kind": if video { "Video" } else { "Auto" },
+                        "kind": if audio {
+                            "Audio"
+                        } else if video {
+                            "Video"
+                        } else {
+                            "Auto"
+                        },
                     });
                     if unique {
                         body["unique"] = json!(true);

@@ -1,8 +1,9 @@
 //! Native HLS/direct media, RTSP H.264 Annex B or G.711 WAV, and MS-WMSP-over-HTTP.
 //! Interrupted streams restart. Complete files enter payload; partial/control
-//! files stay in state. No subprocess, C media engine, or JS runtime is used.
+//! files stay in state. No subprocess or JS runtime is used; MP3 conversion of AAC audio is done in-process by pure-Rust crates.
 mod hls;
 mod mmsh;
+mod mp3;
 mod mp4mux;
 mod parse;
 mod rtsp;

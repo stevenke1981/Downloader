@@ -96,6 +96,9 @@ msgstr "압축 파일"
 msgid "Arguments (one per line)"
 msgstr "인수(한 줄에 하나)"
 
+msgid "Audio as MP3 (YouTube)"
+msgstr "MP3 오디오(YouTube)"
+
 msgid "Automatic"
 msgstr "자동"
 
