@@ -96,6 +96,9 @@ msgstr "壓縮檔"
 msgid "Arguments (one per line)"
 msgstr "參數（每行一個）"
 
+msgid "Audio as MP3 (YouTube)"
+msgstr "音訊轉 MP3（YouTube）"
+
 msgid "Automatic"
 msgstr "自動"
 

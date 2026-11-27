@@ -49,6 +49,9 @@ retina = { version = "=0.4.20", default-features = false }
 aes = "=0.8.4"
 cbc = { version = "=0.1.2", features = ["alloc"] }
 scraper = { version = "=0.24.0", default-features = false }
+# In-process MP3 conversion of downloaded AAC audio (pure Rust, see docs/dependencies-and-modules.md).
+symphonia = { version = "=0.6.1", default-features = false, features = ["aac", "isomp4"] }
+rusty_mp3 = "=0.8.0"
 
 # statvfs for the disk-space precheck (already in the tree through tokio).
 [target.'cfg(unix)'.dependencies]

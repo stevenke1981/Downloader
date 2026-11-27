@@ -27,6 +27,9 @@ struct Args {
     /// Extract direct webpage media or HLS using the built-in Rust engine
     #[arg(long)]
     video: bool,
+    /// Download the audio of a supported site (YouTube) as MP3
+    #[arg(long, conflicts_with = "video")]
+    audio: bool,
     /// Show built-in Rust protocol engines
     #[arg(long)]
     tools: bool,
@@ -190,7 +193,9 @@ async fn main() {
         usage(json, "--mirror needs exactly one URL".into());
     }
     let mirrors = cli::check_mirrors(&a.mirrors).unwrap_or_else(|e| usage(json, e));
-    let kind = if a.video {
+    let kind = if a.audio {
+        DownloadKind::Audio
+    } else if a.video {
         DownloadKind::Video
     } else {
         DownloadKind::Auto

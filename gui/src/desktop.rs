@@ -107,10 +107,10 @@ pub fn bind(
             let template = NewDownload {
                 dir: (!folder.is_empty()).then(|| PathBuf::from(folder)),
                 connections: connection_override(ui.get_add_conns()),
-                kind: if ui.get_add_kind() == 1 {
-                    DownloadKind::Video
-                } else {
-                    DownloadKind::Auto
+                kind: match ui.get_add_kind() {
+                    2 => DownloadKind::Audio,
+                    1 => DownloadKind::Video,
+                    _ => DownloadKind::Auto,
                 },
                 checksum,
                 start: ui.get_add_start(),

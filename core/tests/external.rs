@@ -87,6 +87,7 @@ fn protocols_are_embedded_and_never_spawn_external_engines() {
         include_str!("../src/protocols/media.rs"),
         include_str!("../src/protocols/media/hls.rs"),
         include_str!("../src/protocols/media/mmsh.rs"),
+        include_str!("../src/protocols/media/mp3.rs"),
         include_str!("../src/protocols/media/rtsp.rs"),
         include_str!("../src/protocols/media/parse.rs"),
         include_str!("../src/protocols/media/parse/playlist.rs"),

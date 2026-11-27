@@ -42,6 +42,7 @@ Downloads resume from the partial state kept in the output folder. Progress and 
 | `--mirror URL` | Alternative `http(s)` source for the one URL, repeatable, at most 8. Tried in order when the main URL fails (see [Mirrors](#mirrors)). Allowed only with exactly one URL; anything else, or a non-http(s) URL, exits 2 |
 | `--modules-dir DIR` | Load modules from DIR. Only modules approved with `dlxctl modules approve` run (approvals are read from the default settings file, see below) |
 | `--video` | Extract webpage media or HLS |
+| `--audio` | Download the audio of a supported site (YouTube) as MP3, converted in-process. Conflicts with `--video` (exit 2) |
 | `--proxy URL`, `--retries N`, `-q` | As named |
 | `--json` | NDJSON events on stdout (below) |
 
@@ -123,7 +124,7 @@ Remote errors keep the server's text in `message` (for example `HTTP 401 Unautho
 | Command | Remote route | Notes |
 |---|---|---|
 | `list`, `status ID` | `GET /downloads`, `GET /downloads/{id}` | |
-| `add URL` | `POST /downloads` | `-d DIR`, `--paused`, `--video`, `--unique`, `--priority N`, `--checksum DIGEST`, `--header "NAME: VALUE"`, `--on-conflict rename\|overwrite\|skip`, `--mirror URL` (repeatable, max 8, http(s) only; see [Mirrors](#mirrors)). `--unique` returns exit 6 when the URL is already queued or active |
+| `add URL` | `POST /downloads` | `-d DIR`, `--paused`, `--video`, `--audio` (kind `Audio`, conflicts with `--video`), `--unique`, `--priority N`, `--checksum DIGEST`, `--header "NAME: VALUE"`, `--on-conflict rename\|overwrite\|skip`, `--mirror URL` (repeatable, max 8, http(s) only; see [Mirrors](#mirrors)). `--unique` returns exit 6 when the URL is already queued or active |
 | `start ID`, `pause ID`, `remove ID` | `POST …/start`, `POST …/pause`, `DELETE /downloads/{id}` | |
 | `start-all`, `pause-all` | `POST /start-all`, `POST /pause-all` | |
 | `wait ID...` [--timeout SECS] | polls `GET /downloads/{id}` | Waits until each download completes. Exit code is the most severe failure. Paused downloads wait until `--timeout` (if given) |

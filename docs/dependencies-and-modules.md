@@ -28,6 +28,7 @@ Download protocols run in-process in Rust. Downloading does not require aria2, F
 | `core/src/protocols/media/hls.rs` | HLS transfer |
 | `core/src/protocols/media/rtsp.rs` | RTSP capture and G.711 audio conversion |
 | `core/src/protocols/media/mmsh.rs` | MMS-over-HTTP capture and ASF packet handling |
+| `core/src/protocols/media/mp3.rs` | In-process AAC (mp4/m4a) to MP3 conversion: `symphonia` decodes, `rusty_mp3` encodes, both pure Rust |
 | `core/src/protocols/media/parse.rs` | Shared media URL validation and parsing facade |
 | `core/src/protocols/media/parse/playlist.rs` | HLS playlist parsing |
 | `core/src/protocols/media/parse/discovery.rs` | Webpage media discovery |
@@ -56,6 +57,6 @@ These integrations do not transfer download protocol data. An approved external 
 
 ## Support boundaries
 
-The media module does not replace the entire FFmpeg or yt-dlp feature set. It does not decrypt DRM, execute arbitrary website JavaScript, provide general transcoding or mux every container. RTSP and MMS transport limits are documented in the [feature matrix](fdm-feature-matrix.zh-TW.md).
+The media module does not replace the entire FFmpeg or yt-dlp feature set. It does not decrypt DRM, execute arbitrary website JavaScript, provide general transcoding or mux every container. The one conversion it does is MP3 output for downloaded AAC audio (the `--audio` mode), done in-process by `symphonia` (demux and AAC decode) and `rusty_mp3` (MP3 encode), both pure Rust with no C library and no subprocess. RTSP and MMS transport limits are documented in the [feature matrix](fdm-feature-matrix.zh-TW.md).
 
 Build and validation tools (Cargo/Rust, Node for extension tests, Python for translation generation and Inno Setup for Windows installers) are separate from end-user download dependencies. GUI rendering and native OS libraries remain platform dependencies declared in the Cargo manifests.

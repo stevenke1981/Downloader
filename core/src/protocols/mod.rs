@@ -85,7 +85,7 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     util::validate_source(&snapshot.url)?;
     let protocol =
         registry::find(&snapshot.url, snapshot.kind).ok_or("unsupported native protocol")?;
-    if snapshot.kind == DownloadKind::Video
+    if matches!(snapshot.kind, DownloadKind::Video | DownloadKind::Audio)
         && !reqwest::Url::parse(&snapshot.url).is_ok_and(|u| matches!(u.scheme(), "http" | "https"))
     {
         return Err("website video mode requires an HTTP(S) page URL".into());
