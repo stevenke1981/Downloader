@@ -1,10 +1,12 @@
 //! YouTube item resolver through the InnerTube player API.
 //!
-//! Only single-video URLs resolve. The resolver asks a short list of InnerTube clients
-//! for the player response and keeps the first one that returns directly downloadable
-//! streams (no signature cipher, no JavaScript). Media requests must reuse
-//! [`Resolved::user_agent`]; googlevideo serves large files best in ~10 MiB `Range`
-//! chunks with per-chunk retry, sized from [`Stream::length`].
+//! Only single-video URLs resolve. [`Resolver`] asks a short list of InnerTube clients,
+//! one at a time, for the player response and yields each one that returns directly
+//! downloadable streams (no signature cipher, no JavaScript). The caller probes them and
+//! moves to the next client when googlevideo limits them: without a proof-of-origin
+//! token, adaptive streams often answer only the first minute of media. Media requests
+//! must reuse [`Resolved::user_agent`]; googlevideo serves large files best in ~10 MiB
+//! `Range` chunks with per-chunk retry, sized from [`Stream::length`].
 
 use reqwest::Url;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
@@ -28,8 +30,6 @@ pub(crate) struct Client {
     pub os_name: &'static str,
     pub os_version: &'static str,
     pub android_sdk: Option<u32>,
-    /// Use only `streamingData.hlsManifestUrl` from this client.
-    pub hls_only: bool,
 }
 
 pub(crate) const CLIENTS: &[Client] = &[
@@ -43,31 +43,28 @@ pub(crate) const CLIENTS: &[Client] = &[
         os_name: "Android",
         os_version: "12L",
         android_sdk: Some(32),
-        hls_only: false,
-    },
-    Client {
-        name: "IOS",
-        id: 5,
-        version: "19.45.4",
-        user_agent: "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)",
-        device_make: "Apple",
-        device_model: "iPhone16,2",
-        os_name: "iPhone",
-        os_version: "18.1.0.22B83",
-        android_sdk: None,
-        hls_only: true,
     },
     Client {
         name: "ANDROID",
         id: 3,
-        version: "19.44.38",
-        user_agent: "com.google.android.youtube/19.44.38 (Linux; U; Android 11) gzip",
+        version: "20.10.38",
+        user_agent: "com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip",
         device_make: "Google",
-        device_model: "Pixel 5",
+        device_model: "Pixel 8",
         os_name: "Android",
-        os_version: "11",
-        android_sdk: Some(30),
-        hls_only: false,
+        os_version: "14",
+        android_sdk: Some(34),
+    },
+    Client {
+        name: "IOS",
+        id: 5,
+        version: "20.10.4",
+        user_agent: "com.google.ios.youtube/20.10.4 (iPhone16,2; U; CPU iOS 18_3_2 like Mac OS X;)",
+        device_make: "Apple",
+        device_model: "iPhone16,2",
+        os_name: "iPhone",
+        os_version: "18.3.2.22D82",
+        android_sdk: None,
     },
 ];
 
@@ -93,6 +90,8 @@ pub(crate) enum Choice {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Resolved {
+    /// Name of the InnerTube client, for logs.
+    pub client: &'static str,
     pub title: Option<String>,
     /// User agent of the client that produced the streams; media requests must reuse it.
     pub user_agent: String,
@@ -144,79 +143,115 @@ fn valid_id(id: &str) -> bool {
 fn no_stream() -> String {
     let names: Vec<&str> = CLIENTS.iter().map(|c| c.name).collect();
     format!(
-        "YouTube: no directly downloadable stream (clients tried: {})",
+        "YouTube: no fully downloadable stream (clients tried: {})",
         names.join(", ")
     )
 }
 
-/// Ask each client in turn for the player response of `id` and pick its streams.
-/// `base` is the InnerTube origin ([`DEFAULT_BASE`] in production); its host is
-/// also accepted for stream URLs so a local fixture can serve both.
+/// Walks [`CLIENTS`] in order for one video. `base` is the InnerTube origin
+/// ([`DEFAULT_BASE`] in production); its host is also accepted for stream URLs so a
+/// local fixture can serve both.
+pub(crate) struct Resolver {
+    endpoint: Url,
+    base: Url,
+    id: String,
+    next: usize,
+    reason: Option<String>,
+    failure: Option<String>,
+    playable: bool,
+}
+
+impl Resolver {
+    pub(crate) fn new(base: &Url, id: &str) -> Result<Self, String> {
+        if !valid_id(id) {
+            return Err("YouTube: invalid video id".into());
+        }
+        let endpoint = base
+            .join("youtubei/v1/player?prettyPrint=false")
+            .map_err(|e| format!("YouTube: invalid API base: {e}"))?;
+        Ok(Self {
+            endpoint,
+            base: base.clone(),
+            id: id.to_string(),
+            next: 0,
+            reason: None,
+            failure: None,
+            playable: false,
+        })
+    }
+
+    /// The next client whose player response is playable and has usable streams.
+    pub(crate) async fn next(
+        &mut self,
+        client: &reqwest::Client,
+        audio_only: bool,
+    ) -> Option<Resolved> {
+        while let Some(spec) = CLIENTS.get(self.next) {
+            self.next += 1;
+            let player = match player(client, &self.endpoint, spec, &self.id).await {
+                Ok(player) => player,
+                Err(e) => {
+                    self.failure.get_or_insert(e);
+                    continue;
+                }
+            };
+            let status = player
+                .pointer("/playabilityStatus/status")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            if status != "OK" {
+                let text = player
+                    .pointer("/playabilityStatus/reason")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|r| !r.is_empty())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("video is not playable ({status})"));
+                self.reason.get_or_insert(text);
+                continue;
+            }
+            self.playable = true;
+            let Ok(choice) = choose_in(&player, audio_only, Some(&self.base)) else {
+                continue;
+            };
+            let title = player
+                .pointer("/videoDetails/title")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            return Some(Resolved {
+                client: spec.name,
+                title,
+                user_agent: spec.user_agent.to_string(),
+                progressive: progressive(&player, Some(&self.base)),
+                choice,
+            });
+        }
+        None
+    }
+
+    /// Why no client produced a fully downloadable stream.
+    pub(crate) fn error(self) -> String {
+        match (self.playable, self.reason, self.failure) {
+            (false, Some(reason), _) => format!("YouTube: {reason}"),
+            (false, None, Some(failure)) => failure,
+            _ => no_stream(),
+        }
+    }
+}
+
+/// The first client's streams, without probing them (tests).
+#[cfg(test)]
 pub(crate) async fn resolve(
     client: &reqwest::Client,
     base: &Url,
     id: &str,
     audio_only: bool,
 ) -> Result<Resolved, String> {
-    if !valid_id(id) {
-        return Err("YouTube: invalid video id".into());
+    let mut resolver = Resolver::new(base, id)?;
+    match resolver.next(client, audio_only).await {
+        Some(resolved) => Ok(resolved),
+        None => Err(resolver.error()),
     }
-    let endpoint = base
-        .join("youtubei/v1/player?prettyPrint=false")
-        .map_err(|e| format!("YouTube: invalid API base: {e}"))?;
-    let mut reason = None;
-    let mut failure = None;
-    let mut playable = false;
-    for spec in CLIENTS {
-        let player = match player(client, &endpoint, spec, id).await {
-            Ok(player) => player,
-            Err(e) => {
-                failure.get_or_insert(e);
-                continue;
-            }
-        };
-        let status = player
-            .pointer("/playabilityStatus/status")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        if status != "OK" {
-            let text = player
-                .pointer("/playabilityStatus/reason")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|r| !r.is_empty())
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("video is not playable ({status})"));
-            reason.get_or_insert(text);
-            continue;
-        }
-        playable = true;
-        let choice = if spec.hls_only {
-            if audio_only {
-                continue;
-            }
-            hls(&player, Some(base))
-        } else {
-            choose_in(&player, audio_only, Some(base))
-        };
-        if let Ok(choice) = choice {
-            let title = player
-                .pointer("/videoDetails/title")
-                .and_then(Value::as_str)
-                .map(str::to_string);
-            return Ok(Resolved {
-                title,
-                user_agent: spec.user_agent.to_string(),
-                progressive: progressive(&player, Some(base)),
-                choice,
-            });
-        }
-    }
-    Err(match (playable, reason, failure) {
-        (false, Some(reason), _) => format!("YouTube: {reason}"),
-        (false, None, Some(failure)) => failure,
-        _ => no_stream(),
-    })
 }
 
 fn request_body(spec: &Client, id: &str) -> Value {
@@ -257,7 +292,12 @@ async fn player(
         .body(request_body(spec, id).to_string())
         .send()
         .await
-        .map_err(|e| format!("YouTube: player request failed: {e}"))?;
+        .map_err(|e| {
+            format!(
+                "YouTube: player request failed: {}",
+                super::request_error(e)
+            )
+        })?;
     if !response.status().is_success() {
         return Err(format!(
             "YouTube: player request returned HTTP {}",
@@ -272,11 +312,12 @@ async fn player(
         return Err(too_large());
     }
     let mut body = Vec::new();
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .map_err(|e| format!("YouTube: player response failed: {e}"))?
-    {
+    while let Some(chunk) = response.chunk().await.map_err(|e| {
+        format!(
+            "YouTube: player response failed: {}",
+            super::request_error(e)
+        )
+    })? {
         if body.len().saturating_add(chunk.len()) > BODY_LIMIT {
             return Err(too_large());
         }
@@ -387,7 +428,11 @@ fn choose_in(player: &Value, audio_only: bool, base: Option<&Url>) -> Result<Cho
     let adaptive = formats(player, "adaptiveFormats", base);
     let audio = best_audio(&adaptive);
     if audio_only {
-        return audio.map(Choice::Audio).ok_or_else(no_stream);
+        // Without adaptive AAC the muxed stream's audio track is converted instead.
+        return audio
+            .map(Choice::Audio)
+            .or_else(|| progressive(player, base).map(Choice::Progressive))
+            .ok_or_else(no_stream);
     }
     let video = adaptive
         .iter()

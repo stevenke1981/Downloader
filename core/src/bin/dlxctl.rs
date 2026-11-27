@@ -33,7 +33,6 @@ use std::time::{Duration, Instant};
 #[command(
     name = "dlxctl",
     version,
-    disable_help_subcommand = true,
     about = "Downloader remote control, crawl and local settings tools"
 )]
 struct Args {
@@ -170,11 +169,6 @@ enum Command {
     },
     /// Print the machine-readable description of every command (same as "help --json").
     Schema,
-    /// Print this message or the help of the given subcommand(s)
-    Help {
-        #[arg(value_name = "COMMAND")]
-        command: Vec<String>,
-    },
 }
 
 #[derive(Subcommand)]
@@ -219,7 +213,43 @@ enum AutomationCommand {
     },
 }
 
+/// The command words of `help [COMMAND...] --json`, which has no clap form; clap's own
+/// `help` subcommands (top level and nested) handle everything else unchanged.
+fn help_json(argv: &[String]) -> Option<Vec<String>> {
+    let (mut words, mut json, mut help) = (Vec::new(), false, false);
+    let mut rest = argv.iter().skip(1);
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--json" => json = true,
+            "--endpoint" | "--token" | "--data-dir" if !help => {
+                rest.next();
+            }
+            a if !help
+                && ["--endpoint=", "--token=", "--data-dir="]
+                    .iter()
+                    .any(|p| a.starts_with(p)) => {}
+            a if a.starts_with('-') => return None,
+            "help" if !help => help = true,
+            a if help => words.push(a.to_string()),
+            _ => return None,
+        }
+    }
+    (help && json).then_some(words)
+}
+
 fn main() {
+    let argv: Vec<String> = std::env::args().collect();
+    if let Some(words) = help_json(&argv) {
+        match schema::dlxctl_schema(Args::command(), &words) {
+            Ok(data) => print_envelope(data),
+            Err(e) => {
+                let error = CliError::new("invalid", e);
+                print_json(&envelope_err(&error));
+                std::process::exit(error.exit_code());
+            }
+        }
+        return;
+    }
     let args = Args::parse();
     let json = args.json;
     if let Err(error) = run(args) {
@@ -427,25 +457,6 @@ fn run(args: Args) -> Result<(), CliError> {
         Command::Schema => print_envelope(
             schema::dlxctl_schema(Args::command(), &[]).map_err(|e| CliError::new("invalid", e))?,
         ),
-        Command::Help { command } => {
-            if json {
-                print_envelope(
-                    schema::dlxctl_schema(Args::command(), &command)
-                        .map_err(|e| CliError::new("invalid", e))?,
-                );
-            } else {
-                // Same program name clap shows for --help (argv[0]'s file name).
-                let bin = std::env::args_os()
-                    .next()
-                    .map(PathBuf::from)
-                    .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-                    .unwrap_or_else(|| "dlxctl".into());
-                let root = schema::built(Args::command().bin_name(bin));
-                let target =
-                    schema::find(&root, &command).map_err(|e| CliError::new("invalid", e))?;
-                print!("{}", target.clone().render_help());
-            }
-        }
         Command::GenerateToken => {
             let token = remote::generate_token()?;
             output(json, &token, json!({"token": token}));

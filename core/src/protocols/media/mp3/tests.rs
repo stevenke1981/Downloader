@@ -25,9 +25,7 @@ fn cat(parts: &[Vec<u8>]) -> Vec<u8> {
 const SILENT_FRAME: [u8; 4] = [0, 0, 0, 7];
 const FRAMES: u32 = 100;
 
-/// Fragmented mp4 (init segment plus one moof/mdat) holding silent 44.1 kHz mono AAC-LC,
-/// shaped like YouTube DASH audio.
-pub(crate) fn fragmented_silence() -> Vec<u8> {
+fn audio_stsd() -> Vec<u8> {
     let esds = full(
         b"esds",
         0,
@@ -45,28 +43,54 @@ pub(crate) fn fragmented_silence() -> Vec<u8> {
     mp4a.extend_from_slice(&[0, 1, 0, 16, 0, 0, 0, 0]);
     mp4a.extend_from_slice(&be32(44100 << 16));
     mp4a.extend_from_slice(&esds);
-    let stsd = full(b"stsd", 0, &cat(&[be32(1).to_vec(), atom(b"mp4a", &mp4a)]));
-    let empty = |kind: &[u8; 4]| full(kind, 0, &be32(0));
-    let stsz = full(b"stsz", 0, &[be32(0), be32(0)].concat());
-    let stbl = atom(
-        b"stbl",
-        &cat(&[stsd, empty(b"stts"), empty(b"stsc"), stsz, empty(b"stco")]),
+    full(b"stsd", 0, &cat(&[be32(1).to_vec(), atom(b"mp4a", &mp4a)]))
+}
+
+/// H.264 sample entry with a minimal avcC (baseline, one SPS and one PPS).
+fn video_stsd() -> Vec<u8> {
+    let avcc = atom(
+        b"avcC",
+        &[
+            1, 0x42, 0xc0, 0x1e, 0xff, 0xe1, 0, 4, 0x67, 0x42, 0xc0, 0x1e, 1, 0, 2, 0x68, 0xce,
+        ],
     );
+    let mut avc1 = vec![0; 6];
+    avc1.extend_from_slice(&[0, 1]);
+    avc1.extend_from_slice(&[0; 16]);
+    avc1.extend_from_slice(&[0, 64, 0, 48]); // 64x48
+    avc1.extend_from_slice(&be32(0x48_0000));
+    avc1.extend_from_slice(&be32(0x48_0000));
+    avc1.extend_from_slice(&[0; 4]);
+    avc1.extend_from_slice(&[0, 1]);
+    avc1.extend_from_slice(&[0; 32]);
+    avc1.extend_from_slice(&[0, 0x18, 0xff, 0xff]);
+    avc1.extend_from_slice(&avcc);
+    full(b"stsd", 0, &cat(&[be32(1).to_vec(), atom(b"avc1", &avc1)]))
+}
+
+/// A `trak` with sample tables `tables` (stts, stsc, stsz, stco after stsd).
+fn trak(id: u32, handler: &[u8; 4], scale: u32, stsd: Vec<u8>, tables: Vec<u8>) -> Vec<u8> {
+    let stbl = atom(b"stbl", &cat(&[stsd, tables]));
     let dinf = atom(
         b"dinf",
         &full(b"dref", 0, &cat(&[be32(1).to_vec(), full(b"url ", 1, &[])])),
     );
-    let minf = atom(b"minf", &cat(&[full(b"smhd", 0, &[0; 4]), dinf, stbl]));
+    let header = if handler == b"soun" {
+        full(b"smhd", 0, &[0; 4])
+    } else {
+        full(b"vmhd", 1, &[0; 8])
+    };
+    let minf = atom(b"minf", &cat(&[header, dinf, stbl]));
     let mdhd = full(
         b"mdhd",
         0,
-        &[be32(0), be32(0), be32(44100), be32(0), be32(0)].concat(),
+        &[be32(0), be32(0), be32(scale), be32(0), be32(0)].concat(),
     );
     let mut hdlr = [0u8; 4].to_vec(); // pre_defined, then handler_type
-    hdlr.extend_from_slice(b"soun");
+    hdlr.extend_from_slice(handler);
     hdlr.extend_from_slice(&[0; 13]);
     let mdia = atom(b"mdia", &cat(&[mdhd, full(b"hdlr", 0, &hdlr), minf]));
-    let mut tkhd = [be32(0), be32(0), be32(1), be32(0), be32(0)].concat();
+    let mut tkhd = [be32(0), be32(0), be32(id), be32(0), be32(0)].concat();
     tkhd.extend_from_slice(&[0; 8]);
     tkhd.extend_from_slice(&[0, 0, 0, 0, 1, 0, 0, 0]);
     tkhd.extend_from_slice(&[0; 12]);
@@ -74,7 +98,10 @@ pub(crate) fn fragmented_silence() -> Vec<u8> {
         tkhd.extend_from_slice(&be32(v));
     }
     tkhd.extend_from_slice(&[0; 8]);
-    let trak = atom(b"trak", &cat(&[full(b"tkhd", 3, &tkhd), mdia]));
+    atom(b"trak", &cat(&[full(b"tkhd", 3, &tkhd), mdia]))
+}
+
+fn mvhd(next_track: u32) -> Vec<u8> {
     let mut mvhd = [be32(0), be32(0), be32(1000), be32(0)].concat();
     mvhd.extend_from_slice(&be32(0x10000));
     mvhd.extend_from_slice(&[1, 0, 0, 0]);
@@ -83,16 +110,26 @@ pub(crate) fn fragmented_silence() -> Vec<u8> {
         mvhd.extend_from_slice(&be32(v));
     }
     mvhd.extend_from_slice(&[0; 24]);
-    mvhd.extend_from_slice(&be32(2));
+    mvhd.extend_from_slice(&be32(next_track));
+    full(b"mvhd", 0, &mvhd)
+}
+
+fn empty_tables() -> Vec<u8> {
+    let empty = |kind: &[u8; 4]| full(kind, 0, &be32(0));
+    let stsz = full(b"stsz", 0, &[be32(0), be32(0)].concat());
+    cat(&[empty(b"stts"), empty(b"stsc"), stsz, empty(b"stco")])
+}
+
+/// Fragmented mp4 (init segment plus one moof/mdat) holding silent 44.1 kHz mono AAC-LC,
+/// shaped like YouTube DASH audio.
+pub(crate) fn fragmented_silence() -> Vec<u8> {
+    let trak = trak(1, b"soun", 44100, audio_stsd(), empty_tables());
     let trex = full(
         b"trex",
         0,
         &[be32(1), be32(1), be32(1024), be32(4), be32(0)].concat(),
     );
-    let moov = atom(
-        b"moov",
-        &cat(&[full(b"mvhd", 0, &mvhd), trak, atom(b"mvex", &trex)]),
-    );
+    let moov = atom(b"moov", &cat(&[mvhd(2), trak, atom(b"mvex", &trex)]));
     let ftyp = atom(b"ftyp", b"isom\0\0\0\0isomiso5dash");
 
     let tfhd = full(b"tfhd", 0x02_0000, &be32(1));
@@ -120,6 +157,35 @@ pub(crate) fn fragmented_silence() -> Vec<u8> {
     let moof = build_moof(&run);
     let mdat = atom(b"mdat", &SILENT_FRAME.repeat(FRAMES as usize));
     cat(&[ftyp, moov, moof, mdat])
+}
+
+/// Plain (non-fragmented) mp4 shaped like YouTube itag 18: an H.264 track first (no
+/// samples), then the silent AAC track with sample tables pointing into one mdat.
+pub(crate) fn muxed_video_and_silence() -> Vec<u8> {
+    let ftyp = atom(b"ftyp", b"isom\0\0\x02\0isomiso2avc1mp41");
+    let video = trak(1, b"vide", 90000, video_stsd(), empty_tables());
+    let build = |chunk_offset: u32| {
+        let stts = full(b"stts", 0, &[be32(1), be32(FRAMES), be32(1024)].concat());
+        let stsc = full(
+            b"stsc",
+            0,
+            &[be32(1), be32(1), be32(FRAMES), be32(1)].concat(),
+        );
+        let size = SILENT_FRAME.len() as u32;
+        let stsz = full(b"stsz", 0, &[be32(size), be32(FRAMES)].concat());
+        let stco = full(b"stco", 0, &[be32(1), be32(chunk_offset)].concat());
+        let audio = trak(
+            2,
+            b"soun",
+            44100,
+            audio_stsd(),
+            cat(&[stts, stsc, stsz, stco]),
+        );
+        atom(b"moov", &cat(&[mvhd(3), video.clone(), audio]))
+    };
+    let offset = (ftyp.len() + build(0).len() + 8) as u32;
+    let mdat = atom(b"mdat", &SILENT_FRAME.repeat(FRAMES as usize));
+    cat(&[ftyp, build(offset), mdat])
 }
 
 fn sine_stereo(rate: u32, seconds: u32) -> Vec<f32> {
@@ -227,4 +293,17 @@ fn fragmented_aac_mp4_converts_to_mp3() {
     let err = to_mp3(&input, &dir.path().join("c.mp3"), &cancel, &|_| {}).unwrap_err();
     assert_eq!(err, "mp3: cancelled");
     assert!(!dir.path().join("c.mp3").exists());
+}
+
+#[test]
+fn muxed_mp4_converts_its_aac_track_not_the_video_track() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("muxed.mp4");
+    std::fs::write(&input, muxed_video_and_silence()).unwrap();
+    let output = dir.path().join("muxed.mp3");
+    to_mp3(&input, &output, &CancellationToken::new(), &|_| {}).unwrap();
+    let (rate, channels, frames, _) = inspect(&std::fs::read(&output).unwrap());
+    assert_eq!((rate, channels), (44100, 1));
+    let expected = (FRAMES * 1024) as usize;
+    assert!(frames.abs_diff(expected) <= 2 * 1152, "decoded {frames}");
 }

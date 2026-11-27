@@ -198,6 +198,25 @@ async fn audio_flag_conflicts_with_video() {
     ))
     .await;
     assert_eq!(ctl.code, 2);
+    // A non-YouTube link fails as a usage error before any request (port 9 would be
+    // a network error, exit 3).
+    let out = state.path().join("out");
+    let other = finish(dlx(
+        state.path(),
+        &[
+            "--audio",
+            "-o",
+            out.to_str().unwrap(),
+            "http://127.0.0.1:9/x",
+        ],
+    ))
+    .await;
+    assert_eq!(other.code, 2, "{}", other.stderr);
+    assert!(
+        other
+            .stderr
+            .contains("audio download supports YouTube links only")
+    );
     // --audio alone parses: help lists it on both binaries.
     let help = finish(dlx(state.path(), &["--help"])).await;
     assert!(help.stdout.contains("--audio"));

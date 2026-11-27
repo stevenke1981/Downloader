@@ -174,3 +174,35 @@ fn dlxctl_help_command_matches_clap_help() {
     let b = dlxctl(state.path(), &["modules", "approve", "--help"]);
     assert_eq!(a.stdout, b.stdout);
 }
+
+#[test]
+fn nested_help_subcommands_are_kept() {
+    let state = tempfile::tempdir().unwrap();
+    for group in ["modules", "site", "automation"] {
+        let help = dlxctl(state.path(), &[group, "help"]);
+        assert_eq!(help.code, 0, "{group} help");
+        let listing = dlxctl(state.path(), &[group, "--help"]);
+        assert!(
+            listing
+                .stdout
+                .lines()
+                .any(|l| l.trim_start().starts_with("help ")),
+            "{group} --help lists help:\n{}",
+            listing.stdout
+        );
+    }
+    let top = dlxctl(state.path(), &["--help"]);
+    assert!(
+        top.stdout
+            .lines()
+            .any(|l| l.trim_start().starts_with("help "))
+    );
+    // `help --json` still works after global options.
+    let json = dlxctl(
+        state.path(),
+        &["--endpoint", "http://127.0.0.1:1", "help", "add", "--json"],
+    );
+    assert_eq!(json.code, 0);
+    let doc: Value = serde_json::from_str(json.stdout.trim()).unwrap();
+    assert_eq!(doc["data"]["name"], "add");
+}

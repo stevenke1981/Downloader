@@ -165,11 +165,12 @@ pub(crate) async fn resolve(
         .append_pair("token", &token(id));
     let mut response = client
         .get(url)
+        .timeout(std::time::Duration::from_secs(30))
         .header(reqwest::header::USER_AGENT, "Mozilla/5.0")
         .send()
         .await
         // The request URL carries the syndication query; keep it out of messages.
-        .map_err(|e| format!("x: request failed: {}", e.without_url()))?;
+        .map_err(|e| format!("x: request failed: {}", super::request_error(e)))?;
     let status = response.status();
     if status == reqwest::StatusCode::NOT_FOUND {
         return Err(UNAVAILABLE.into());
@@ -181,7 +182,7 @@ pub(crate) async fn resolve(
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|e| format!("x: read failed: {}", e.without_url()))?
+        .map_err(|e| format!("x: read failed: {}", super::request_error(e)))?
     {
         if body.len() + chunk.len() > MAX_BODY {
             return Err("x: response too large".into());

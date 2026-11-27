@@ -9,8 +9,8 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 use symphonia::core::codecs::audio::AudioDecoderOptions;
 use symphonia::core::errors::Error as SymError;
+use symphonia::core::formats::FormatOptions;
 use symphonia::core::formats::probe::Hint;
-use symphonia::core::formats::{FormatOptions, TrackType};
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use tokio_util::sync::CancellationToken;
@@ -57,8 +57,11 @@ fn convert(
             MetadataOptions::default(),
         )
         .map_err(|e| format!("mp3: input is not a readable mp4/m4a file: {e}"))?;
+    // A muxed mp4 (YouTube itag 18) has its video track first: take the first audio one.
     let track = format
-        .default_track(TrackType::Audio)
+        .tracks()
+        .iter()
+        .find(|t| t.codec_params.as_ref().and_then(|p| p.audio()).is_some())
         .ok_or("mp3: no audio track in input")?;
     let track_id = track.id;
     let total_frames = track.num_frames;

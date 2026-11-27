@@ -57,7 +57,7 @@ struct Transfer {
     payload: PathBuf,
     origin: Url,
     /// User agent a site resolver requires on its media requests (googlevideo).
-    user_agent: std::sync::OnceLock<String>,
+    user_agent: Mutex<Option<String>>,
     /// Payload file stem (a site's title); `media` when unset.
     stem: std::sync::OnceLock<String>,
 }
@@ -95,7 +95,7 @@ impl Transfer {
                     request = request.header(reqwest::header::AUTHORIZATION, auth);
                 }
             }
-            if let Some(agent) = self.user_agent.get() {
+            if let Some(agent) = self.user_agent.lock().unwrap().clone() {
                 request = request.header(reqwest::header::USER_AGENT, agent);
             }
             if let Some(referer) = &self.snapshot.referer {
@@ -115,7 +115,7 @@ impl Transfer {
             let response = request
                 .send()
                 .await
-                .map_err(|e| format!("media request failed: {e}"))?;
+                .map_err(|e| format!("media request failed: {}", net(e)))?;
             if response.status().is_redirection() {
                 let location = response
                     .headers()
@@ -165,7 +165,7 @@ impl Transfer {
         while let Some(chunk) = response
             .chunk()
             .await
-            .map_err(|e| format!("media body: {e}"))?
+            .map_err(|e| format!("media body: {}", net(e)))?
         {
             self.limit(chunk.len()).await;
             if bytes.len().saturating_add(chunk.len()) > limit {
@@ -222,7 +222,7 @@ impl Transfer {
             let total = response.content_length();
             let mut prefix = Vec::new();
             while prefix.len() < 512 {
-                let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? else {
+                let Some(chunk) = response.chunk().await.map_err(net)? else {
                     break;
                 };
                 self.limit(chunk.len()).await;
@@ -241,7 +241,7 @@ impl Transfer {
                 if total.is_some_and(|n| n > DOCUMENT_LIMIT as u64) {
                     return Err("media document exceeds 4 MiB".into());
                 }
-                while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+                while let Some(chunk) = response.chunk().await.map_err(net)? {
                     self.limit(chunk.len()).await;
                     if prefix.len().saturating_add(chunk.len()) > DOCUMENT_LIMIT {
                         return Err("media document exceeds 4 MiB".into());
@@ -279,7 +279,7 @@ impl Transfer {
             while let Some(chunk) = response
                 .chunk()
                 .await
-                .map_err(|e| format!("media body: {e}"))?
+                .map_err(|e| format!("media body: {}", net(e)))?
             {
                 self.limit(chunk.len()).await;
                 file.write_all(&chunk).await.map_err(|e| e.to_string())?;
@@ -371,6 +371,12 @@ async fn download_with(
         _ = ctx.cancel.cancelled() => { task.lock().unwrap().append_log("Native media stopped; next capture restarts safely"); Ok(Outcome::Cancelled) }
         result = future => result,
     }
+}
+
+/// Request errors never carry the URL: signed media URLs (sig, ip, expire) stay out
+/// of task errors, state and JSON output.
+fn net(error: reqwest::Error) -> String {
+    crate::protocols::sites::request_error(error)
 }
 
 fn media_extension(bytes: &[u8]) -> Option<&'static str> {

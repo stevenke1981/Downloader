@@ -137,9 +137,11 @@ fn ciphered_and_foreign_formats_are_skipped() {
         panic!()
     };
     assert_eq!(s.itag, 18);
+    // Audio mode converts the muxed stream's AAC track when no adaptive AAC is usable.
+    assert_eq!(choose(&p, true).unwrap(), Choice::Progressive(s));
     assert_eq!(
-        choose(&p, true).unwrap_err(),
-        "YouTube: no directly downloadable stream (clients tried: ANDROID_VR, IOS, ANDROID)"
+        no_stream(),
+        "YouTube: no fully downloadable stream (clients tried: ANDROID_VR, ANDROID, IOS)"
     );
     p["streamingData"]["formats"][0]["url"] = json!("https://evil.example/videoplayback");
     p["streamingData"]["hlsManifestUrl"] = json!("https://manifest.googlevideo.com/hls.m3u8");
@@ -303,19 +305,24 @@ async fn resolve_falls_back_through_clients() {
         resolved.choice,
         Choice::Hls(Url::parse("https://manifest.googlevideo.com/api/hls.m3u8").unwrap())
     );
-    assert_eq!(resolved.user_agent, CLIENTS[1].user_agent);
-    // Audio-only ignores the IOS HLS answer and reaches ANDROID, which fails here.
+    // ANDROID failed (HTTP 500 here); IOS answered with HLS.
+    assert_eq!(resolved.client, "IOS");
+    assert_eq!(resolved.user_agent, CLIENTS[2].user_agent);
+    // Audio mode cannot use an HLS-only answer: every client is exhausted.
     let err = resolve(&client, &fx.base, "dQw4w9WgXcQ", true)
         .await
         .unwrap_err();
     assert_eq!(err, no_stream());
-    let names: Vec<String> = fx.seen.lock().unwrap()[2..]
+    let names: Vec<String> = fx.seen.lock().unwrap()[3..]
         .iter()
         .map(|(_, b)| b["context"]["client"]["clientName"].to_string())
         .collect();
-    assert_eq!(names, ["\"ANDROID_VR\"", "\"IOS\"", "\"ANDROID\""]);
+    assert_eq!(names, ["\"ANDROID_VR\"", "\"ANDROID\"", "\"IOS\""]);
+    let seen = fx.seen.lock().unwrap();
+    assert_eq!(seen[4].1["context"]["client"]["androidSdkVersion"], 34);
+    assert_eq!(seen[4].1["context"]["client"]["clientVersion"], "20.10.38");
     assert!(
-        fx.seen.lock().unwrap()[3].1["context"]["client"]
+        seen[5].1["context"]["client"]
             .get("androidSdkVersion")
             .is_none()
     );

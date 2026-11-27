@@ -3,14 +3,16 @@
 ## 0.9.0 — 2026-11-27
 
 ### Added
-- **YouTube video** ([docs/cli.md](docs/cli.md#youtube-and-x)): a single YouTube video link (`watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`) is recognised in the default mode. H.264 video up to 1080p and AAC audio are fetched in 10 MiB ranges (each retried up to three times) and muxed in process into one MP4; when the streams are not fragmented the muxed stream is used, and live or HLS-only videos use the HLS path. No signature JavaScript is run; such streams are skipped. Channels, playlists and profiles are not supported.
-- **YouTube audio as MP3**: `dlx --audio`, `dlxctl add --audio` and the "Audio as MP3 (YouTube)" mode convert the AAC track to a 192 kbps MP3 in process (`symphonia` + `rusty_mp3`, pure Rust). Other links fail with `audio download supports YouTube links only`.
+- **YouTube video** ([docs/cli.md](docs/cli.md#youtube-and-x)): a single YouTube video link (`watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`) is recognised in the default mode. H.264 video up to 1080p and AAC audio are fetched in 10 MiB ranges (each retried up to three times) and muxed in process into one MP4. The end of each stream is probed first; when googlevideo limits HD streams to about the first minute (no proof-of-origin token) the 360p muxed stream is used, and the next client is tried when none is fully downloadable; when the streams are not fragmented the muxed stream is used, and live or HLS-only videos use the HLS path. No signature JavaScript is run; such streams are skipped. Channels, playlists and profiles are not supported.
+- **YouTube audio as MP3**: `dlx --audio`, `dlxctl add --audio` and the "Audio as MP3 (YouTube)" mode convert the AAC track to a 192 kbps MP3 in process (`symphonia` + `rusty_mp3`, pure Rust). When the AAC stream is limited, the 360p muxed stream's AAC track is converted. Other links fail before any request with `unsupported link for audio: audio download supports YouTube links only` (exit 2).
 - **X (Twitter) post video**: `x.com/USER/status/ID` and `twitter.com` links download the highest-bitrate MP4, or the HLS playlist when a post has no MP4.
 - Files from YouTube and X are named after the title (or the post's first line); a name you give still wins.
 - `dlx --tools` lists the new YouTube, MP3 and X engines.
 - Agent-first CLI: `dlxctl doctor [--online]`, `dlx --schema`, `dlxctl help --json`.
 
 ### Changed
+- `dlxctl modules help`, `dlxctl site help` and `dlxctl automation help` work again (nested clap help); `dlxctl help [COMMAND...] --json` is unchanged.
+- Media request errors no longer include the request URL, so signed stream URLs stay out of task errors, state and JSON output. Site lookup connection failures and timeouts are classified as network errors (exit 3).
 - Built-in site resolvers take single YouTube video and X post links before any resolver module.
 
 ## 0.8.1 — 2026-11-26

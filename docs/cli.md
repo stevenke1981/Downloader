@@ -51,12 +51,12 @@ Downloads resume from the partial state kept in the output folder. Progress and 
 Single YouTube videos (`youtube.com/watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`) and X posts (`x.com/USER/status/ID`, `twitter.com/...`) are recognised without `--video`. Channels, playlists and profiles are not. The file is named after the video title or the first line of the post; `--out` still wins.
 
 ```sh
-dlx https://youtu.be/dQw4w9WgXcQ                      # H.264 up to 1080p + AAC, muxed in-process to .mp4
+dlx https://youtu.be/dQw4w9WgXcQ                      # H.264 up to 1080p + AAC muxed in-process to .mp4 (360p when HD is limited)
 dlx --audio https://youtu.be/dQw4w9WgXcQ              # AAC audio converted in-process to .mp3
 dlx https://x.com/someone/status/1234567890123456789  # highest-bitrate mp4 of the post
 ```
 
-YouTube streams that need the website's signature JavaScript are skipped; when no stream is directly downloadable the error is `YouTube: no directly downloadable stream (clients tried: ...)`, and an unplayable video reports YouTube's reason (`YouTube: <reason>`). X errors start with `x: `. `--audio` with any other link fails with `audio download supports YouTube links only`. All three exit with class `error` (exit 1) unless the message names an HTTP status or network failure. Built-in site resolvers take these links before any resolver module.
+YouTube streams that need the website's signature JavaScript are skipped. Before downloading, the end of each chosen stream is probed with a small range request: googlevideo often serves HD (adaptive) streams only for about the first minute to clients without a proof-of-origin token, and then the 360p muxed stream (itag 18) is used instead (for `--audio`, its AAC track is converted). Clients are tried in order (ANDROID_VR, ANDROID, IOS). When none gives a fully downloadable stream the error is `YouTube: no fully downloadable stream (clients tried: ANDROID_VR, ANDROID, IOS)`, and an unplayable video reports YouTube's reason (`YouTube: <reason>`, exit 1). X errors start with `x: `. Connection failures and timeouts of these lookups exit 3 (network). `--audio` with any other link fails before any request with `unsupported link for audio: audio download supports YouTube links only` (exit 2). Built-in site resolvers take these links before any resolver module.
 
 ### dlx --json
 
