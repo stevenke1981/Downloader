@@ -3,6 +3,7 @@
 //! files stay in state. No subprocess, C media engine, or JS runtime is used.
 mod hls;
 mod mmsh;
+mod mp4mux;
 mod parse;
 mod rtsp;
 
