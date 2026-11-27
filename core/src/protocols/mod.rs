@@ -4,6 +4,7 @@ mod ftp;
 mod media;
 mod metalink;
 pub mod registry;
+pub(crate) mod sites;
 mod torrent;
 use crate::engine::{Ctx, Outcome};
 use crate::task::{ConflictPolicy, DownloadKind, Seg, Status, Task, Verification, VerifyState};

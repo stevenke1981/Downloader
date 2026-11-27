@@ -91,6 +91,9 @@ fn protocols_are_embedded_and_never_spawn_external_engines() {
         include_str!("../src/protocols/media/parse.rs"),
         include_str!("../src/protocols/media/parse/playlist.rs"),
         include_str!("../src/protocols/media/parse/discovery.rs"),
+        include_str!("../src/protocols/media/mp4mux.rs"),
+        include_str!("../src/protocols/sites/mod.rs"),
+        include_str!("../src/protocols/sites/youtube.rs"),
     ] {
         assert!(!source.contains("process::Command"));
         assert!(!source.contains("Command::new"));
