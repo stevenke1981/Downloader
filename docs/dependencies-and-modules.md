@@ -29,6 +29,10 @@ Download protocols run in-process in Rust. Downloading does not require aria2, F
 | `core/src/protocols/media/rtsp.rs` | RTSP capture and G.711 audio conversion |
 | `core/src/protocols/media/mmsh.rs` | MMS-over-HTTP capture and ASF packet handling |
 | `core/src/protocols/media/mp3.rs` | In-process AAC (mp4/m4a) to MP3 conversion: `symphonia` decodes, `rusty_mp3` encodes, both pure Rust |
+| `core/src/protocols/media/mp4mux.rs` | In-process fragmented MP4 muxer: joins DASH video-only and audio-only files into one MP4, streaming media data |
+| `core/src/protocols/media/site.rs` | Site downloads: ranged googlevideo transfer, mux or MP3 conversion, title naming |
+| `core/src/protocols/sites/youtube.rs` | YouTube item URLs and InnerTube player resolution (direct H.264/AAC streams only) |
+| `core/src/protocols/sites/x.rs` | X / Twitter post URLs and syndication resolution (mp4, else HLS) |
 | `core/src/protocols/media/parse.rs` | Shared media URL validation and parsing facade |
 | `core/src/protocols/media/parse/playlist.rs` | HLS playlist parsing |
 | `core/src/protocols/media/parse/discovery.rs` | Webpage media discovery |
@@ -52,6 +56,8 @@ The public `dlcore::external` API remains a compatibility alias for `dlcore::pro
 | Scheduled program | User-selected executable and arguments | Explicitly configured schedule |
 | Scheduled shutdown | Windows `shutdown.exe` or Unix `shutdown` | Explicit shutdown schedule |
 | Approved external module (optional) | The module's own `command` in `<state dir>/modules/<id>/` | Settings enable modules and the module is approved by SHA-256 |
+
+Built-in site resolvers (`protocols/sites`) take single YouTube video and X post links before any external resolver module is consulted; modules still see every other link.
 
 These integrations do not transfer download protocol data. An approved external module only returns URLs, headers and mirrors (or receives events); the downloader still performs the transfer. Modules are described in [modules](modules.md) and the command-line tools in [cli](cli.md). They remain necessary for their existing features. OS permissions, file associations and desktop configuration affect their availability.
 

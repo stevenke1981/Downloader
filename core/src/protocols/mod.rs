@@ -27,6 +27,9 @@ pub fn capabilities() -> Vec<Capability> {
         "Rust HLS / webpage media",
         "Rust RTSP H.264 / G.711",
         "Rust MMS-over-HTTP",
+        "Rust YouTube video (H.264 + AAC, in-process MP4 mux)",
+        "Rust YouTube audio to MP3",
+        "Rust X (Twitter) post video",
     ]
     .into_iter()
     .map(|name| Capability {

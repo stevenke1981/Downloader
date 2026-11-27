@@ -46,6 +46,18 @@ Downloads resume from the partial state kept in the output folder. Progress and 
 | `--proxy URL`, `--retries N`, `-q` | As named |
 | `--json` | NDJSON events on stdout (below) |
 
+### YouTube and X
+
+Single YouTube videos (`youtube.com/watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`) and X posts (`x.com/USER/status/ID`, `twitter.com/...`) are recognised without `--video`. Channels, playlists and profiles are not. The file is named after the video title or the first line of the post; `--out` still wins.
+
+```sh
+dlx https://youtu.be/dQw4w9WgXcQ                      # H.264 up to 1080p + AAC, muxed in-process to .mp4
+dlx --audio https://youtu.be/dQw4w9WgXcQ              # AAC audio converted in-process to .mp3
+dlx https://x.com/someone/status/1234567890123456789  # highest-bitrate mp4 of the post
+```
+
+YouTube streams that need the website's signature JavaScript are skipped; when no stream is directly downloadable the error is `YouTube: no directly downloadable stream (clients tried: ...)`, and an unplayable video reports YouTube's reason (`YouTube: <reason>`). X errors start with `x: `. `--audio` with any other link fails with `audio download supports YouTube links only`. All three exit with class `error` (exit 1) unless the message names an HTTP status or network failure. Built-in site resolvers take these links before any resolver module.
+
 ### dlx --json
 
 Stdout carries one JSON object per line and nothing else. Every object has an `event` field:
@@ -173,7 +185,7 @@ Local checks, no manager needed. Each check is `{id, status, message, hint?}` wi
 Human output is one line per check (`[ok]   state-dir  C:\...`) plus a summary line. With `--json`:
 
 ```json
-{"ok":true,"data":{"version":"0.8.1","checks":[...],"summary":{"ok":7,"warn":2,"fail":0}}}
+{"ok":true,"data":{"version":"0.9.0","checks":[...],"summary":{"ok":7,"warn":2,"fail":0}}}
 ```
 
 Exit status: 0 when no check is `fail`. With any `fail`, the exit status is 1 and the envelope is `{"ok":false,"error":{"code":"doctor","message":"N check(s) failed"},"data":{...same data...}}`, so `ok` always tells whether the setup is healthy and `data.checks` is present either way. `warn` never changes the exit status.

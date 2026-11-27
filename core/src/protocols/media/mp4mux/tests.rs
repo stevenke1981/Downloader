@@ -65,7 +65,7 @@ fn trex(default: u32) -> Vec<u8> {
     )
 }
 
-struct Frag {
+pub(crate) struct Frag {
     time: u64,
     count: u32,
     /// Per-sample duration in `trun`, or `None` to use a default.
@@ -148,7 +148,7 @@ fn ftyp() -> Vec<u8> {
     bx(b"ftyp", &[b"dash", &n(0), b"iso6", b"mp41"])
 }
 
-fn video_file(frags: &[Frag]) -> Vec<u8> {
+pub(crate) fn video_file(frags: &[Frag]) -> Vec<u8> {
     let mvex = bx(b"mvex", &[&trex(1000)]);
     let moov = bx(
         b"moov",
@@ -185,7 +185,7 @@ fn audio_file(frags: &[Frag]) -> Vec<u8> {
     file
 }
 
-fn video_frags() -> Vec<Frag> {
+pub(crate) fn video_frags() -> Vec<Frag> {
     let mut v = vec![
         frag(0, 2, Some(90000), b"video-0"),
         frag(180_000, 2, Some(90000), b"video-1-large"),

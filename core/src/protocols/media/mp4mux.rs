@@ -4,7 +4,6 @@
 //! fragmented MP4: the video `ftyp`, a rebuilt `moov` with both tracks (ids 1 and 2),
 //! then every `moof`+`mdat` pair copied intact and interleaved by decode time. `sidx`,
 //! `mfra` and other top-level boxes are dropped. Media data is streamed, never loaded.
-#![allow(dead_code)] // Wired into the media module in a later change.
 
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
@@ -655,4 +654,4 @@ pub(crate) fn mux(
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

@@ -27,7 +27,7 @@ const FRAMES: u32 = 100;
 
 /// Fragmented mp4 (init segment plus one moof/mdat) holding silent 44.1 kHz mono AAC-LC,
 /// shaped like YouTube DASH audio.
-fn fragmented_silence() -> Vec<u8> {
+pub(crate) fn fragmented_silence() -> Vec<u8> {
     let esds = full(
         b"esds",
         0,
@@ -62,7 +62,7 @@ fn fragmented_silence() -> Vec<u8> {
         0,
         &[be32(0), be32(0), be32(44100), be32(0), be32(0)].concat(),
     );
-    let mut hdlr = [0u8; 8].to_vec();
+    let mut hdlr = [0u8; 4].to_vec(); // pre_defined, then handler_type
     hdlr.extend_from_slice(b"soun");
     hdlr.extend_from_slice(&[0; 13]);
     let mdia = atom(b"mdia", &cat(&[mdhd, full(b"hdlr", 0, &hdlr), minf]));

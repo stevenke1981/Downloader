@@ -5,7 +5,6 @@
 //! streams (no signature cipher, no JavaScript). Media requests must reuse
 //! [`Resolved::user_agent`]; googlevideo serves large files best in ~10 MiB `Range`
 //! chunks with per-chunk retry, sized from [`Stream::length`].
-#![allow(dead_code)] // Wired into the media module in a later change.
 
 use reqwest::Url;
 use reqwest::header::{CONTENT_TYPE, USER_AGENT};
@@ -98,6 +97,8 @@ pub(crate) struct Resolved {
     /// User agent of the client that produced the streams; media requests must reuse it.
     pub user_agent: String,
     pub choice: Choice,
+    /// Progressive stream from the same client, for when a split pair cannot be muxed.
+    pub progressive: Option<Stream>,
 }
 
 /// The 11-character video id of a single-video YouTube URL. Channels, playlists,
@@ -206,6 +207,7 @@ pub(crate) async fn resolve(
             return Ok(Resolved {
                 title,
                 user_agent: spec.user_agent.to_string(),
+                progressive: progressive(&player, Some(base)),
                 choice,
             });
         }
@@ -284,6 +286,7 @@ async fn player(
 }
 
 /// Pick streams from a player response with the production host policy.
+#[cfg(test)]
 pub(crate) fn choose(player: &Value, audio_only: bool) -> Result<Choice, String> {
     choose_in(player, audio_only, None)
 }
@@ -371,6 +374,15 @@ fn hls(player: &Value, base: Option<&Url>) -> Result<Choice, String> {
         .ok_or_else(no_stream)
 }
 
+/// Best progressive (muxed) mp4, preferring itag 18.
+fn progressive(player: &Value, base: Option<&Url>) -> Option<Stream> {
+    formats(player, "formats", base)
+        .into_iter()
+        .filter(|f| f.stream.mime == "video/mp4" && !f.codecs.contains("av01"))
+        .max_by_key(|f| (f.stream.itag == 18, f.height, f.bitrate))
+        .map(|f| f.stream)
+}
+
 fn choose_in(player: &Value, audio_only: bool, base: Option<&Url>) -> Result<Choice, String> {
     let adaptive = formats(player, "adaptiveFormats", base);
     let audio = best_audio(&adaptive);
@@ -387,13 +399,8 @@ fn choose_in(player: &Value, audio_only: bool, base: Option<&Url>) -> Result<Cho
     if let (Some(video), Some(audio)) = (video, audio) {
         return Ok(Choice::Split { video, audio });
     }
-    let progressive = formats(player, "formats", base);
-    if let Some(stream) = progressive
-        .iter()
-        .filter(|f| f.stream.mime == "video/mp4" && !f.codecs.contains("av01"))
-        .max_by_key(|f| (f.stream.itag == 18, f.height, f.bitrate))
-    {
-        return Ok(Choice::Progressive(stream.stream.clone()));
+    if let Some(stream) = progressive(player, base) {
+        return Ok(Choice::Progressive(stream));
     }
     hls(player, base)
 }

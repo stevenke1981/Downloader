@@ -3,8 +3,6 @@
 //! Resolves a status URL through the public syndication endpoint (JSON, no login) to
 //! direct `video/mp4` URLs on `twimg.com`. Pure helpers are offline-testable; `resolve`
 //! performs the single HTTP request.
-// Nothing calls this module yet; the site wiring lands in a later change.
-#![allow(dead_code)]
 
 use serde_json::Value;
 
@@ -16,7 +14,8 @@ const NO_VIDEO: &str = "x: tweet has no video";
 const MAX_BODY: usize = 4 * 1024 * 1024;
 const TITLE_CHARS: usize = 80;
 
-/// A resolved direct video. `bitrate` is 0 when the variant omits it.
+/// A resolved direct video. `bitrate` is 0 when the variant omits it. When a post has
+/// no mp4 variant, `url` is its HLS playlist (`application/x-mpegURL`).
 #[derive(Debug, Clone)]
 pub(crate) struct XVideo {
     pub url: reqwest::Url,
@@ -169,7 +168,8 @@ pub(crate) async fn resolve(
         .header(reqwest::header::USER_AGENT, "Mozilla/5.0")
         .send()
         .await
-        .map_err(|e| format!("x: request failed: {e}"))?;
+        // The request URL carries the syndication query; keep it out of messages.
+        .map_err(|e| format!("x: request failed: {}", e.without_url()))?;
     let status = response.status();
     if status == reqwest::StatusCode::NOT_FOUND {
         return Err(UNAVAILABLE.into());
@@ -181,7 +181,7 @@ pub(crate) async fn resolve(
     while let Some(chunk) = response
         .chunk()
         .await
-        .map_err(|e| format!("x: read failed: {e}"))?
+        .map_err(|e| format!("x: read failed: {}", e.without_url()))?
     {
         if body.len() + chunk.len() > MAX_BODY {
             return Err("x: response too large".into());
@@ -190,11 +190,17 @@ pub(crate) async fn resolve(
     }
     let json: Value =
         serde_json::from_slice(&body).map_err(|e| format!("x: invalid response: {e}"))?;
-    pick(&json)
+    pick_in(&json, Some(base))
 }
 
 /// Highest-bitrate `video/mp4` variant of the tweet's first video, else of its quoted tweet.
+#[cfg(test)]
 pub(crate) fn pick(json: &Value) -> Result<XVideo, String> {
+    pick_in(json, None)
+}
+
+/// [`pick`], also trusting media on the `base` origin (the syndication endpoint used).
+fn pick_in(json: &Value, base: Option<&reqwest::Url>) -> Result<XVideo, String> {
     if matches!(
         json.get("__typename").and_then(Value::as_str),
         Some("TweetTombstone" | "TweetUnavailable")
@@ -207,11 +213,11 @@ pub(crate) fn pick(json: &Value) -> Result<XVideo, String> {
     let quoted = json.get("quoted_tweet").filter(|q| q.is_object());
     std::iter::once(json)
         .chain(quoted)
-        .find_map(best_mp4)
+        .find_map(|tweet| best_mp4(tweet, base))
         .ok_or_else(|| NO_VIDEO.to_string())
 }
 
-fn best_mp4(tweet: &Value) -> Option<XVideo> {
+fn best_mp4(tweet: &Value, base: Option<&reqwest::Url>) -> Option<XVideo> {
     let media = tweet.get("mediaDetails")?.as_array()?;
     for item in media {
         let variants = item
@@ -220,23 +226,29 @@ fn best_mp4(tweet: &Value) -> Option<XVideo> {
             .into_iter()
             .flatten();
         let mut best: Option<(u64, reqwest::Url)> = None;
+        let mut playlist = None;
         for variant in variants {
-            if variant.get("content_type").and_then(Value::as_str) != Some("video/mp4") {
-                continue;
-            }
             let Some(url) = variant
                 .get("url")
                 .and_then(Value::as_str)
-                .and_then(trusted_url)
+                .and_then(|raw| trusted_url(raw, base))
             else {
                 continue;
             };
+            match variant.get("content_type").and_then(Value::as_str) {
+                Some("video/mp4") => {}
+                Some("application/x-mpegURL") => {
+                    playlist.get_or_insert(url);
+                    continue;
+                }
+                _ => continue,
+            }
             let bitrate = variant.get("bitrate").and_then(Value::as_u64).unwrap_or(0);
             if best.as_ref().is_none_or(|(b, _)| bitrate > *b) {
                 best = Some((bitrate, url));
             }
         }
-        if let Some((bitrate, url)) = best {
+        if let Some((bitrate, url)) = best.or_else(|| playlist.map(|url| (0, url))) {
             return Some(XVideo {
                 url,
                 title: title_of(tweet),
@@ -247,9 +259,12 @@ fn best_mp4(tweet: &Value) -> Option<XVideo> {
     None
 }
 
-/// HTTPS URLs on `twimg.com` or one of its subdomains only.
-fn trusted_url(raw: &str) -> Option<reqwest::Url> {
+/// HTTPS URLs on `twimg.com` or one of its subdomains, or on the `base` origin.
+fn trusted_url(raw: &str, base: Option<&reqwest::Url>) -> Option<reqwest::Url> {
     let url = reqwest::Url::parse(raw).ok()?;
+    if base.is_some_and(|b| b.origin() == url.origin()) {
+        return Some(url);
+    }
     let trusted_host = url
         .host_str()
         .is_some_and(|h| h == "twimg.com" || h.ends_with(".twimg.com"));
@@ -491,6 +506,27 @@ mod tests {
         }
         assert_eq!(pick(&json!({})).unwrap_err(), "x: tweet is unavailable");
         assert_eq!(pick(&Value::Null).unwrap_err(), "x: tweet is unavailable");
+    }
+
+    #[test]
+    fn pick_falls_back_to_the_hls_playlist() {
+        let json = json!({
+            "text": "live",
+            "mediaDetails": [{
+                "type": "video",
+                "video_info": {"variants": [
+                    {"content_type": "application/x-mpegURL", "url": "https://example.com/p.m3u8"},
+                    {"content_type": "application/x-mpegURL",
+                     "url": "https://video.twimg.com/1/pl/playlist.m3u8"}
+                ]}
+            }]
+        });
+        let video = pick(&json).unwrap();
+        assert_eq!(
+            video.url.as_str(),
+            "https://video.twimg.com/1/pl/playlist.m3u8"
+        );
+        assert_eq!(video.bitrate, 0);
     }
 
     #[test]

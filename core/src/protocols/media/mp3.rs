@@ -22,7 +22,6 @@ const FALLBACK_RATE: u32 = 44100;
 
 /// Converts `input` (mp4/m4a with an AAC track) to a 192 kbps CBR MP3 at `output`.
 /// `progress` receives 0.0..=1.0 when the input duration is known.
-#[allow(dead_code)]
 pub(crate) fn to_mp3(
     input: &Path,
     output: &Path,
@@ -290,4 +289,4 @@ impl Encoder {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

@@ -7,6 +7,7 @@ mod mp3;
 mod mp4mux;
 mod parse;
 mod rtsp;
+mod site;
 
 use crate::engine::{Ctx, Outcome};
 use crate::task::{Seg, Task};
@@ -55,6 +56,10 @@ struct Transfer {
     state: PathBuf,
     payload: PathBuf,
     origin: Url,
+    /// User agent a site resolver requires on its media requests (googlevideo).
+    user_agent: std::sync::OnceLock<String>,
+    /// Payload file stem (a site's title); `media` when unset.
+    stem: std::sync::OnceLock<String>,
 }
 
 impl Transfer {
@@ -89,6 +94,9 @@ impl Transfer {
                 if let Some(auth) = &self.snapshot.authorization {
                     request = request.header(reqwest::header::AUTHORIZATION, auth);
                 }
+            }
+            if let Some(agent) = self.user_agent.get() {
+                request = request.header(reqwest::header::USER_AGENT, agent);
             }
             if let Some(referer) = &self.snapshot.referer {
                 request = request.header(reqwest::header::REFERER, referer);
@@ -181,9 +189,10 @@ impl Transfer {
         }
         // A synchronous atomic rename cannot continue as a detached filesystem
         // job after cancellation drops the async transfer future.
+        let stem = self.stem.get().map_or("media", String::as_str);
         std::fs::rename(
             self.state.join("media.part"),
-            self.payload.join(format!("media.{extension}")),
+            self.payload.join(format!("{stem}.{extension}")),
         )
         .map_err(|e| format!("cannot complete staged media: {e}"))?;
         let mut task = self.task.lock().unwrap();
@@ -291,6 +300,16 @@ pub(crate) async fn download(
     ctx: Ctx,
     stage: &Path,
 ) -> Result<Outcome, String> {
+    download_with(task, ctx, stage, &site::Sites::default()).await
+}
+
+/// [`download`] with explicit site endpoints (tests point them at a local server).
+async fn download_with(
+    task: Arc<Mutex<Task>>,
+    ctx: Ctx,
+    stage: &Path,
+    sites: &site::Sites,
+) -> Result<Outcome, String> {
     let snapshot = task.lock().unwrap().clone();
     let mut url = Url::parse(&snapshot.url).map_err(|_| "invalid media URL")?;
     if !url.username().is_empty() || url.password().is_some() {
@@ -320,6 +339,8 @@ pub(crate) async fn download(
         state: stage.join("state"),
         payload: stage.join("payload"),
         origin: url.clone(),
+        user_agent: Default::default(),
+        stem: Default::default(),
     };
     {
         let mut task = task.lock().unwrap();
@@ -339,7 +360,7 @@ pub(crate) async fn download(
             transfer.mmsh(url).await?;
         } else if url.scheme() == "rtsp" {
             transfer.rtsp(url).await?;
-        } else {
+        } else if !transfer.site(&url, sites).await? {
             transfer.http(url).await?;
         }
         Ok(Outcome::Completed)

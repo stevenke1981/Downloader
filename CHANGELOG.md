@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.0 — 2026-11-27
+
+### Added
+- **YouTube video** ([docs/cli.md](docs/cli.md#youtube-and-x)): a single YouTube video link (`watch?v=`, `youtu.be/`, `/shorts/`, `/embed/`, `/live/`) is recognised in the default mode. H.264 video up to 1080p and AAC audio are fetched in 10 MiB ranges (each retried up to three times) and muxed in process into one MP4; when the streams are not fragmented the muxed stream is used, and live or HLS-only videos use the HLS path. No signature JavaScript is run; such streams are skipped. Channels, playlists and profiles are not supported.
+- **YouTube audio as MP3**: `dlx --audio`, `dlxctl add --audio` and the "Audio as MP3 (YouTube)" mode convert the AAC track to a 192 kbps MP3 in process (`symphonia` + `rusty_mp3`, pure Rust). Other links fail with `audio download supports YouTube links only`.
+- **X (Twitter) post video**: `x.com/USER/status/ID` and `twitter.com` links download the highest-bitrate MP4, or the HLS playlist when a post has no MP4.
+- Files from YouTube and X are named after the title (or the post's first line); a name you give still wins.
+- `dlx --tools` lists the new YouTube, MP3 and X engines.
+- Agent-first CLI: `dlxctl doctor [--online]`, `dlx --schema`, `dlxctl help --json`.
+
+### Changed
+- Built-in site resolvers take single YouTube video and X post links before any resolver module.
+
 ## 0.8.1 — 2026-11-26
 
 ### Added
