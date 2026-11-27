@@ -295,6 +295,19 @@ mod tests {
         reqwest::Url::parse(s).unwrap()
     }
 
+    /// Reference values from JavaScript (Node): the expression in `token`'s doc comment.
+    #[test]
+    fn token_matches_javascript() {
+        for (id, expected) in [
+            ("1628832338187636740", "3y54libozsy"),
+            ("20", "6dq1a2xwd93"),
+            ("1854190823112450048", "4ht41hzjdqv"),
+            ("463440424141459456", "14fxvks611f"),
+        ] {
+            assert_eq!(token(id), expected, "id {id}");
+        }
+    }
+
     #[test]
     fn status_id_accepts_known_forms() {
         let id = "1234567890123456789";
