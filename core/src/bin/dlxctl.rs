@@ -2,15 +2,19 @@
 #[path = "shared/cli.rs"]
 mod cli;
 
+#[path = "dlxctl/doctor.rs"]
+mod doctor;
 #[path = "dlxctl/modules.rs"]
 mod modules;
+#[path = "shared/schema.rs"]
+mod schema;
 #[path = "dlxctl/settings.rs"]
 mod settings;
 
 use modules::{ModuleCommand, modules_command};
 use settings::{APPLIES, APPLIES_SAVED, read_settings, save_settings, saved};
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use cli::{CliError, ConflictArg, envelope_err, envelope_ok, parse_header, print_json};
 use dlcore::{
     Checksum, Manager, Settings,
@@ -29,6 +33,7 @@ use std::time::{Duration, Instant};
 #[command(
     name = "dlxctl",
     version,
+    disable_help_subcommand = true,
     about = "Downloader remote control, crawl and local settings tools"
 )]
 struct Args {
@@ -154,6 +159,19 @@ enum Command {
         command: ModuleCommand,
     },
     GenerateToken,
+    /// Check the state directory, settings, token, remote endpoint, modules and binaries.
+    Doctor {
+        /// Also test reachability of the supported download sites.
+        #[arg(long)]
+        online: bool,
+    },
+    /// Print the machine-readable description of every command (same as "help --json").
+    Schema,
+    /// Print this message or the help of the given subcommand(s)
+    Help {
+        #[arg(value_name = "COMMAND")]
+        command: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -400,6 +418,31 @@ fn run(args: Args) -> Result<(), CliError> {
         .or_else(|| std::env::var("DOWNLOADER_REMOTE_TOKEN").ok());
     let endpoint_text = args.endpoint;
     match args.command {
+        Command::Doctor { online } => {
+            doctor::doctor(&dir, json, token.as_deref(), &endpoint_text, online)?
+        }
+        Command::Schema => print_envelope(
+            schema::dlxctl_schema(Args::command(), &[]).map_err(|e| CliError::new("invalid", e))?,
+        ),
+        Command::Help { command } => {
+            if json {
+                print_envelope(
+                    schema::dlxctl_schema(Args::command(), &command)
+                        .map_err(|e| CliError::new("invalid", e))?,
+                );
+            } else {
+                // Same program name clap shows for --help (argv[0]'s file name).
+                let bin = std::env::args_os()
+                    .next()
+                    .map(PathBuf::from)
+                    .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                    .unwrap_or_else(|| "dlxctl".into());
+                let root = schema::built(Args::command().bin_name(bin));
+                let target =
+                    schema::find(&root, &command).map_err(|e| CliError::new("invalid", e))?;
+                print!("{}", target.clone().render_help());
+            }
+        }
         Command::GenerateToken => {
             let token = remote::generate_token()?;
             output(json, &token, json!({"token": token}));

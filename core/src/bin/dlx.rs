@@ -1,8 +1,10 @@
 //! dlx - headless multi-connection downloader.
 #[path = "shared/cli.rs"]
 mod cli;
+#[path = "shared/schema.rs"]
+mod schema;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use cli::{CliError, ConflictArg, parse_header, print_json};
 use dlcore::modules::{HookEvent, ModuleSettings, Registry};
 use dlcore::task::DownloadKind;
@@ -22,7 +24,7 @@ use tokio_util::sync::CancellationToken;
 )]
 struct Args {
     /// URL(s), local .torrent/.metalink/.meta4 descriptor(s)
-    #[arg(required_unless_present = "tools")]
+    #[arg(required_unless_present_any = ["tools", "schema"])]
     urls: Vec<String>,
     /// Extract direct webpage media or HLS using the built-in Rust engine
     #[arg(long)]
@@ -30,6 +32,9 @@ struct Args {
     /// Show built-in Rust protocol engines
     #[arg(long)]
     tools: bool,
+    /// Print the machine-readable description of this command (flags, exit codes, events) as JSON
+    #[arg(long)]
+    schema: bool,
     /// NDJSON events on stdout (start, progress, done, error, summary); human text stays on stderr
     #[arg(long)]
     json: bool,
@@ -156,6 +161,10 @@ fn load_modules(json: bool, quiet: bool, dir: &Path) -> Arc<Registry> {
 async fn main() {
     let a = Args::parse();
     let json = a.json;
+    if a.schema {
+        print_json(&schema::dlx_schema(Args::command()));
+        return;
+    }
     if a.tools {
         let tools = dlcore::protocols::capabilities();
         if json {

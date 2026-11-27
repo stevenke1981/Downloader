@@ -74,7 +74,7 @@ dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha
 按 Ctrl+C 中斷後，再執行同一個指令就會續傳。
 
 ### 給 AI 代理與腳本
-`dlx --json` 與 `dlxctl --json` 輸出機器可讀的結果，退出碼 0–7 與 130 有固定意義。開發與腳本指引請見 [AGENTS.md](AGENTS.md)、[命令列參考](docs/cli.md) 與 [模組](docs/modules.md)。
+`dlx --json` 與 `dlxctl --json` 輸出機器可讀的結果，退出碼 0–7 與 130 有固定意義。`dlxctl help --json`、`dlx --schema` 與 `dlxctl doctor --json` 可讓代理自行探索與診斷。開發與腳本指引請見 [AGENTS.md](AGENTS.md)、[命令列參考](docs/cli.md) 與 [模組](docs/modules.md)。
 
 ### Google Drive
 公開的單一檔案分享連結可直接加入 Downloader，會解析下載確認頁並使用伺服器回傳的檔名。需要登入的檔案請先在瀏覽器登入，再從 Drive 按「下載」；擴充功能會保留已解析的檔案網址與該網址的 Cookie。Google 登入頁不會被當成檔案儲存。
@@ -149,7 +149,7 @@ FTP/listing, Metalink, BitTorrent/magnet, HLS, RTSP H.264/G.711 and MMS-over-HTT
 Preview displays images/text inside Downloader and metadata for other supported media/documents; audio/video playback and PDF/EPUB rendering are not implemented. Open folder and explicitly configured scheduled programs remain OS integration features. The system tray icon remains Windows-only.
 
 ### For AI agents and scripts / 給 AI 代理與腳本
-`dlx --json` and `dlxctl --json` print machine-readable results, and exit codes 0–7 and 130 have fixed meanings. See [AGENTS.md](AGENTS.md), the [CLI reference](docs/cli.md) and [modules](docs/modules.md).
+`dlx --json` and `dlxctl --json` print machine-readable results, and exit codes 0–7 and 130 have fixed meanings. Agents can discover the tools with `dlxctl help --json` and `dlx --schema`, and diagnose with `dlxctl doctor --json`. See [AGENTS.md](AGENTS.md), the [CLI reference](docs/cli.md) and [modules](docs/modules.md).
 
 ### License
 MIT. This is an independent project; it is not affiliated with Free Download Manager, and all icons are original.
