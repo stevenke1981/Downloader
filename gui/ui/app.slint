@@ -607,7 +607,7 @@ export component AppWindow inherits Window {
             Button { text: @tr("Paste links"); enabled: !root.add-busy; clicked => { root.paste-links(); } }
             Button { text: @tr("Import torrent / Metalink…"); enabled: !root.add-busy; clicked => { root.import-files(); } }
         }
-        Field { label: @tr("Download mode"); ComboBox { model: [@tr("Automatic"), @tr("Webpage media (Rust)")]; current-index <=> root.add-kind; horizontal-stretch: 1; } }
+        Field { label: @tr("Download mode"); ComboBox { model: [@tr("Automatic"), @tr("Webpage media (Rust)"), @tr("Audio as MP3 (YouTube)")]; current-index <=> root.add-kind; horizontal-stretch: 1; } }
         Field {
             label: @tr("Save to");
             LineEdit { text <=> root.add-folder; placeholder-text: @tr("Default folder for the file type"); horizontal-stretch: 1; }

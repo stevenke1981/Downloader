@@ -96,6 +96,9 @@ msgstr "圧縮ファイル"
 msgid "Arguments (one per line)"
 msgstr "引数（1 行に 1 つ）"
 
+msgid "Audio as MP3 (YouTube)"
+msgstr "MP3 として音声（YouTube）"
+
 msgid "Automatic"
 msgstr "自動"
 

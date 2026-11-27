@@ -4,6 +4,7 @@ mod ftp;
 mod media;
 mod metalink;
 pub mod registry;
+pub(crate) mod sites;
 mod torrent;
 use crate::engine::{Ctx, Outcome};
 use crate::task::{ConflictPolicy, DownloadKind, Seg, Status, Task, Verification, VerifyState};
@@ -26,6 +27,9 @@ pub fn capabilities() -> Vec<Capability> {
         "Rust HLS / webpage media",
         "Rust RTSP H.264 / G.711",
         "Rust MMS-over-HTTP",
+        "Rust YouTube video (H.264 + AAC, in-process MP4 mux)",
+        "Rust YouTube audio to MP3",
+        "Rust X (Twitter) post video",
     ]
     .into_iter()
     .map(|name| Capability {
@@ -85,7 +89,7 @@ pub(crate) async fn run(task: Arc<Mutex<Task>>, ctx: Ctx) -> Result<Outcome, Str
     util::validate_source(&snapshot.url)?;
     let protocol =
         registry::find(&snapshot.url, snapshot.kind).ok_or("unsupported native protocol")?;
-    if snapshot.kind == DownloadKind::Video
+    if matches!(snapshot.kind, DownloadKind::Video | DownloadKind::Audio)
         && !reqwest::Url::parse(&snapshot.url).is_ok_and(|u| matches!(u.scheme(), "http" | "https"))
     {
         return Err("website video mode requires an HTTP(S) page URL".into());

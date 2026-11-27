@@ -1,10 +1,13 @@
 //! Native HLS/direct media, RTSP H.264 Annex B or G.711 WAV, and MS-WMSP-over-HTTP.
 //! Interrupted streams restart. Complete files enter payload; partial/control
-//! files stay in state. No subprocess, C media engine, or JS runtime is used.
+//! files stay in state. No subprocess or JS runtime is used; MP3 conversion of AAC audio is done in-process by pure-Rust crates.
 mod hls;
 mod mmsh;
+mod mp3;
+mod mp4mux;
 mod parse;
 mod rtsp;
+mod site;
 
 use crate::engine::{Ctx, Outcome};
 use crate::task::{Seg, Task};
@@ -53,6 +56,10 @@ struct Transfer {
     state: PathBuf,
     payload: PathBuf,
     origin: Url,
+    /// User agent a site resolver requires on its media requests (googlevideo).
+    user_agent: Mutex<Option<String>>,
+    /// Payload file stem (a site's title); `media` when unset.
+    stem: std::sync::OnceLock<String>,
 }
 
 impl Transfer {
@@ -88,6 +95,9 @@ impl Transfer {
                     request = request.header(reqwest::header::AUTHORIZATION, auth);
                 }
             }
+            if let Some(agent) = self.user_agent.lock().unwrap().clone() {
+                request = request.header(reqwest::header::USER_AGENT, agent);
+            }
             if let Some(referer) = &self.snapshot.referer {
                 request = request.header(reqwest::header::REFERER, referer);
             }
@@ -105,7 +115,7 @@ impl Transfer {
             let response = request
                 .send()
                 .await
-                .map_err(|e| format!("media request failed: {e}"))?;
+                .map_err(|e| format!("media request failed: {}", net(e)))?;
             if response.status().is_redirection() {
                 let location = response
                     .headers()
@@ -155,7 +165,7 @@ impl Transfer {
         while let Some(chunk) = response
             .chunk()
             .await
-            .map_err(|e| format!("media body: {e}"))?
+            .map_err(|e| format!("media body: {}", net(e)))?
         {
             self.limit(chunk.len()).await;
             if bytes.len().saturating_add(chunk.len()) > limit {
@@ -179,9 +189,10 @@ impl Transfer {
         }
         // A synchronous atomic rename cannot continue as a detached filesystem
         // job after cancellation drops the async transfer future.
+        let stem = self.stem.get().map_or("media", String::as_str);
         std::fs::rename(
             self.state.join("media.part"),
-            self.payload.join(format!("media.{extension}")),
+            self.payload.join(format!("{stem}.{extension}")),
         )
         .map_err(|e| format!("cannot complete staged media: {e}"))?;
         let mut task = self.task.lock().unwrap();
@@ -211,7 +222,7 @@ impl Transfer {
             let total = response.content_length();
             let mut prefix = Vec::new();
             while prefix.len() < 512 {
-                let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? else {
+                let Some(chunk) = response.chunk().await.map_err(net)? else {
                     break;
                 };
                 self.limit(chunk.len()).await;
@@ -230,7 +241,7 @@ impl Transfer {
                 if total.is_some_and(|n| n > DOCUMENT_LIMIT as u64) {
                     return Err("media document exceeds 4 MiB".into());
                 }
-                while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+                while let Some(chunk) = response.chunk().await.map_err(net)? {
                     self.limit(chunk.len()).await;
                     if prefix.len().saturating_add(chunk.len()) > DOCUMENT_LIMIT {
                         return Err("media document exceeds 4 MiB".into());
@@ -268,7 +279,7 @@ impl Transfer {
             while let Some(chunk) = response
                 .chunk()
                 .await
-                .map_err(|e| format!("media body: {e}"))?
+                .map_err(|e| format!("media body: {}", net(e)))?
             {
                 self.limit(chunk.len()).await;
                 file.write_all(&chunk).await.map_err(|e| e.to_string())?;
@@ -288,6 +299,16 @@ pub(crate) async fn download(
     task: Arc<Mutex<Task>>,
     ctx: Ctx,
     stage: &Path,
+) -> Result<Outcome, String> {
+    download_with(task, ctx, stage, &site::Sites::default()).await
+}
+
+/// [`download`] with explicit site endpoints (tests point them at a local server).
+async fn download_with(
+    task: Arc<Mutex<Task>>,
+    ctx: Ctx,
+    stage: &Path,
+    sites: &site::Sites,
 ) -> Result<Outcome, String> {
     let snapshot = task.lock().unwrap().clone();
     let mut url = Url::parse(&snapshot.url).map_err(|_| "invalid media URL")?;
@@ -318,6 +339,8 @@ pub(crate) async fn download(
         state: stage.join("state"),
         payload: stage.join("payload"),
         origin: url.clone(),
+        user_agent: Default::default(),
+        stem: Default::default(),
     };
     {
         let mut task = task.lock().unwrap();
@@ -337,7 +360,7 @@ pub(crate) async fn download(
             transfer.mmsh(url).await?;
         } else if url.scheme() == "rtsp" {
             transfer.rtsp(url).await?;
-        } else {
+        } else if !transfer.site(&url, sites).await? {
             transfer.http(url).await?;
         }
         Ok(Outcome::Completed)
@@ -348,6 +371,12 @@ pub(crate) async fn download(
         _ = ctx.cancel.cancelled() => { task.lock().unwrap().append_log("Native media stopped; next capture restarts safely"); Ok(Outcome::Cancelled) }
         result = future => result,
     }
+}
+
+/// Request errors never carry the URL: signed media URLs (sig, ip, expire) stay out
+/// of task errors, state and JSON output.
+fn net(error: reqwest::Error) -> String {
+    crate::protocols::sites::request_error(error)
 }
 
 fn media_extension(bytes: &[u8]) -> Option<&'static str> {

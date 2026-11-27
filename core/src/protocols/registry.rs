@@ -38,6 +38,13 @@ fn scheme(source: &str) -> Option<String> {
         .map(|u| u.scheme().to_string())
 }
 
+/// A single YouTube video or X post URL, which the built-in site resolvers take.
+fn site_item(source: &str) -> bool {
+    use super::sites::{x, youtube};
+    reqwest::Url::parse(source)
+        .is_ok_and(|u| youtube::video_id(&u).is_some() || x::status_id(&u).is_some())
+}
+
 /// Lowercase extension of a local descriptor or an HTTP(S) URL path.
 fn extension(source: &str) -> Option<String> {
     let ext = |p: &Path| Some(p.extension()?.to_str()?.to_ascii_lowercase());
@@ -64,7 +71,8 @@ impl ProtocolModule for Media {
         "HLS / RTSP / MMS / web media"
     }
     fn matches(&self, source: &str, kind: DownloadKind) -> bool {
-        kind == DownloadKind::Video
+        matches!(kind, DownloadKind::Video | DownloadKind::Audio)
+            || site_item(source)
             || scheme(source)
                 .is_some_and(|s| matches!(s.as_str(), "rtsp" | "mms" | "mmsh" | "mmst"))
             || extension(source).as_deref() == Some("m3u8")
@@ -224,6 +232,35 @@ mod tests {
                     legacy(source, kind).is_some()
                 );
             }
+        }
+    }
+
+    #[test]
+    fn site_items_route_to_media() {
+        let media = |source: &str, kind| find(source, kind).map(|m| m.id());
+        for source in [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://youtu.be/dQw4w9WgXcQ",
+            "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+            "https://x.com/someone/status/1234567890123456789",
+            "https://twitter.com/i/status/1234567890123456789/video/1",
+        ] {
+            assert_eq!(media(source, DownloadKind::Auto), Some("media"), "{source}");
+            assert!(crate::protocols::handles(source, DownloadKind::Auto));
+        }
+        for source in [
+            "https://www.youtube.com/@channel",
+            "https://www.youtube.com/channel/UC1234567890",
+            "https://www.youtube.com/playlist?list=PL123",
+            "https://x.com/someone",
+            "https://x.com/someone/media",
+            "https://example.com/watch?v=dQw4w9WgXcQ",
+        ] {
+            assert_eq!(media(source, DownloadKind::Auto), None, "{source}");
+        }
+        for source in ["https://youtu.be/dQw4w9WgXcQ", "https://example.com/page"] {
+            assert_eq!(media(source, DownloadKind::Audio), Some("media"));
+            assert_eq!(media(source, DownloadKind::Video), Some("media"));
         }
     }
 

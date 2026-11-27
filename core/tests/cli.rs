@@ -184,6 +184,47 @@ async fn dlx_usage_errors_exit_2_and_report_json() {
 }
 
 #[tokio::test]
+async fn audio_flag_conflicts_with_video() {
+    let state = tempfile::tempdir().unwrap();
+    let both = finish(dlx(
+        state.path(),
+        &["--json", "--audio", "--video", "https://example.com/a"],
+    ))
+    .await;
+    assert_eq!(both.code, 2);
+    let ctl = finish(dlxctl(
+        state.path(),
+        &["add", "--audio", "--video", "https://example.com/a"],
+    ))
+    .await;
+    assert_eq!(ctl.code, 2);
+    // A non-YouTube link fails as a usage error before any request (port 9 would be
+    // a network error, exit 3).
+    let out = state.path().join("out");
+    let other = finish(dlx(
+        state.path(),
+        &[
+            "--audio",
+            "-o",
+            out.to_str().unwrap(),
+            "http://127.0.0.1:9/x",
+        ],
+    ))
+    .await;
+    assert_eq!(other.code, 2, "{}", other.stderr);
+    assert!(
+        other
+            .stderr
+            .contains("audio download supports YouTube links only")
+    );
+    // --audio alone parses: help lists it on both binaries.
+    let help = finish(dlx(state.path(), &["--help"])).await;
+    assert!(help.stdout.contains("--audio"));
+    let help = finish(dlxctl(state.path(), &["add", "--help"])).await;
+    assert!(help.stdout.contains("--audio"));
+}
+
+#[tokio::test]
 async fn dlx_tools_json_is_one_document() {
     let state = tempfile::tempdir().unwrap();
     let run = finish(dlx(state.path(), &["--tools", "--json"])).await;

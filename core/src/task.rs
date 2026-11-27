@@ -8,6 +8,8 @@ pub enum DownloadKind {
     #[default]
     Auto,
     Video,
+    /// Download the audio track of a supported site (YouTube) and convert it to MP3.
+    Audio,
 }
 
 /// What to do when the target file already exists.

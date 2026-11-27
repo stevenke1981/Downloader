@@ -2,15 +2,19 @@
 #[path = "shared/cli.rs"]
 mod cli;
 
+#[path = "dlxctl/doctor.rs"]
+mod doctor;
 #[path = "dlxctl/modules.rs"]
 mod modules;
+#[path = "shared/schema.rs"]
+mod schema;
 #[path = "dlxctl/settings.rs"]
 mod settings;
 
 use modules::{ModuleCommand, modules_command};
 use settings::{APPLIES, APPLIES_SAVED, read_settings, save_settings, saved};
 
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use cli::{CliError, ConflictArg, envelope_err, envelope_ok, parse_header, print_json};
 use dlcore::{
     Checksum, Manager, Settings,
@@ -70,6 +74,9 @@ enum Command {
         paused: bool,
         #[arg(long)]
         video: bool,
+        /// Download the audio of a supported site (YouTube) as MP3.
+        #[arg(long, conflicts_with = "video")]
+        audio: bool,
         /// Refuse (exit 6) when this URL is already queued or active.
         #[arg(long)]
         unique: bool,
@@ -154,6 +161,14 @@ enum Command {
         command: ModuleCommand,
     },
     GenerateToken,
+    /// Check the state directory, settings, token, remote endpoint, modules and binaries.
+    Doctor {
+        /// Also test reachability of the supported download sites.
+        #[arg(long)]
+        online: bool,
+    },
+    /// Print the machine-readable description of every command (same as "help --json").
+    Schema,
 }
 
 #[derive(Subcommand)]
@@ -198,7 +213,43 @@ enum AutomationCommand {
     },
 }
 
+/// The command words of `help [COMMAND...] --json`, which has no clap form; clap's own
+/// `help` subcommands (top level and nested) handle everything else unchanged.
+fn help_json(argv: &[String]) -> Option<Vec<String>> {
+    let (mut words, mut json, mut help) = (Vec::new(), false, false);
+    let mut rest = argv.iter().skip(1);
+    while let Some(arg) = rest.next() {
+        match arg.as_str() {
+            "--json" => json = true,
+            "--endpoint" | "--token" | "--data-dir" if !help => {
+                rest.next();
+            }
+            a if !help
+                && ["--endpoint=", "--token=", "--data-dir="]
+                    .iter()
+                    .any(|p| a.starts_with(p)) => {}
+            a if a.starts_with('-') => return None,
+            "help" if !help => help = true,
+            a if help => words.push(a.to_string()),
+            _ => return None,
+        }
+    }
+    (help && json).then_some(words)
+}
+
 fn main() {
+    let argv: Vec<String> = std::env::args().collect();
+    if let Some(words) = help_json(&argv) {
+        match schema::dlxctl_schema(Args::command(), &words) {
+            Ok(data) => print_envelope(data),
+            Err(e) => {
+                let error = CliError::new("invalid", e);
+                print_json(&envelope_err(&error));
+                std::process::exit(error.exit_code());
+            }
+        }
+        return;
+    }
     let args = Args::parse();
     let json = args.json;
     if let Err(error) = run(args) {
@@ -400,6 +451,12 @@ fn run(args: Args) -> Result<(), CliError> {
         .or_else(|| std::env::var("DOWNLOADER_REMOTE_TOKEN").ok());
     let endpoint_text = args.endpoint;
     match args.command {
+        Command::Doctor { online } => {
+            doctor::doctor(&dir, json, token.as_deref(), &endpoint_text, online)?
+        }
+        Command::Schema => print_envelope(
+            schema::dlxctl_schema(Args::command(), &[]).map_err(|e| CliError::new("invalid", e))?,
+        ),
         Command::GenerateToken => {
             let token = remote::generate_token()?;
             output(json, &token, json!({"token": token}));
@@ -626,6 +683,7 @@ fn run(args: Args) -> Result<(), CliError> {
                     dir,
                     paused,
                     video,
+                    audio,
                     unique,
                     priority,
                     checksum,
@@ -637,7 +695,13 @@ fn run(args: Args) -> Result<(), CliError> {
                         "url": url,
                         "dir": dir,
                         "start": !paused,
-                        "kind": if video { "Video" } else { "Auto" },
+                        "kind": if audio {
+                            "Audio"
+                        } else if video {
+                            "Video"
+                        } else {
+                            "Auto"
+                        },
                     });
                     if unique {
                         body["unique"] = json!(true);

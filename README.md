@@ -74,7 +74,7 @@ dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha
 按 Ctrl+C 中斷後，再執行同一個指令就會續傳。
 
 ### 給 AI 代理與腳本
-`dlx --json` 與 `dlxctl --json` 輸出機器可讀的結果，退出碼 0–7 與 130 有固定意義。開發與腳本指引請見 [AGENTS.md](AGENTS.md)、[命令列參考](docs/cli.md) 與 [模組](docs/modules.md)。
+`dlx --json` 與 `dlxctl --json` 輸出機器可讀的結果，退出碼 0–7 與 130 有固定意義。`dlxctl help --json`、`dlx --schema` 與 `dlxctl doctor --json` 可讓代理自行探索與診斷。開發與腳本指引請見 [AGENTS.md](AGENTS.md)、[命令列參考](docs/cli.md) 與 [模組](docs/modules.md)。
 
 ### Google Drive
 公開的單一檔案分享連結可直接加入 Downloader，會解析下載確認頁並使用伺服器回傳的檔名。需要登入的檔案請先在瀏覽器登入，再從 Drive 按「下載」；擴充功能會保留已解析的檔案網址與該網址的 Cookie。Google 登入頁不會被當成檔案儲存。
@@ -82,6 +82,8 @@ dlx https://example.com/file.iso -o ~/Downloads -c 16 --limit 5M --checksum <sha
 資料夾連結請在瀏覽器開啟後選取檔案下載；Downloader 不會遞迴列出資料夾。瀏覽器自行產生的 `blob:` ZIP 由瀏覽器下載。更新本機擴充功能檔案後，請在瀏覽器的擴充功能頁按「重新載入」。
 
 ### 內建 Rust 通訊協定
+**YouTube 與 X（0.9.0）**：單一 YouTube 影片連結會下載 H.264（最高 1080p）與 AAC 並在程式內合併成 MP4（YouTube 限制 HD 串流時改用 360p 合併串流）；`dlx --audio` 或下載模式「音訊轉 MP3（YouTube）」會轉成 MP3。X（Twitter）貼文的影片直接下載 MP4。檔名取自影片標題。頻道、播放清單與個人頁不支援。
+
 FTP／目錄瀏覽、Metalink、BitTorrent／磁力連結、HLS、RTSP H.264／G.711 與 MMS-over-HTTP 均在程式內執行，不需要安裝 aria2、FFmpeg、yt-dlp 或 curl。`dlx --tools` 與工具視窗列出內建引擎。
 
 `.m3u8` 可直接加入；一般網頁請選擇「網頁影音（Rust）」或使用 `dlx --video`。擷取支援網頁直接提供的媒體與 HLS，不解密 DRM 或執行網站的簽章 JavaScript。RTSP 輸出 H.264 Annex B 或獨立 G.711 音軌的 PCM16 WAV，不進行音訊／影片混流；MMS 支援 HTTP transport，未實作舊 MMST transport。詳細支援範圍、續傳與測試請見 [原生引擎說明](docs/fdm-tools.zh-TW.md) 與 [功能對照](docs/fdm-feature-matrix.zh-TW.md)。
@@ -144,12 +146,14 @@ Public single-file share links resolve their download confirmation page and use 
 Open folder links in the browser and select files to download; recursive folder listing is not supported. Browser-generated `blob:` ZIPs stay with the browser. Reload the extension in the browser after updating its local files.
 
 ### Built-in Rust protocols
+**YouTube and X (0.9.0)**: a single YouTube video link downloads H.264 (up to 1080p) and AAC and muxes them in process into an MP4 (360p muxed stream when YouTube limits HD streams); `dlx --audio` or the "Audio as MP3 (YouTube)" download mode converts the audio to MP3 in process. X (Twitter) post videos download as MP4. Files are named after the title. Channels, playlists and profiles are not supported. Examples in [docs/cli.md](docs/cli.md#youtube-and-x).
+
 FTP/listing, Metalink, BitTorrent/magnet, HLS, RTSP H.264/G.711 and MMS-over-HTTP run in process using Rust libraries. No aria2, FFmpeg, yt-dlp or curl installation is required. `dlx --tools` lists embedded engines. Add `.m3u8` directly; use `--video` for direct media/HLS exposed by a webpage. DRM and JavaScript signature deciphering are unsupported. RTSP writes H.264 Annex B or audio-only G.711 decoded to PCM16 WAV, without audio/video remuxing; legacy MMST is unsupported. See the [engine guide](docs/fdm-tools.zh-TW.md) for protocol limits.
 
 Preview displays images/text inside Downloader and metadata for other supported media/documents; audio/video playback and PDF/EPUB rendering are not implemented. Open folder and explicitly configured scheduled programs remain OS integration features. The system tray icon remains Windows-only.
 
 ### For AI agents and scripts / 給 AI 代理與腳本
-`dlx --json` and `dlxctl --json` print machine-readable results, and exit codes 0–7 and 130 have fixed meanings. See [AGENTS.md](AGENTS.md), the [CLI reference](docs/cli.md) and [modules](docs/modules.md).
+`dlx --json` and `dlxctl --json` print machine-readable results, and exit codes 0–7 and 130 have fixed meanings. Agents can discover the tools with `dlxctl help --json` and `dlx --schema`, and diagnose with `dlxctl doctor --json`. See [AGENTS.md](AGENTS.md), the [CLI reference](docs/cli.md) and [modules](docs/modules.md).
 
 ### License
 MIT. This is an independent project; it is not affiliated with Free Download Manager, and all icons are original.

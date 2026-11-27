@@ -202,6 +202,7 @@ T = {
     "Download mode": ["下載模式", "下载模式", "ダウンロードモード", "다운로드 모드", "Modo de descarga", "Download-Modus", "Mode de téléchargement"],
     "Automatic": ["自動", "自动", "自動", "자동", "Automático", "Automatisch", "Automatique"],
     "Webpage media (Rust)": ["網頁影音（Rust）", "网页影音（Rust）", "Web ページのメディア（Rust）", "웹페이지 미디어(Rust)", "Multimedia web (Rust)", "Webseiten-Medien (Rust)", "Médias de page Web (Rust)"],
+    "Audio as MP3 (YouTube)": ["音訊轉 MP3（YouTube）", "音频转 MP3（YouTube）", "MP3 として音声（YouTube）", "MP3 오디오(YouTube)", "Audio como MP3 (YouTube)", "Audio als MP3 (YouTube)", "Audio en MP3 (YouTube)"],
     "Connections (0 = automatic / site default)": ["連線數（0 = 自動／網站預設）", "连接数（0 = 自动／站点默认）", "接続数（0 = 自動／サイトの既定値）", "연결 수(0 = 자동 / 사이트 기본값)", "Conexiones (0 = automático / predeterminado del sitio)", "Verbindungen (0 = automatisch / Standard der Website)", "Connexions (0 = automatique / valeur du site)"],
     "Working…": ["處理中…", "处理中…", "処理中…", "작업 중…", "Procesando…", "Wird verarbeitet…", "Traitement…"],
     "Drop torrent / Metalink files here to add downloads.": ["將 torrent／Metalink 檔案拖放到此處即可新增下載。", "将 torrent／Metalink 文件拖放到此处即可添加下载。", "torrent／Metalink ファイルをここにドロップするとダウンロードを追加します。", "torrent / Metalink 파일을 여기에 놓으면 다운로드가 추가됩니다.", "Arrastra aquí archivos torrent / Metalink para añadir descargas.", "Torrent- oder Metalink-Dateien hierher ziehen, um Downloads hinzuzufügen.", "Déposez ici des fichiers torrent / Metalink pour ajouter des téléchargements."],
